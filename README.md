@@ -75,12 +75,20 @@ Each clip's audio is analyzed once, when it's saved, and kept. The timeline and 
 
 Transcribing each clip at its natural speed also recognizes speech better: whole-draft transcription missed slowed-down speech and gave up after muted gaps.
 
+### Cover selector (thumbnail)
+A screen to choose the pulse's final thumbnail: the poster that's uploaded with the video and shown on the draft card.
+
+- **A frame from the video:** scrub the whole merged video after the merge (part of the export screen, which is being reworked) and pick the frame. The picked time is saved and the cover is rendered at full size (1080×1920) with `thumbnail`.
+- **A picture from the device:** chosen with the platform's native photo picker (`expo-image-picker`, which Pulse already uses for imports).
+- **Default** when nothing is picked: the video's first frame.
+- **Much later:** a thumbnail-generation method (suggested covers) can plug into the same screen as a third source.
+
 ### What each piece needs
 
 | Piece | From |
 |---|---|
 | Playback across clips with edits, preview == export | `<PulsePreview>` (step 8) |
-| Thumbnails along each clip | `thumbnail` (step 7) |
+| Thumbnails along each clip, and the cover selector's frames | `thumbnail` (step 7) |
 | Waveform, captions, speech regions | `extractAudio` (done) + the per-clip audio job in Pulse |
 | Rendering the edits at export | `merge` (done) |
 
