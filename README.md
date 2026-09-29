@@ -17,7 +17,7 @@ Pulse is moving every native video method it uses from its react-native-video-tr
 | 1 | `probe` | `probeVideo`, `isValidFile` | ✅ Tested on device | ✅ Tested on device (Galaxy S24 Ultra, Android 16) |
 | 2 | `merge`: fast join (trims, mute), cancel | `merge` (no-re-encode path), `onMergeProgress` | ✅ Tested on device | ✅ Tested on device (join, trims, mute); cancel on emulator |
 | 3 | `merge`: edited clips (rotate, flip, crop, speed): selective render | `merge` with `clipEdits` | ✅ Tested on device (iPhone 17 Pro Max) | ✅ Tested on device (one hardware encode) |
-| 4 | `merge`: full encode (clips off the recorder's format, lower bitrate) | the re-encode fallback | Checked on macOS with iPhone recordings; device test pending | ✅ Tested on emulator |
+| 4 | `merge`: full encode (clips off the recorder's format, lower bitrate) | the re-encode fallback | ✅ Tested on device | ✅ Tested on emulator |
 | 5 | `conform`: import normalization, including HDR | `compress`, `cancelCompress` | Planned | Planned |
 | 6 | `extractAudio` (feeds whisper.rn's `transcribeData` / `detectSpeechData`) | `extractAudio` | ✅ Tested on device | ✅ Tested on device |
 | 7 | `thumbnail` | `getFrameAt` | Planned | Planned |
@@ -155,6 +155,7 @@ Media3 can't mix copied and re-encoded clips in one export, and its copy mode is
   - fast join of recorded drafts, trims and a muted middle clip;
   - seed drafts of 2 and 8 minutes (0.66 s and 2.4–5.2 s);
   - cancel;
+  - full encode on an iPhone 17 Pro Max: Pulse's mixed seed draft (20 clips: HEVC, 60 fps, 4K, landscape, 5.1 audio) and wild-imports draft (12 clips: HDR, VFR, 120 fps, Opus, no audio) come out H.264 High 1080×1920 at a constant 30 fps, SDR, 4.2–4.9 Mbps, faststart, audio in sync; 120.00 s for 120.00 s of clips, and 95.67 s for 96.00 s (the odd-timing clips resampled to 30 fps);
   - on an iPhone 17 Pro Max: a 3-clip join in 90 ms; trim + 2× in 0.4 s and rotate + flip + crop + 0.5× + mute in 2.2–2.5 s, only the edited clips rendered; lengths within a frame of the edits.
 - **Audio sync, every iOS path** (join, trim, muted clip, selective, selective with a muted clip, full encode), run on macOS with real iPhone recordings: the output's audio matches the original recording within 0.1 ms read by AVFoundation and by FFmpeg. Confirmed on an iPhone export.
 - **iOS, on macOS with the same code**, using a clip tagged like an iPhone recording:
