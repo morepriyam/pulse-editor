@@ -12,9 +12,22 @@
 // Forward declaration of `HybridPulseEditorSpec_cxx` to properly resolve imports.
 namespace PulseEditor { class HybridPulseEditorSpec_cxx; }
 
+// Forward declaration of `ProbeResult` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ProbeResult; }
+// Forward declaration of `ProbeVideo` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ProbeVideo; }
+// Forward declaration of `Transfer` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { enum class Transfer; }
+// Forward declaration of `ProbeAudio` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
 
-
+#include "ProbeResult.hpp"
+#include <NitroModules/Promise.hpp>
+#include "ProbeVideo.hpp"
+#include <optional>
 #include <string>
+#include "Transfer.hpp"
+#include "ProbeAudio.hpp"
 
 #include "PulseEditor-Swift-Cxx-Umbrella.hpp"
 
@@ -66,8 +79,8 @@ namespace margelo::nitro::pulseeditor {
 
   public:
     // Methods
-    inline std::string hello() override {
-      auto __result = _swiftPart.hello();
+    inline std::shared_ptr<Promise<ProbeResult>> probe(const std::string& uri) override {
+      auto __result = _swiftPart.probe(uri);
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

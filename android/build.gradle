@@ -120,9 +120,11 @@ dependencies {
   implementation project(":react-native-nitro-modules")
 
   // Platform media stack only: Media3 Transformer (hardware MediaCodec encode/decode, edits,
-  // composition export) + Effect (crop / rotate / speed). No FFmpeg.
+  // composition export), Effect (crop / rotate / speed) and Inspector (metadata for probe).
+  // No FFmpeg.
   def media3Version = getExtOrDefault("media3Version")
   implementation "androidx.media3:media3-transformer:$media3Version"
   implementation "androidx.media3:media3-effect:$media3Version"
   implementation "androidx.media3:media3-common:$media3Version"
+  implementation "androidx.media3:media3-inspector:$media3Version"
 }

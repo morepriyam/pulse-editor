@@ -13,8 +13,11 @@
 #error NitroModules cannot be found! Are you sure you installed NitroModules properly?
 #endif
 
+// Forward declaration of `ProbeResult` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ProbeResult; }
 
-
+#include "ProbeResult.hpp"
+#include <NitroModules/Promise.hpp>
 #include <string>
 
 namespace margelo::nitro::pulseeditor {
@@ -48,7 +51,7 @@ namespace margelo::nitro::pulseeditor {
 
     public:
       // Methods
-      virtual std::string hello() = 0;
+      virtual std::shared_ptr<Promise<ProbeResult>> probe(const std::string& uri) = 0;
 
     protected:
       // Hybrid Setup

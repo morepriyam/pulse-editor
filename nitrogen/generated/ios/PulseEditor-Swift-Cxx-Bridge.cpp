@@ -14,6 +14,22 @@
 
 namespace margelo::nitro::pulseeditor::bridge::swift {
 
+  // pragma MARK: std::function<void(const ProbeResult& /* result */)>
+  Func_void_ProbeResult create_Func_void_ProbeResult(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PulseEditor::Func_void_ProbeResult::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const ProbeResult& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const std::exception_ptr& /* error */)>
+  Func_void_std__exception_ptr create_Func_void_std__exception_ptr(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PulseEditor::Func_void_std__exception_ptr::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::exception_ptr& error) mutable -> void {
+      swiftClosure.call(error);
+    };
+  }
+  
   // pragma MARK: std::shared_ptr<HybridPulseEditorSpec>
   std::shared_ptr<HybridPulseEditorSpec> create_std__shared_ptr_HybridPulseEditorSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
     PulseEditor::HybridPulseEditorSpec_cxx swiftPart = PulseEditor::HybridPulseEditorSpec_cxx::fromUnsafe(swiftUnsafePointer);

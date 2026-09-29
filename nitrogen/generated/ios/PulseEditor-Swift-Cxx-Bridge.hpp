@@ -10,6 +10,14 @@
 // Forward declarations of C++ defined types
 // Forward declaration of `HybridPulseEditorSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridPulseEditorSpec; }
+// Forward declaration of `ProbeAudio` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
+// Forward declaration of `ProbeResult` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ProbeResult; }
+// Forward declaration of `ProbeVideo` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ProbeVideo; }
+// Forward declaration of `Transfer` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { enum class Transfer; }
 
 // Forward declarations of Swift defined types
 // Forward declaration of `HybridPulseEditorSpec_cxx` to properly resolve imports.
@@ -17,9 +25,17 @@ namespace PulseEditor { class HybridPulseEditorSpec_cxx; }
 
 // Include C++ defined types
 #include "HybridPulseEditorSpec.hpp"
+#include "ProbeAudio.hpp"
+#include "ProbeResult.hpp"
+#include "ProbeVideo.hpp"
+#include "Transfer.hpp"
+#include <NitroModules/Promise.hpp>
+#include <NitroModules/PromiseHolder.hpp>
 #include <NitroModules/Result.hpp>
 #include <exception>
+#include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 
 /**
@@ -28,6 +44,92 @@ namespace PulseEditor { class HybridPulseEditorSpec_cxx; }
  */
 namespace margelo::nitro::pulseeditor::bridge::swift {
 
+  // pragma MARK: std::optional<ProbeVideo>
+  /**
+   * Specialized version of `std::optional<ProbeVideo>`.
+   */
+  using std__optional_ProbeVideo_ = std::optional<ProbeVideo>;
+  inline std::optional<ProbeVideo> create_std__optional_ProbeVideo_(const ProbeVideo& value) noexcept {
+    return std::optional<ProbeVideo>(value);
+  }
+  inline bool has_value_std__optional_ProbeVideo_(const std::optional<ProbeVideo>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline ProbeVideo get_std__optional_ProbeVideo_(const std::optional<ProbeVideo>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::optional<ProbeAudio>
+  /**
+   * Specialized version of `std::optional<ProbeAudio>`.
+   */
+  using std__optional_ProbeAudio_ = std::optional<ProbeAudio>;
+  inline std::optional<ProbeAudio> create_std__optional_ProbeAudio_(const ProbeAudio& value) noexcept {
+    return std::optional<ProbeAudio>(value);
+  }
+  inline bool has_value_std__optional_ProbeAudio_(const std::optional<ProbeAudio>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline ProbeAudio get_std__optional_ProbeAudio_(const std::optional<ProbeAudio>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<ProbeResult>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<ProbeResult>>`.
+   */
+  using std__shared_ptr_Promise_ProbeResult__ = std::shared_ptr<Promise<ProbeResult>>;
+  inline std::shared_ptr<Promise<ProbeResult>> create_std__shared_ptr_Promise_ProbeResult__() noexcept {
+    return Promise<ProbeResult>::create();
+  }
+  inline PromiseHolder<ProbeResult> wrap_std__shared_ptr_Promise_ProbeResult__(std::shared_ptr<Promise<ProbeResult>> promise) noexcept {
+    return PromiseHolder<ProbeResult>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const ProbeResult& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const ProbeResult&)>`.
+   */
+  using Func_void_ProbeResult = std::function<void(const ProbeResult& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const ProbeResult& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_ProbeResult_Wrapper final {
+  public:
+    explicit Func_void_ProbeResult_Wrapper(std::function<void(const ProbeResult& /* result */)>&& func): _function(std::make_unique<std::function<void(const ProbeResult& /* result */)>>(std::move(func))) {}
+    inline void call(ProbeResult result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const ProbeResult& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_ProbeResult create_Func_void_ProbeResult(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_ProbeResult_Wrapper wrap_Func_void_ProbeResult(Func_void_ProbeResult value) noexcept {
+    return Func_void_ProbeResult_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::function<void(const std::exception_ptr& /* error */)>
+  /**
+   * Specialized version of `std::function<void(const std::exception_ptr&)>`.
+   */
+  using Func_void_std__exception_ptr = std::function<void(const std::exception_ptr& /* error */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::exception_ptr& / * error * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__exception_ptr_Wrapper final {
+  public:
+    explicit Func_void_std__exception_ptr_Wrapper(std::function<void(const std::exception_ptr& /* error */)>&& func): _function(std::make_unique<std::function<void(const std::exception_ptr& /* error */)>>(std::move(func))) {}
+    inline void call(std::exception_ptr error) const noexcept {
+      _function->operator()(error);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::exception_ptr& /* error */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__exception_ptr create_Func_void_std__exception_ptr(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__exception_ptr_Wrapper wrap_Func_void_std__exception_ptr(Func_void_std__exception_ptr value) noexcept {
+    return Func_void_std__exception_ptr_Wrapper(std::move(value));
+  }
+  
   // pragma MARK: std::shared_ptr<HybridPulseEditorSpec>
   /**
    * Specialized version of `std::shared_ptr<HybridPulseEditorSpec>`.
@@ -40,13 +142,13 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
   using std__weak_ptr_HybridPulseEditorSpec_ = std::weak_ptr<HybridPulseEditorSpec>;
   inline std__weak_ptr_HybridPulseEditorSpec_ weakify_std__shared_ptr_HybridPulseEditorSpec_(const std::shared_ptr<HybridPulseEditorSpec>& strong) noexcept { return strong; }
   
-  // pragma MARK: Result<std::string>
-  using Result_std__string_ = Result<std::string>;
-  inline Result_std__string_ create_Result_std__string_(const std::string& value) noexcept {
-    return Result<std::string>::withValue(value);
+  // pragma MARK: Result<std::shared_ptr<Promise<ProbeResult>>>
+  using Result_std__shared_ptr_Promise_ProbeResult___ = Result<std::shared_ptr<Promise<ProbeResult>>>;
+  inline Result_std__shared_ptr_Promise_ProbeResult___ create_Result_std__shared_ptr_Promise_ProbeResult___(const std::shared_ptr<Promise<ProbeResult>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<ProbeResult>>>::withValue(value);
   }
-  inline Result_std__string_ create_Result_std__string_(const std::exception_ptr& error) noexcept {
-    return Result<std::string>::withError(error);
+  inline Result_std__shared_ptr_Promise_ProbeResult___ create_Result_std__shared_ptr_Promise_ProbeResult___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<ProbeResult>>>::withError(error);
   }
 
 } // namespace margelo::nitro::pulseeditor::bridge::swift

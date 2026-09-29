@@ -1,11 +1,15 @@
 package com.margelo.nitro.pulseeditor
 
-import androidx.media3.common.MediaLibraryInfo
 import com.facebook.proguard.annotations.DoNotStrip
+import com.margelo.nitro.NitroModules
+import com.margelo.nitro.core.Promise
 
 @DoNotStrip
 class PulseEditor : HybridPulseEditorSpec() {
-  override fun hello(): String {
-    return "Hello from PulseEditor (Android, Media3 ${MediaLibraryInfo.VERSION})"
+  override fun probe(uri: String): Promise<ProbeResult> {
+    return Promise.parallel { Probe.read(context(), uri) }
   }
+
+  private fun context() =
+    NitroModules.applicationContext ?: throw IllegalStateException("React context not ready")
 }

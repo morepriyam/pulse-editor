@@ -13,7 +13,7 @@ public protocol HybridPulseEditorSpec_protocol: HybridObject {
   
 
   // Methods
-  func hello() throws -> String
+  func probe(uri: String) throws -> Promise<ProbeResult>
 }
 
 public extension HybridPulseEditorSpec_protocol {

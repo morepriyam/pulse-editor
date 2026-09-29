@@ -54,7 +54,7 @@ namespace margelo::nitro::pulseeditor {
 
   public:
     // Methods
-    std::string hello() override;
+    std::shared_ptr<Promise<ProbeResult>> probe(const std::string& uri) override;
 
   private:
     jni::global_ref<JHybridPulseEditorSpec::JavaPart> _javaPart;

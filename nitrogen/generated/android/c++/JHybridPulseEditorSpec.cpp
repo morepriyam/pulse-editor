@@ -7,9 +7,27 @@
 
 #include "JHybridPulseEditorSpec.hpp"
 
+// Forward declaration of `ProbeResult` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ProbeResult; }
+// Forward declaration of `ProbeVideo` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ProbeVideo; }
+// Forward declaration of `Transfer` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { enum class Transfer; }
+// Forward declaration of `ProbeAudio` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
 
-
+#include "ProbeResult.hpp"
+#include <NitroModules/Promise.hpp>
+#include <NitroModules/JPromise.hpp>
+#include "JProbeResult.hpp"
+#include "ProbeVideo.hpp"
+#include <optional>
+#include "JProbeVideo.hpp"
 #include <string>
+#include "Transfer.hpp"
+#include "JTransfer.hpp"
+#include "ProbeAudio.hpp"
+#include "JProbeAudio.hpp"
 
 namespace margelo::nitro::pulseeditor {
 
@@ -44,10 +62,21 @@ namespace margelo::nitro::pulseeditor {
   
 
   // Methods
-  std::string JHybridPulseEditorSpec::hello() {
-    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<jni::JString>()>("hello");
-    auto __result = method(_javaPart);
-    return __result->toStdString();
+  std::shared_ptr<Promise<ProbeResult>> JHybridPulseEditorSpec::probe(const std::string& uri) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* uri */)>("probe");
+    auto __result = method(_javaPart, jni::make_jstring(uri));
+    return [&]() {
+      auto __promise = Promise<ProbeResult>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JProbeResult>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
   }
 
 } // namespace margelo::nitro::pulseeditor

@@ -125,14 +125,21 @@ open class HybridPulseEditorSpec_cxx {
 
   // Methods
   @inline(__always)
-  public final func hello() -> bridge.Result_std__string_ {
+  public final func probe(uri: std.string) -> bridge.Result_std__shared_ptr_Promise_ProbeResult___ {
     do {
-      let __result = try self.__implementation.hello()
-      let __resultCpp = std.string(__result)
-      return bridge.create_Result_std__string_(__resultCpp)
+      let __result = try self.__implementation.probe(uri: String(uri))
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_ProbeResult__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_ProbeResult__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_ProbeResult__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_ProbeResult___(__resultCpp)
     } catch (let __error) {
       let __exceptionPtr = __error.toCpp()
-      return bridge.create_Result_std__string_(__exceptionPtr)
+      return bridge.create_Result_std__shared_ptr_Promise_ProbeResult___(__exceptionPtr)
     }
   }
 }

@@ -1,7 +1,17 @@
 import AVFoundation
+import CoreMedia
+import NitroModules
 
 class PulseEditor: HybridPulseEditorSpec {
-    public func hello() throws -> String {
-        return "Hello from PulseEditor (iOS, AVFoundation)"
+  public func probe(uri: String) throws -> Promise<ProbeResult> {
+    return Promise.async(.userInitiated) {
+      try await Probe.read(fileURL(uri))
     }
+  }
+}
+
+/// `file://` URI or bare path → file URL.
+func fileURL(_ uri: String) -> URL {
+  if let url = URL(string: uri), url.scheme != nil { return url }
+  return URL(fileURLWithPath: uri)
 }

@@ -10,12 +10,26 @@
 // Forward declarations of C++ defined types
 // Forward declaration of `HybridPulseEditorSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridPulseEditorSpec; }
+// Forward declaration of `ProbeAudio` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
+// Forward declaration of `ProbeResult` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ProbeResult; }
+// Forward declaration of `ProbeVideo` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ProbeVideo; }
+// Forward declaration of `Transfer` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { enum class Transfer; }
 
 // Include C++ defined types
 #include "HybridPulseEditorSpec.hpp"
+#include "ProbeAudio.hpp"
+#include "ProbeResult.hpp"
+#include "ProbeVideo.hpp"
+#include "Transfer.hpp"
+#include <NitroModules/Promise.hpp>
 #include <NitroModules/Result.hpp>
 #include <exception>
 #include <memory>
+#include <optional>
 #include <string>
 
 // C++ helpers for Swift
