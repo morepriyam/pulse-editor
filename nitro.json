@@ -1,0 +1,23 @@
+{
+  "cxxNamespace": ["pulseeditor"],
+  "ios": {
+    "iosModuleName": "PulseEditor"
+  },
+  "android": {
+    "androidNamespace": ["pulseeditor"],
+    "androidCxxLibName": "pulseeditor"
+  },
+  "autolinking": {
+    "PulseEditor": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "PulseEditor"
+      },
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "PulseEditor"
+      }
+    }
+  },
+  "ignorePaths": ["node_modules"]
+}
