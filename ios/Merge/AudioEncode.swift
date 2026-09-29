@@ -15,7 +15,10 @@ enum AudioEncode {
     readerOutput.alwaysCopiesSampleData = false
     reader.add(readerOutput)
 
-    let writer = try AVAssetWriter(outputURL: output, fileType: .m4a)
+    // MP4, not M4A: in an MP4 the encoder's priming (2112 samples) goes into the edit list, which
+    // the join's export carries over. From an M4A it's lost on export: Apple players still trim
+    // it, but FFmpeg-based ones (Chrome, servers) then play the audio 44 ms late.
+    let writer = try AVAssetWriter(outputURL: output, fileType: .mp4)
     let input = AVAssetWriterInput(mediaType: .audio, outputSettings: EncodeSettings.aac(audio))
     input.expectsMediaDataInRealTime = false
     writer.add(input)

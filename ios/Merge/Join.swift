@@ -63,7 +63,7 @@ enum Join {
       // asset alive, so hold it until the export is done.
       var encodedAsset: AVAsset?
       if let audioOut, audioGap || reencodeAudio {
-        let url = output.deletingPathExtension().appendingPathExtension("audio.m4a")
+        let url = output.deletingPathExtension().appendingPathExtension("audio.mp4")
         encodedAudio = url
         try await AudioEncode.run(composition, audio: options.audio, to: url) { progress($0 * 0.3) }
         encodedAsset = try await replaceAudio(of: composition, track: audioOut, with: url)
