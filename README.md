@@ -30,7 +30,7 @@ Pulse is moving every native video method it uses from its react-native-video-tr
 | 10 | File helpers to `expo-file-system` | `deleteFile`, `cleanFiles`, `saveToDocuments` | 📋 | 📋 | 
 | 11 | **Last commit:** remove the RNVT merge fallback, the fork and FFmpeg (package, Podfile, Gradle, submodule), then merge | the fork | 📋 | 📋 | 
 
-Pulse still falls back to RNVT if pulse-editor's `merge` throws. It never triggered in testing, and it comes out after the Android cancel run.
+Pulse still falls back to RNVT if pulse-editor's `merge` throws. It never triggered in testing; it's removed in the migration's last commit, with RNVT itself.
 
 RNVT's file helpers (`deleteFile`, `cleanFiles`, `saveToDocuments`) don't move here; Pulse uses `expo-file-system` for those.
 
