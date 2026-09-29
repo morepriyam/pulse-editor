@@ -11,7 +11,7 @@ class PulseEditor : HybridPulseEditorSpec() {
   }
 
   override fun createMerge(clips: Array<MergeClip>, options: MergeOptions): HybridMergeJobSpec =
-    MergeJob(clips, options)
+    com.margelo.nitro.pulseeditor.merge.MergeJob(clips, options)
 
   private fun context() =
     NitroModules.applicationContext ?: throw IllegalStateException("React context not ready")

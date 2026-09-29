@@ -41,6 +41,13 @@ apply from: '../nitrogen/generated/android/pulseeditor+autolinking.gradle'
 
 apply plugin: "com.facebook.react"
 
+// Nitro generates this module's bindings; React Native codegen has nothing to do here. Point it
+// at src/ so it never scans the module's own node_modules (which would generate React Native's
+// built-in view managers into this library and collide with the app's copies at dex merge).
+react {
+  jsRootDir = file("../src")
+}
+
 android {
   namespace "com.margelo.nitro.pulseeditor"
 

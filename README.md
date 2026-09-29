@@ -14,16 +14,16 @@ Pulse is moving every native video method it uses from its react-native-video-tr
 
 | Step | pulse-editor | Replaces (RNVT) | iOS | Android |
 |---|---|---|---|---|
-| 1 | `probe` | `probeVideo`, `isValidFile` | ✅ Tested on device | Built, not device-tested |
-| 2 | `merge`: fast join (trims, mute), cancel | `merge` (no-re-encode path), `onMergeProgress` | ✅ Tested on device | Next |
-| 3 | `merge`: edited clips (rotate, flip, crop, speed): selective render | `merge` with `clipEdits` | Built, checked on macOS; device test pending | Next (one full encode) |
-| 4 | `merge`: full encode (clips off the recorder's format, lower bitrate) | the re-encode fallback | Built, checked on macOS; device test pending | Next |
+| 1 | `probe` | `probeVideo`, `isValidFile` | ✅ Tested on device | ✅ Tested on emulator (Android 17) |
+| 2 | `merge`: fast join (trims, mute), cancel | `merge` (no-re-encode path), `onMergeProgress` | ✅ Tested on device | ✅ Tested on emulator (no trims) |
+| 3 | `merge`: edited clips (rotate, flip, crop, speed): selective render | `merge` with `clipEdits` | Built, checked on macOS; device test pending | ✅ Tested on emulator (one full encode) |
+| 4 | `merge`: full encode (clips off the recorder's format, lower bitrate) | the re-encode fallback | Built, checked on macOS; device test pending | ✅ Tested on emulator |
 | 5 | `conform`: import normalization, including HDR | `compress`, `cancelCompress` | Planned | Planned |
 | 6 | `thumbnail`, `extractAudio` | `getFrameAt`, `extractAudio` | Planned | Planned |
 | 7 | `<PulsePreview>`: composition player | the preview screen | Planned | Planned |
 | 8 | Multi-clip editor UI, in React Native on `<PulsePreview>` | `showEditor` (RNVT's native trim screen) | **Last** | **Last** |
 
-Until a method is complete on both platforms, Pulse falls back to RNVT for whatever pulse-editor rejects (today: `merge` on Android).
+Pulse still falls back to RNVT if pulse-editor's `merge` throws, until both platforms have been tested on real devices.
 
 RNVT's file helpers (`deleteFile`, `cleanFiles`, `saveToDocuments`) don't move here; Pulse uses `expo-file-system` for those.
 
@@ -124,7 +124,27 @@ type MergeResult = { uri: string; durationMs: number; encoded: boolean; bitrate:
 - **Audio:** copied when possible. If the timeline has a gap (a muted clip, or one without sound) or mixes encoders, the audio alone is re-encoded with real silence in the gaps. The reason: a gap left as an MP4 empty edit plays as silence in Apple players, but FFmpeg-based players (Chrome, most servers) skip it and play the next clip's audio early.
 - **Bitrate allowance:** 1.6× covers recorder overshoot. Recordings aimed at 5 Mbps average 6–7 Mbps; see Pulse #241.
 
+### How a merge runs (Android)
+
+Media3 can't mix copied and re-encoded clips in one export, and its copy mode isn't frame-accurate at a trimmed start (it begins at the previous keyframe). So Android has two paths:
+
+| Path | When | What happens |
+|---|---|---|
+| **Fast join** | No clip is trimmed or has a rendered edit, and every clip shares one H.264/AAC format that fits, at most 1.6× the chosen bitrate | One `Transformer` export of an `EditedMediaItemSequence` with `setTransmuxVideo`. Audio is copied too, unless a clip is muted or has no sound; then audio alone is encoded, with generated silence. |
+| **Full encode** | Anything else, and the fast join's fallback | One hardware encode of the whole timeline: `ClippingConfiguration` trims, `SpeedParameters` (natural pitch), `ScaleAndRotateTransformation` / `Crop` / `Presentation` (letterbox) effects on the upright frame, `setFrameRate` cap, H.264 at the chosen bitrate via `DefaultEncoderFactory`. Audio is mixed to the recorder's layout, with an explicit 5.1 → stereo downmix. |
+
+- **Threading:** `Transformer` runs on the main looper, as Media3 requires. Progress comes from polling `getProgress`; cancel calls `Transformer.cancel()` and deletes the partial file.
+- **Verification:** every output is checked with `probe` (H.264, the canvas, the expected duration) and must be faststart.
+- **Known difference from iOS:** slowed-down clips come out at a variable frame rate (Media3's frame rate setting only caps it). They play correctly.
+
 ### Tested
+- **Android, on an emulator (Android 17, arm64, software codecs), same fixtures as iOS:**
+  - fast join of 3 clips without re-encoding, and with a muted last clip (silent);
+  - trims; every rotation, flip and crop, and combinations (frames identical to iOS);
+  - 2× and 0.5× with natural pitch;
+  - a mixed HEVC / 60 fps / 4K / landscape / 5.1-audio draft;
+  - cancel.
+  - Every output is faststart. The emulator's software encoder writes Baseline profile and didn't hold a 2 Mbps target; real hardware encoders still need checking.
 - **iOS, on device (Pulse):**
   - fast join of recorded drafts, trims and a muted middle clip;
   - seed drafts of 2 and 8 minutes (0.66 s and 2.4–5.2 s);
