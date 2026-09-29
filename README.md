@@ -14,14 +14,15 @@ Pulse is moving every native video method it uses from its react-native-video-tr
 
 | Step | pulse-editor | Replaces (RNVT) | iOS | Android |
 |---|---|---|---|---|
-| 1 | `probe` | `probeVideo`, `isValidFile` | ✅ Tested on device | ✅ Tested on emulator (Android 17) |
-| 2 | `merge`: fast join (trims, mute), cancel | `merge` (no-re-encode path), `onMergeProgress` | ✅ Tested on device | ✅ Tested on emulator (no trims) |
-| 3 | `merge`: edited clips (rotate, flip, crop, speed): selective render | `merge` with `clipEdits` | Built, checked on macOS; device test pending | ✅ Tested on emulator (one full encode) |
-| 4 | `merge`: full encode (clips off the recorder's format, lower bitrate) | the re-encode fallback | Built, checked on macOS; device test pending | ✅ Tested on emulator |
+| 1 | `probe` | `probeVideo`, `isValidFile` | ✅ Tested on device | ✅ Tested on device (Galaxy S24 Ultra, Android 16) |
+| 2 | `merge`: fast join (trims, mute), cancel | `merge` (no-re-encode path), `onMergeProgress` | ✅ Tested on device | ✅ Tested on device (join, trims, mute); cancel on emulator |
+| 3 | `merge`: edited clips (rotate, flip, crop, speed): selective render | `merge` with `clipEdits` | ✅ Tested on device (iPhone 17 Pro Max) | ✅ Tested on device (one hardware encode) |
+| 4 | `merge`: full encode (clips off the recorder's format, lower bitrate) | the re-encode fallback | Checked on macOS with iPhone recordings; device test pending | ✅ Tested on emulator |
 | 5 | `conform`: import normalization, including HDR | `compress`, `cancelCompress` | Planned | Planned |
-| 6 | `thumbnail`, `extractAudio` | `getFrameAt`, `extractAudio` | Planned | Planned |
-| 7 | `<PulsePreview>`: composition player | the preview screen | Planned | Planned |
-| 8 | Multi-clip editor UI, in React Native on `<PulsePreview>` | `showEditor` (RNVT's native trim screen) | **Last** | **Last** |
+| 6 | `extractAudio` (feeds whisper.rn's `transcribeData` / `detectSpeechData`) | `extractAudio` | ✅ Tested on device | ✅ Tested on device |
+| 7 | `thumbnail` | `getFrameAt` | Planned | Planned |
+| 8 | `<PulsePreview>`: composition player | the preview screen | Planned | Planned |
+| 9 | Multi-clip editor UI, in React Native on `<PulsePreview>` | `showEditor` (RNVT's native trim screen) | **Last** | **Last** |
 
 Pulse still falls back to RNVT if pulse-editor's `merge` throws, until both platforms have been tested on real devices.
 
@@ -122,6 +123,7 @@ type MergeResult = { uri: string; durationMs: number; encoded: boolean; bitrate:
 
 - **Rendering:** each clip gets a trimmed slot, `scaleTimeRange` for speed, and a video-composition instruction for rotate → flip → crop → letterboxed fit. Encoding is `AVAssetReader` → `AVAssetWriter` (H.264 High, BT.709, keyframe every 2 s), with frames filled to a constant 30 fps.
 - **Audio:** copied when possible. If the timeline has a gap (a muted clip, or one without sound) or mixes encoders, the audio alone is re-encoded with real silence in the gaps. The reason: a gap left as an MP4 empty edit plays as silence in Apple players, but FFmpeg-based players (Chrome, most servers) skip it and play the next clip's audio early.
+- **Re-encoded audio keeps its sync everywhere:** it's encoded to an MP4 (not M4A) before the join, so the AAC encoder's priming (2112 samples) is carried into the output's edit list. From an M4A that edit was lost: Apple players still trimmed it, but FFmpeg-based ones played the audio 44 ms late.
 - **Bitrate allowance:** 1.6× covers recorder overshoot. Recordings aimed at 5 Mbps average 6–7 Mbps; see Pulse #241.
 
 ### How a merge runs (Android)
@@ -145,10 +147,16 @@ Media3 can't mix copied and re-encoded clips in one export, and its copy mode is
   - a mixed HEVC / 60 fps / 4K / landscape / 5.1-audio draft;
   - cancel.
   - Every output is faststart. The emulator's software encoder writes Baseline profile and didn't hold a 2 Mbps target; real hardware encoders still need checking.
+- **Android, on a Galaxy S24 Ultra (Android 16) in Pulse:**
+  - fast join of 3 recordings without re-encoding in 0.65 s, exactly the clips' total length;
+  - trims, rotate + flip, crop, 2× and 0.5×, and a muted clip: one hardware encode in 1.7–2.1 s, lengths within a frame of the edits, 5.6–6.2 Mbps at a 5 Mbps target;
+  - slowed clips come out at a variable frame rate (the 0.5× part plays at ~15 fps), as noted above.
 - **iOS, on device (Pulse):**
   - fast join of recorded drafts, trims and a muted middle clip;
   - seed drafts of 2 and 8 minutes (0.66 s and 2.4–5.2 s);
-  - cancel.
+  - cancel;
+  - on an iPhone 17 Pro Max: a 3-clip join in 90 ms; trim + 2× in 0.4 s and rotate + flip + crop + 0.5× + mute in 2.2–2.5 s, only the edited clips rendered; lengths within a frame of the edits.
+- **Audio sync, every iOS path** (join, trim, muted clip, selective, selective with a muted clip, full encode), run on macOS with real iPhone recordings: the output's audio matches the original recording within 0.1 ms read by AVFoundation and by FFmpeg. Confirmed on an iPhone export.
 - **iOS, on macOS with the same code**, using a clip tagged like an iPhone recording:
   - every rotation, flip and crop, and combinations, checked frame by frame;
   - 2× and 0.5× have exact durations, a constant 30 fps and natural pitch;
@@ -156,6 +164,32 @@ Media3 can't mix copied and re-encoded clips in one export, and its copy mode is
   - mixed HEVC / 60 fps / 4K / landscape drafts encode to H.264 1080×1920 at 30 fps, faststart;
   - a 2 Mbps target gives 1.98 Mbps;
   - cancel mid-render leaves no files.
+
+## `extractAudio`
+
+```ts
+import { extractAudio } from '@mieweb/pulse-editor';
+
+const { data, sampleRate, durationMs } = await extractAudio(uri); // default sampleRate 16000
+// data: ArrayBuffer of 16-bit signed little-endian mono PCM (empty when there's no audio track)
+await whisperContext.transcribeData(data, options);   // whisper.rn, no WAV file
+await vadContext.detectSpeechData(data);
+```
+
+What whisper.cpp takes, decoded in memory: no FFmpeg, no intermediate file, and whisper.rn's JSI reads the `ArrayBuffer` Nitro hands back without a copy on our side.
+
+- **iOS:** one `AVAssetReader` pass, where Apple's converter decodes, downmixes and resamples (filtered) together.
+- **Android:** Media3's extractor feeding `MediaCodec`, then mono and a band-limited polyphase resampler (windowed sinc; Media3's Sonic interpolates linearly, which aliases). Priming samples are dropped by timestamp, since some decoders already drop them; the output stops at the track's duration.
+- **Level:** channels are summed at −3 dB each (Apple's downmix), and the whole buffer is turned down only if that would clip, never up.
+
+### Tested
+- **iOS on macOS, Android on the emulator**, against an FFmpeg reference (`aresample` with a 64-tap filter) on speech clips with 48 kHz stereo, 48 kHz 5.1 and 44.1 kHz mono AAC, and a file without audio:
+  - Android matches the reference's length and speech onset to the sample; iOS is within 6 samples (0.4 ms) and 1 sample;
+  - waveform correlation 0.99 (iOS) and envelope correlation 1.00 (Android); no clipping on 5.1;
+  - a 7 s clip takes ~10 ms on macOS and ~0.3 s on the emulator's software decoder.
+- **In Pulse, on an iPhone 17 Pro Max and a Galaxy S24 Ultra**, transcribing merged exports with whisper.rn 0.7.4:
+  - the PCM's length matches the video's (14,799 vs 14,800 ms; 12,648 vs 12,660 ms); 80–180 ms on the iPhone and 0.4–0.8 s on the S24 for 6–15 s of audio;
+  - the transcripts match a local run of the same whisper.cpp (1.9.3) with whisper.rn's exact settings on the same exports, and the iOS extractor's PCM matches an FFmpeg reference decode to 0.1 ms.
 
 ## Development
 
