@@ -14,7 +14,7 @@ Pulse is moving every native video method it uses from its react-native-video-tr
 
 | Step | pulse-editor | Replaces (RNVT) | Status |
 |---|---|---|---|
-| 1 | `probe` | `probeVideo`, `isValidFile` | ✅ Done: tested on device |
+| 1 | `probe` | `probeVideo`, `isValidFile` | ✅ Done: tested on iOS (Android pending) |
 | 2 | `merge`: passthrough join, trims, mute | `merge`, `onMergeProgress` | Next |
 | 3 | `merge`: rendered edits (rotate, flip, crop, speed) | `merge` with `clipEdits` | Planned |
 | 4 | `conform`: import normalization, including HDR | `compress`, `cancelCompress` | Planned |
@@ -64,7 +64,7 @@ type ProbeResult = {
 - **iOS:** AVFoundation's async loaders, requesting several properties per `load(...)` call as Apple recommends. About **2 ms per clip**.
 - **Android:** Media3 Inspector's `MetadataRetriever`, one per file, closed after use, with its results awaited inside `Promise.async`.
 
-### Tested
+### Tested on iOS
 
 - All 24 of Pulse's fixture clips read correctly on iOS, including HDR (HLG and PQ), Opus audio, variable frame rate, 120 fps slow motion, screen recordings, and 90° and 270° rotations. A file that isn't media is rejected.
 - In the Pulse app on an iPhone:
