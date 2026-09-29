@@ -20,9 +20,9 @@ Pulse is moving every native video method it uses from its react-native-video-tr
 | 2 | `merge`: join, trims, mute | `merge` (copy path) | ✅ iPhone: 3-clip join (90 ms), trims, muted clip, 2- and 8-min drafts (0.66 s, 2.4–5.2 s); macOS: audio matches the original within 0.1 ms | ✅ S24: 3-clip join (0.65 s, exact length), trims, muted clip; emulator: same fixtures | #240 |
 |  | `merge`: cancel | (not possible in RNVT) | ✅ iPhone: cancel mid-merge; macOS: no files left behind | ✅ emulator · ⏳ S24: next device run | #240 |
 | 3 | `merge`: edited clips (rotate, flip, crop, 2×, 0.5×) | `merge` with clip edits | ✅ iPhone: rotate + flip + crop + 0.5× + mute, trim + 2× (only edited clips rendered, lengths within a frame); macOS: every rotation/flip/crop frame by frame, exact durations, natural pitch | ✅ S24: rotate + flip, crop, 2×, 0.5×, mute (one hardware encode, lengths within a frame, 5.6–6.2 Mbps); emulator: frames identical to iOS | #240 |
-| 4 | `merge`: full encode | the re-encode path | ✅ iPhone: mixed (20 clips) and wild-imports (12 clips: HDR, VFR, Opus, no audio) seed drafts → H.264 1080×1920 30 fps, SDR, audio in sync; macOS: 2 Mbps target → 1.98 Mbps | ✅ S24: every edited export above runs this path · emulator: mixed HEVC / 60 fps / 4K / landscape / 5.1 draft · ⏳ a mixed-format draft on the S24 | #240 |
+| 4 | `merge`: full encode | the re-encode path | ✅ iPhone: mixed (20 clips) and wild-imports (12 clips: HDR, VFR, Opus, no audio) seed drafts → H.264 1080×1920 30 fps, SDR, audio in sync; macOS: 2 Mbps target → 1.98 Mbps | ✅ emulator: mixed HEVC / 60 fps / 4K / landscape / 5.1 draft · ⏳ S24 | #240 |
 | 5 | `extractAudio` → Whisper captions | `extractAudio` | ✅ iPhone: captions (extract 80–180 ms, VAD 128 ms, Whisper 123 ms); macOS: PCM vs FFmpeg reference within 0.1 ms; local whisper.cpp 1.9.3 gives the same transcripts | ✅ S24: captions (extract 0.4–0.8 s, Whisper 1.5 s on CPU); emulator: length and speech onset exact vs FFmpeg; local whisper.cpp gives the same transcripts | #240 |
-| | Preview pitch fix for 2× / 0.5× clips | | not affected | ✅ S24: preview at 2× | #240 |
+| | Preview pitch fix for 2× / 0.5× clips | | not tested | ✅ S24: preview at 2× | #240 |
 | | whisper.rn audit cleanups (VAD comment, real CPU fallback) | | ⏳ | ⏳ | #240 |
 | | Remove the RNVT merge fallback (never triggered in testing) | `merge` | ⏳ after the S24 cancel run | ⏳ | #240 |
 | | Tune Whisper: `maxThreads` 4 vs 6, q8_0 models on Android | | ⏳ next device run | ⏳ next device run | #240 |
@@ -83,7 +83,7 @@ Each clip's audio is analyzed once, when it's saved, and kept. The timeline and 
 
    The export no longer transcribes: its captions are ready when the merge finishes. Hand-edited captions stay draft-level, as today.
 
-Transcribing each clip at its natural speed also recognizes speech better: whole-draft transcription missed slowed-down speech and gave up after muted gaps.
+Transcribing each clip at its natural speed should also help recognition: whole-draft transcription didn't transcribe a quiet clip slowed to 0.5×, which gives words at 1× in a local run. Not tested in the app yet.
 
 ### Cover selector (thumbnail)
 A screen to choose the pulse's final thumbnail: the poster that's uploaded with the video and shown on the draft card.
@@ -194,7 +194,7 @@ type MergeResult = { uri: string; durationMs: number; encoded: boolean; bitrate:
 | **Full encode** | The clips don't share a format that fits, or the selective path fails | The whole timeline is encoded once onto the upright canvas at the chosen bitrate. |
 
 - **Rendering:** each clip gets a trimmed slot, `scaleTimeRange` for speed, and a video-composition instruction for rotate → flip → crop → letterboxed fit. Encoding is `AVAssetReader` → `AVAssetWriter` (H.264 High, BT.709, keyframe every 2 s), with frames filled to a constant 30 fps.
-- **Audio:** copied when possible. If the timeline has a gap (a muted clip, or one without sound) or mixes encoders, the audio alone is re-encoded with real silence in the gaps. The reason: a gap left as an MP4 empty edit plays as silence in Apple players, but FFmpeg-based players (Chrome, most servers) skip it and play the next clip's audio early.
+- **Audio:** copied when possible. If the timeline has a gap (a muted clip, or one without sound) or mixes encoders, the audio alone is re-encoded with real silence in the gaps. The gap becomes real silence instead of an empty stretch in the audio track. (In a local check, FFmpeg 9 also placed the audio correctly after an empty stretch, within 8 ms; browsers weren't tested.)
 - **Re-encoded audio keeps its sync everywhere:** it's encoded to an MP4 (not M4A) before the join, so the AAC encoder's priming (2112 samples) is carried into the output's edit list. From an M4A that edit was lost: Apple players still trimmed it, but FFmpeg-based ones played the audio 44 ms late.
 - **Bitrate allowance:** 1.6× covers recorder overshoot. Recordings aimed at 5 Mbps average 6–7 Mbps; see Pulse #241.
 
@@ -222,7 +222,7 @@ Media3 can't mix copied and re-encoded clips in one export, and its copy mode is
 - **Android, on a Galaxy S24 Ultra (Android 16) in Pulse:**
   - fast join of 3 recordings without re-encoding in 0.65 s, exactly the clips' total length;
   - trims, rotate + flip, crop, 2× and 0.5×, and a muted clip: one hardware encode in 1.7–2.1 s, lengths within a frame of the edits, 5.6–6.2 Mbps at a 5 Mbps target;
-  - slowed clips come out at a variable frame rate (the 0.5× part plays at ~15 fps), as noted above.
+  - slowed clips come out at a variable frame rate (an export with a 0.5× clip averaged 19.9 fps), as noted above.
 - **iOS, on device (Pulse):**
   - fast join of recorded drafts, trims and a muted middle clip;
   - seed drafts of 2 and 8 minutes (0.66 s and 2.4–5.2 s);
