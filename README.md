@@ -22,13 +22,67 @@ Pulse is moving every native video method it uses from its react-native-video-tr
 | 6 | `extractAudio` (feeds whisper.rn's `transcribeData` / `detectSpeechData`) | `extractAudio` | ✅ Tested on device | ✅ Tested on device |
 | 7 | `thumbnail` | `getFrameAt` | Planned | Planned |
 | 8 | `<PulsePreview>`: composition player | the preview screen | Planned | Planned |
-| 9 | Multi-clip editor UI, in React Native on `<PulsePreview>` | `showEditor` (RNVT's native trim screen) | **Last** | **Last** |
+| 9 | Multi-clip timeline editor, in React Native on `<PulsePreview>` (see [The timeline editor](#the-timeline-editor-plan)) | the clip preview and `showEditor` (RNVT's per-clip editor) | **Last** | **Last** |
 
 Pulse still falls back to RNVT if pulse-editor's `merge` throws, until both platforms have been tested on real devices.
 
 RNVT's file helpers (`deleteFile`, `cleanFiles`, `saveToDocuments`) don't move here; Pulse uses `expo-file-system` for those.
 
 Every step keeps Pulse's output unchanged: the same saved clip edits (`editState`), the same 1080×1920 H.264 export, and the same recorder format. Existing drafts keep working.
+
+## The timeline editor (plan)
+
+Where the migration is heading. Nothing here is built yet: it follows the steps above.
+
+### Today: three screens
+1. **Recorder.** Camera, record, import, and the clip bar (drag to reorder, drag to delete).
+2. **Clip preview.** Tap a clip in the bar. Plays the draft across clips with edits applied, with a playhead on the clip bar, play/pause, ✂ edit, 🗑 delete and "Revert edits".
+3. **Clip editor.** ✂ opens RNVT's full-screen editor on **one clip**: trim, crop, rotate, flip, mute, speed (presets and recent custom speeds), and undo/redo that reopens where you left off. Save stores the edit as settings (`editState`); nothing is encoded.
+
+Editing a draft means going through screens 2 and 3 once per clip, and screen 3 can't show the clips around the one being edited.
+
+### Target: two screens
+1. **Recorder: unchanged.**
+2. **Timeline editor**, replacing screens 2 and 3: every clip on one timeline, played by `<PulsePreview>` so the preview is exactly what exports.
+   - **Keeps every current feature:** play/pause and scrubbing across clips; trim, crop, rotate, flip, mute and speed (presets and custom speeds) on any clip without leaving the timeline; revert edits; delete; reorder; undo/redo.
+   - **Edits apply immediately, with undo as the safety net** (Pulse's editing style): no save step, and still stored as settings, rendered once by `merge` at export.
+   - **New on the timeline:** each clip's thumbnails, its **audio waveform** (see where people speak, so trims land in the gaps between words), and its captions.
+   - **Later:** split a clip into two segments that share one original (Pulse #58).
+   - Trim handles come last within the editor work.
+
+### Per-clip audio: waveform and captions
+Each clip's audio is analyzed once, when it's saved, and kept. The timeline and the export build from that.
+
+1. **On save** (a recording finishes, or an import finishes converting), one job runs **`extractAudio` once** and writes, from the same buffer:
+   - `{clip}.wav`: 16 kHz mono 16-bit PCM (~1.9 MB per minute, ~5% of the clip's video), for Whisper later;
+   - `{clip}.wave`: peak + RMS per 10 ms, for the timeline waveform.
+
+   One decode for both, never separate. On an iPhone 17 Pro Max this takes ~5–12 ms per second of audio, on a Galaxy S24 Ultra up to ~65 ms per second, in the background.
+2. **Whisper runs later**, as a separate job, when the recorder has been idle a few seconds or the editor opens. whisper.rn reads the saved WAV directly (`transcribe(path)`, VAD `detectSpeech(path)`), with no second decode and no resampling. Words and speech regions are stored in the clip's own time, with the model that made them.
+   - **It depends on having a model:** without one, clips still get their WAV and waveform, and when a model is downloaded, clips without words are queued.
+   - **Switching models** re-runs Whisper from the saved WAVs; the old words stay until then.
+3. **Queue rules:**
+   - one clip at a time, and **nothing runs while the camera records**;
+   - clips visible in the editor go first;
+   - deleting a clip cancels its work and removes its files;
+   - existing drafts fill in the first time they're opened.
+4. **The timeline and the export build from edits**, so trims, speed, mute and reorder never re-analyze anything:
+   - muted clips are skipped;
+   - a word is kept when its midpoint is inside the trim window;
+   - time maps as `clip start on the timeline + (word time − trim start) / speed`, the same maths as `merge`.
+
+   The export no longer transcribes: its captions are ready when the merge finishes. Hand-edited captions stay draft-level, as today.
+
+Transcribing each clip at its natural speed also recognizes speech better: whole-draft transcription missed slowed-down speech and gave up after muted gaps.
+
+### What each piece needs
+
+| Piece | From |
+|---|---|
+| Playback across clips with edits, preview == export | `<PulsePreview>` (step 8) |
+| Thumbnails along each clip | `thumbnail` (step 7) |
+| Waveform, captions, speech regions | `extractAudio` (done) + the per-clip audio job in Pulse |
+| Rendering the edits at export | `merge` (done) |
 
 ## `probe`
 
