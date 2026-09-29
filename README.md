@@ -12,26 +12,23 @@ The native video engine behind [Pulse](https://github.com/mieweb/pulse): fast, s
 
 Pulse is moving every native video method it uses from its react-native-video-trim fork into pulse-editor, **one method at a time**. Each method is added here, switched over in the app, and tested on a device before the next one starts. The trim editor UI moves last.
 
-✅ done · ⏳ left to do · 📋 planned. Devices: **iPhone 17 Pro Max** (iOS) and **Galaxy S24 Ultra, Android 16** (Android); "macOS" = the same iOS code run on a Mac against references; "emulator" = Android 17 emulator.
+✅ done · ⏳ left to do · 📋 not started. Devices: **iPhone 17 Pro Max** (iOS) and **Galaxy S24 Ultra, Android 16** (Android); "macOS" = the same iOS code run on a Mac against references; "emulator" = Android 17 emulator.
 
-| # | Step | Replaces (RNVT) | iOS | Android | Where (Pulse) |
-|---|---|---|---|---|---|
-| 1 | `probe` | `probeVideo`, `isValidFile` | ✅ iPhone: recordings, upright + letterboxed imports, HDR import, preview sizing, recording rescue · iOS: all 24 fixtures read correctly | ✅ S24: recordings (codec, rotation, fps, bitrate, audio); emulator: fixtures | #240 |
-| 2 | `merge`: join, trims, mute | `merge` (copy path) | ✅ iPhone: 3-clip join (90 ms), trims, muted clip, 2- and 8-min drafts (0.66 s, 2.4–5.2 s); macOS: audio matches the original within 0.1 ms | ✅ S24: 3-clip join (0.65 s, exact length), trims, muted clip; emulator: same fixtures | #240 |
-|  | `merge`: cancel | (not possible in RNVT) | ✅ iPhone: cancel mid-merge; macOS: no files left behind | ✅ emulator · ⏳ S24: next device run | #240 |
-| 3 | `merge`: edited clips (rotate, flip, crop, 2×, 0.5×) | `merge` with clip edits | ✅ iPhone: rotate + flip + crop + 0.5× + mute, trim + 2× (only edited clips rendered, lengths within a frame); macOS: every rotation/flip/crop frame by frame, exact durations, natural pitch | ✅ S24: rotate + flip, crop, 2×, 0.5×, mute (one hardware encode, lengths within a frame, 5.6–6.2 Mbps); emulator: frames identical to iOS | #240 |
-| 4 | `merge`: full encode | the re-encode path | ✅ iPhone: mixed (20 clips) and wild-imports (12 clips: HDR, VFR, Opus, no audio) seed drafts → H.264 1080×1920 30 fps, SDR, audio in sync; macOS: 2 Mbps target → 1.98 Mbps | ✅ emulator: mixed HEVC / 60 fps / 4K / landscape / 5.1 draft · ⏳ S24 | #240 |
-| 5 | `extractAudio` → Whisper captions | `extractAudio` | ✅ iPhone: captions (extract 80–180 ms, VAD 128 ms, Whisper 123 ms); macOS: PCM vs FFmpeg reference within 0.1 ms; local whisper.cpp 1.9.3 gives the same transcripts | ✅ S24: captions (extract 0.4–0.8 s, Whisper 1.5 s on CPU); emulator: length and speech onset exact vs FFmpeg; local whisper.cpp gives the same transcripts | #240 |
-| | whisper.rn audit cleanups (VAD comment, real CPU fallback) | | ⏳ | ⏳ | #240 |
-| | Remove the RNVT merge fallback (never triggered in testing) | `merge` | ⏳ after the S24 cancel run | ⏳ | #240 |
-| | Tune Whisper: `maxThreads` 4 vs 6, q8_0 models on Android | | ⏳ next device run | ⏳ next device run | #240 |
-| 6 | `conform`: import normalization, HDR | `compress`, `cancelCompress` | 📋 | 📋 (RNVT's fails on the S24 today) | next PR |
-| 7 | Per-clip audio: WAV + waveform on save, Whisper later from the WAV | whole-draft transcription | 📋 | 📋 | own PR |
-| 8 | `thumbnail` | `getFrameAt` | 📋 | 📋 | later |
-| 9 | Cover selector: a video frame or a device photo |  | 📋 | 📋 | later |
-| 10 | `<PulsePreview>`: composition player | the clip preview | 📋 | 📋 | later |
-| 11 | Timeline editor UI (React Native; see [The timeline editor](#the-timeline-editor-plan)) | the clip preview + `showEditor` | 📋 last | 📋 last | later |
-| 12 | Remove RNVT and FFmpeg | the fork | 📋 | 📋 | last |
+| # | Step | Replaces (RNVT) | iOS | Android |
+|---|---|---|---|---|
+| 1 | `probe` | `probeVideo`, `isValidFile` | ✅ iPhone: recordings, upright + letterboxed imports, HDR import, preview sizing, recording rescue · iOS: all 24 fixtures read correctly | ✅ S24: recordings (codec, rotation, fps, bitrate, audio); emulator: fixtures | 
+| 2 | `merge`: join, trims, mute | `merge` (copy path) | ✅ iPhone: 3-clip join (90 ms), trims, muted clip, 2- and 8-min drafts (0.66 s, 2.4–5.2 s); macOS: audio matches the original within 0.1 ms | ✅ S24: 3-clip join (0.65 s, exact length), trims, muted clip; emulator: same fixtures | 
+|  | `merge`: cancel | (not possible in RNVT) | ✅ iPhone: cancel mid-merge; macOS: no files left behind | ✅ emulator · ⏳ S24: next device run | 
+| 3 | `merge`: edited clips (rotate, flip, crop, 2×, 0.5×) | `merge` with clip edits | ✅ iPhone: rotate + flip + crop + 0.5× + mute, trim + 2× (only edited clips rendered, lengths within a frame); macOS: every rotation/flip/crop frame by frame, exact durations, natural pitch | ✅ S24: rotate + flip, crop, 2×, 0.5×, mute (one hardware encode, lengths within a frame, 5.6–6.2 Mbps); emulator: frames identical to iOS | 
+| 4 | `merge`: full encode | the re-encode path | ✅ iPhone: mixed (20 clips) and wild-imports (12 clips: HDR, VFR, Opus, no audio) seed drafts → H.264 1080×1920 30 fps, SDR, audio in sync; macOS: 2 Mbps target → 1.98 Mbps | ✅ emulator: mixed HEVC / 60 fps / 4K / landscape / 5.1 draft · ⏳ S24 | 
+| 5 | `extractAudio` → Whisper captions | `extractAudio` | ✅ iPhone: captions (extract 80–180 ms, VAD 128 ms, Whisper 123 ms); macOS: PCM vs FFmpeg reference within 0.1 ms; local whisper.cpp 1.9.3 gives the same transcripts | ✅ S24: captions (extract 0.4–0.8 s, Whisper 1.5 s on CPU); emulator: length and speech onset exact vs FFmpeg; local whisper.cpp gives the same transcripts | 
+| | Cleanups from the whisper.rn audit (VAD comment, real CPU fallback) | | ⏳ | ⏳ | 
+| 6 | `conform`: import normalization, HDR | `compress`, `cancelCompress` | 📋 | 📋 (RNVT's fails on the S24 today) | 
+| 7 | `thumbnail` | `getFrameAt` | 📋 | 📋 | 
+| 8 | `<PulsePreview>`: composition player | (needed by the editor) | 📋 | 📋 | 
+| 9 | Timeline editor UI (React Native), replacing the clip preview and the per-clip editor (see [The timeline editor](#the-timeline-editor-plan)) | `showEditor` | 📋 | 📋 | 
+| 10 | File helpers to `expo-file-system` | `deleteFile`, `cleanFiles`, `saveToDocuments` | 📋 | 📋 | 
+| 11 | **Last commit:** remove the RNVT merge fallback, the fork and FFmpeg (package, Podfile, Gradle, submodule), then merge | the fork | 📋 | 📋 | 
 
 Pulse still falls back to RNVT if pulse-editor's `merge` throws. It never triggered in testing, and it comes out after the Android cancel run.
 
@@ -55,9 +52,22 @@ Editing a draft means going through screens 2 and 3 once per clip, and screen 3 
 2. **Timeline editor**, replacing screens 2 and 3: every clip on one timeline, played by `<PulsePreview>` so the preview is exactly what exports.
    - **Keeps every current feature:** play/pause and scrubbing across clips; trim, crop, rotate, flip, mute and speed (presets and custom speeds) on any clip without leaving the timeline; revert edits; delete; reorder; undo/redo.
    - **Edits apply immediately, with undo as the safety net** (Pulse's editing style): no save step, and still stored as settings, rendered once by `merge` at export.
-   - **New on the timeline:** each clip's thumbnails, its **audio waveform** (see where people speak, so trims land in the gaps between words), and its captions.
+   - **New on the timeline:** each clip's thumbnails, and later its **audio waveform** (see where people speak, so trims land in the gaps between words) and captions, from per-clip audio (below).
    - **Later:** split a clip into two segments that share one original (Pulse #58).
    - Trim handles come last within the editor work.
+
+### What each piece needs
+
+| Piece | From |
+|---|---|
+| Playback across clips with edits, preview == export | `<PulsePreview>` (step 8) |
+| Thumbnails along each clip | `thumbnail` (step 7) |
+| Waveform and captions on the timeline | `extractAudio` (done) + per-clip audio ([after the migration](#after-the-migration-planned-features)) |
+| Rendering the edits at export | `merge` (done) |
+
+## After the migration (planned features)
+
+New features, planned for after RNVT is gone. They aren't part of the migration PR.
 
 ### Per-clip audio: waveform and captions
 Each clip's audio is analyzed once, when it's saved, and kept. The timeline and the export build from that.
@@ -92,14 +102,11 @@ A screen to choose the pulse's final thumbnail: the poster that's uploaded with 
 - **Default** when nothing is picked: the video's first frame.
 - **Much later:** a thumbnail-generation method (suggested covers) can plug into the same screen as a third source.
 
-### What each piece needs
-
-| Piece | From |
-|---|---|
-| Playback across clips with edits, preview == export | `<PulsePreview>` (step 10) |
-| Thumbnails along each clip, and the cover selector's frames | `thumbnail` (step 8) |
-| Waveform, captions, speech regions | `extractAudio` (done) + the per-clip audio job in Pulse (step 7) |
-| Rendering the edits at export | `merge` (done) |
+### Whisper tuning
+- Test `maxThreads` 4 vs 6 on device (whisper.rn advises against using all cores; its default is 4 on phones with more than 4 cores).
+- Test q8_0 models on Android: whisper.rn's guidance says q8 is faster on Android CPUs, and its 0.8 NPU support (Snapdragon 8 Gen 1 and newer) doesn't run q5 models.
+- whisper.rn 0.8 for the Android NPU once it's stable.
+- Ask whisper.rn to expose whisper.cpp options we could use: built-in VAD inside transcribe, `suppress_nst`, DTW word timestamps, `no_speech_thold`.
 
 ## `probe`
 
