@@ -2,7 +2,7 @@
   "compilerOptions": {
     "rootDir": ".",
     "paths": {
-      "pulse-editor": ["./src/index"]
+      "@mieweb/pulse-editor": ["./src/index"]
     },
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,

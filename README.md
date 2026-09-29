@@ -1,4 +1,4 @@
-# pulse-editor
+# @mieweb/pulse-editor
 
 The native video engine behind [Pulse](https://github.com/mieweb/pulse): fast, simple, and built only on each platform's own media stack.
 
@@ -29,7 +29,7 @@ Every step keeps Pulse's output unchanged: the same saved clip edits (`editState
 ## `probe`
 
 ```ts
-import { probe } from 'pulse-editor';
+import { probe } from '@mieweb/pulse-editor';
 
 const result = await probe('file:///…/clip.mp4');
 ```

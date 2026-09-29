@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button, ScrollView, StyleSheet, Text, TextInput } from 'react-native';
-import { probe } from 'pulse-editor';
+import { probe } from '@mieweb/pulse-editor';
 
 export default function App() {
   const [uri, setUri] = useState('');
