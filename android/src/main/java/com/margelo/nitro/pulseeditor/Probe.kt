@@ -8,16 +8,18 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.inspector.MetadataRetriever
 import java.io.File
+import kotlinx.coroutines.guava.await
 
 /**
  * Container and track metadata from Media3's extractors (the same ones the player and Transformer
- * use): reads the header, never decodes, so a probe costs a few milliseconds.
+ * use): reads the header, never decodes, so a probe costs a few milliseconds. One retriever per
+ * item, closed with `use`, futures awaited — the usage the Media3 Inspector guide recommends.
  */
 object Probe {
-  fun read(context: Context, uri: String): ProbeResult {
+  suspend fun read(context: Context, uri: String): ProbeResult {
     MetadataRetriever.Builder(context, MediaItem.fromUri(toUri(uri))).build().use { retriever ->
-      val groups = retriever.retrieveTrackGroups().get()
-      val durationUs = retriever.retrieveDurationUs().get()
+      val groups = retriever.retrieveTrackGroups().await()
+      val durationUs = retriever.retrieveDurationUs().await()
       val formats = (0 until groups.length).map { groups[it].getFormat(0) }
       if (formats.isEmpty()) throw IllegalArgumentException("No media tracks in $uri")
 

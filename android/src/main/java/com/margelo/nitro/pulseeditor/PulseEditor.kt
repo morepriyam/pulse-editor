@@ -7,7 +7,7 @@ import com.margelo.nitro.core.Promise
 @DoNotStrip
 class PulseEditor : HybridPulseEditorSpec() {
   override fun probe(uri: String): Promise<ProbeResult> {
-    return Promise.parallel { Probe.read(context(), uri) }
+    return Promise.async { Probe.read(context(), uri) }
   }
 
   private fun context() =
