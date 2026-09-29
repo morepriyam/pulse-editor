@@ -1,10 +1,14 @@
 import Foundation
 
-/// Which path a merge takes. The fast join copies samples untouched, so it needs every clip to
-/// have no rendered edit and to already share one format that fits the output.
+/// Which path a merge takes.
+/// - join: every clip shares one format that fits the output, and none has a rendered edit.
+/// - selective: the clips share that format, but some have a rotate / flip / crop / speed edit:
+///   only those are rendered (into the shared format), then everything joins.
+/// - encode: the clips don't share a format that fits (the full encode, not built yet).
 struct MergePlan {
   enum Path {
     case join
+    case selective(render: [Int])
     case encode(reasons: [String])
   }
 
@@ -16,12 +20,15 @@ struct MergePlan {
   let path: Path
 
   init(clips: [MergeClip], media: [Probe.Media], options: MergeOptions) {
-    var reasons: [String] = []
-    for (i, clip) in clips.enumerated() where Self.needsRender(clip) {
-      reasons.append("clip \(i + 1) has a rotate, flip, crop or speed edit")
+    let blockers = Self.joinBlockers(media: media, options: options)
+    let render = clips.indices.filter { Self.needsRender(clips[$0]) }
+    if !blockers.isEmpty {
+      path = .encode(reasons: blockers)
+    } else if render.isEmpty {
+      path = .join
+    } else {
+      path = .selective(render: render)
     }
-    reasons += Self.joinBlockers(media: media, options: options)
-    path = reasons.isEmpty ? .join : .encode(reasons: reasons)
   }
 
   /// Edits that change pixels or timing, so the clip can't be copied.

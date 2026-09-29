@@ -1,36 +1,47 @@
 import AVFoundation
 
-/// The fast path: clips that already share one format are joined by copying their samples
-/// (AVMutableComposition + a passthrough export), with trims as frame-accurate edit lists.
-/// Video is never decoded or encoded. Audio is copied too, unless the timeline has a gap (a muted
-/// clip, or one without sound): then the audio alone is re-encoded with real silence in the gap
-/// (see AudioEncode) and joined with the copied video.
+/// Joins clips that share one format by copying their samples (AVMutableComposition + a
+/// passthrough export), with trims as frame-accurate edit lists. Video is never decoded or
+/// encoded. Audio is copied too, unless the timeline has a gap (a muted clip, or one without
+/// sound) or mixes encoders: then the audio alone is re-encoded over the whole timeline, gaps as
+/// real silence (see AudioEncode), and joined with the copied video.
 enum Join {
-  static func run(_ clips: [MergeClip], _ media: [Probe.Media], options: MergeOptions, progress: MergeProgress) async throws -> MergeResult {
+  /// One piece of the timeline: a source file, cut to a window (the whole file when unset).
+  struct Segment {
+    let media: Probe.Media
+    var startMs: Double = 0
+    var endMs: Double = 0
+    var muted = false
+  }
+
+  static func run(
+    _ segments: [Segment], options: MergeOptions, reencodeAudio: Bool, encoded: Bool,
+    progress: @escaping @Sendable (Double) -> Void
+  ) async throws -> MergeResult {
     let composition = AVMutableComposition()
     guard let videoOut = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
       throw MergeError.failed("Couldn't create the video track.")
     }
-    let hasAudio = zip(clips, media).contains { !$0.muted && $1.audioTrack != nil }
+    let hasAudio = segments.contains { !$0.muted && $0.media.audioTrack != nil }
     let audioOut = hasAudio
       ? composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
       : nil
     var audioGap = false
 
-    // Every clip shares the first clip's orientation (MergePlan checked), so one track transform
-    // shows them all upright.
-    videoOut.preferredTransform = try await media[0].videoTrack!.load(.preferredTransform)
+    // Every segment is in the draft's format (MergePlan checked; renders are verified), so one
+    // track transform shows them all upright.
+    videoOut.preferredTransform = try await segments[0].media.videoTrack!.load(.preferredTransform)
 
     var cursor = CMTime.zero
-    for (clip, m) in zip(clips, media) {
-      let video = m.videoTrack!
-      let range = trimRange(clip, in: try await video.load(.timeRange))
+    for segment in segments {
+      let video = segment.media.videoTrack!
+      let range = trimRange(startMs: segment.startMs, endMs: segment.endMs, in: try await video.load(.timeRange))
       try videoOut.insertTimeRange(range, of: video, at: cursor)
 
-      // A muted clip (or one without sound, or sound shorter than its picture) leaves a gap.
+      // A muted segment (or one without sound, or sound shorter than its picture) leaves a gap.
       if let audioOut {
         var covered = CMTime.zero
-        if !clip.muted, let audio = m.audioTrack {
+        if !segment.muted, let audio = segment.media.audioTrack {
           let overlap = range.intersection(try await audio.load(.timeRange))
           if overlap.duration > .zero {
             try audioOut.insertTimeRange(overlap, of: audio, at: cursor + (overlap.start - range.start))
@@ -47,11 +58,11 @@ enum Join {
     var encodedAudio: URL?
     defer { if let encodedAudio { try? FileManager.default.removeItem(at: encodedAudio) } }
     do {
-      var exportProgress = progress.callAsFunction
+      var exportProgress = progress
       // The composition reads the encoded audio through this asset; a track doesn't keep its
       // asset alive, so hold it until the export is done.
       var encodedAsset: AVAsset?
-      if let audioOut, audioGap {
+      if let audioOut, audioGap || reencodeAudio {
         let url = output.deletingPathExtension().appendingPathExtension("audio.m4a")
         encodedAudio = url
         try await AudioEncode.run(composition, audio: options.audio, to: url) { progress($0 * 0.3) }
@@ -61,7 +72,7 @@ enum Join {
       try Task.checkCancellation()
       try await export(composition, to: output, progress: exportProgress)
       withExtendedLifetime(encodedAsset) {}
-      let result = try await verify(output, expectedMs: Probe.ms(cursor))
+      let result = try await verify(output, expectedMs: Probe.ms(cursor), encoded: encoded)
       progress(1)
       return result
     } catch {
@@ -70,11 +81,11 @@ enum Join {
     }
   }
 
-  /// The clip's trim window inside its source video track (the whole track when unset or invalid).
-  static func trimRange(_ clip: MergeClip, in track: CMTimeRange) -> CMTimeRange {
-    guard clip.endMs > clip.startMs else { return track }
-    let start = track.start + CMTime(value: CMTimeValue(clip.startMs.rounded()), timescale: 1000)
-    let end = CMTimeMinimum(track.start + CMTime(value: CMTimeValue(clip.endMs.rounded()), timescale: 1000), track.end)
+  /// The window inside a source video track (the whole track when unset or invalid).
+  static func trimRange(startMs: Double, endMs: Double, in track: CMTimeRange) -> CMTimeRange {
+    guard endMs > startMs else { return track }
+    let start = track.start + CMTime(value: CMTimeValue(startMs.rounded()), timescale: 1000)
+    let end = CMTimeMinimum(track.start + CMTime(value: CMTimeValue(endMs.rounded()), timescale: 1000), track.end)
     guard start < end else { return track }
     return CMTimeRange(start: start, end: end)
   }
@@ -96,7 +107,7 @@ enum Join {
   }
 
   /// Passthrough export with faststart (moov before mdat). Cancelling the calling task cancels it.
-  private static func export(_ composition: AVComposition, to output: URL, progress: @escaping (Double) -> Void) async throws {
+  private static func export(_ composition: AVComposition, to output: URL, progress: @escaping @Sendable (Double) -> Void) async throws {
     guard let session = AVAssetExportSession(asset: composition, presetName: AVAssetExportPresetPassthrough) else {
       throw MergeError.failed("Couldn't create the export session.")
     }
@@ -118,8 +129,8 @@ enum Join {
     try await session.export(to: output, as: .mp4)
   }
 
-  /// Reject silent assembly bugs: the output must be as long as the clips it was built from.
-  private static func verify(_ output: URL, expectedMs: Double) async throws -> MergeResult {
+  /// Reject silent assembly bugs: the output must be as long as the segments it was built from.
+  private static func verify(_ output: URL, expectedMs: Double, encoded: Bool) async throws -> MergeResult {
     let media = try await Probe.load(output)
     let gotMs = media.result.durationMs
     let tolerance = max(500, expectedMs * 0.01)
@@ -129,7 +140,7 @@ enum Join {
     return MergeResult(
       uri: output.absoluteString,
       durationMs: gotMs,
-      encoded: false,
+      encoded: encoded,
       bitrate: media.result.video?.bitrate ?? -1)
   }
 }
