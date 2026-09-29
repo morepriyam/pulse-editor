@@ -8,16 +8,17 @@
 #include "PulseEditor-Swift-Cxx-Bridge.hpp"
 
 // Include C++ implementation defined types
+#include "HybridMergeJobSpecSwift.hpp"
 #include "HybridPulseEditorSpecSwift.hpp"
 #include "PulseEditor-Swift-Cxx-Umbrella.hpp"
 #include <NitroModules/NitroDefines.hpp>
 
 namespace margelo::nitro::pulseeditor::bridge::swift {
 
-  // pragma MARK: std::function<void(const ProbeResult& /* result */)>
-  Func_void_ProbeResult create_Func_void_ProbeResult(void* NON_NULL swiftClosureWrapper) noexcept {
-    auto swiftClosure = PulseEditor::Func_void_ProbeResult::fromUnsafe(swiftClosureWrapper);
-    return [swiftClosure = std::move(swiftClosure)](const ProbeResult& result) mutable -> void {
+  // pragma MARK: std::function<void(const MergeResult& /* result */)>
+  Func_void_MergeResult create_Func_void_MergeResult(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PulseEditor::Func_void_MergeResult::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const MergeResult& result) mutable -> void {
       swiftClosure.call(result);
     };
   }
@@ -27,6 +28,38 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
     auto swiftClosure = PulseEditor::Func_void_std__exception_ptr::fromUnsafe(swiftClosureWrapper);
     return [swiftClosure = std::move(swiftClosure)](const std::exception_ptr& error) mutable -> void {
       swiftClosure.call(error);
+    };
+  }
+  
+  // pragma MARK: std::function<void(double /* progress */)>
+  Func_void_double create_Func_void_double(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PulseEditor::Func_void_double::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](double progress) mutable -> void {
+      swiftClosure.call(progress);
+    };
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridMergeJobSpec>
+  std::shared_ptr<HybridMergeJobSpec> create_std__shared_ptr_HybridMergeJobSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
+    PulseEditor::HybridMergeJobSpec_cxx swiftPart = PulseEditor::HybridMergeJobSpec_cxx::fromUnsafe(swiftUnsafePointer);
+    return std::make_shared<margelo::nitro::pulseeditor::HybridMergeJobSpecSwift>(swiftPart);
+  }
+  void* NON_NULL get_std__shared_ptr_HybridMergeJobSpec_(std__shared_ptr_HybridMergeJobSpec_ cppType) {
+    std::shared_ptr<margelo::nitro::pulseeditor::HybridMergeJobSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::pulseeditor::HybridMergeJobSpecSwift>(cppType);
+    #ifdef NITRO_DEBUG
+    if (swiftWrapper == nullptr) [[unlikely]] {
+      throw std::runtime_error("Class \"HybridMergeJobSpec\" is not implemented in Swift!");
+    }
+    #endif
+    PulseEditor::HybridMergeJobSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
+    return swiftPart.toUnsafe();
+  }
+  
+  // pragma MARK: std::function<void(const ProbeResult& /* result */)>
+  Func_void_ProbeResult create_Func_void_ProbeResult(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PulseEditor::Func_void_ProbeResult::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const ProbeResult& result) mutable -> void {
+      swiftClosure.call(result);
     };
   }
   

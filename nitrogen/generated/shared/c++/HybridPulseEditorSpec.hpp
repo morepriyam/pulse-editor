@@ -15,10 +15,21 @@
 
 // Forward declaration of `ProbeResult` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ProbeResult; }
+// Forward declaration of `HybridMergeJobSpec` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
+// Forward declaration of `MergeClip` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct MergeClip; }
+// Forward declaration of `MergeOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct MergeOptions; }
 
 #include "ProbeResult.hpp"
 #include <NitroModules/Promise.hpp>
 #include <string>
+#include <memory>
+#include "HybridMergeJobSpec.hpp"
+#include "MergeClip.hpp"
+#include <vector>
+#include "MergeOptions.hpp"
 
 namespace margelo::nitro::pulseeditor {
 
@@ -52,6 +63,7 @@ namespace margelo::nitro::pulseeditor {
     public:
       // Methods
       virtual std::shared_ptr<Promise<ProbeResult>> probe(const std::string& uri) = 0;
+      virtual std::shared_ptr<HybridMergeJobSpec> createMerge(const std::vector<MergeClip>& clips, const MergeOptions& options) = 0;
 
     protected:
       // Hybrid Setup

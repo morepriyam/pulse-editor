@@ -4,22 +4,38 @@ import CoreMedia
 /// Container and track metadata straight from AVFoundation's async loaders: no decoding, no
 /// sample scan (imprecise timing is enough for durations), so a probe costs a few milliseconds.
 enum Probe {
+  /// A probed file plus the tracks it was read from, for callers that go on to use them (merge).
+  struct Media {
+    let asset: AVURLAsset
+    let videoTrack: AVAssetTrack?
+    let audioTrack: AVAssetTrack?
+    let result: ProbeResult
+  }
+
   static func read(_ url: URL) async throws -> ProbeResult {
+    try await load(url).result
+  }
+
+  static func load(_ url: URL) async throws -> Media {
     let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: false])
     let (duration, tracks) = try await asset.load(.duration, .tracks)
     guard !tracks.isEmpty else {
       throw NSError(domain: "PulseEditor", code: 1, userInfo: [NSLocalizedDescriptionKey: "No media tracks in \(url.lastPathComponent)"])
     }
 
+    let videoTrack = tracks.first(where: { $0.mediaType == .video })
+    let audioTrack = tracks.first(where: { $0.mediaType == .audio })
     var video: ProbeVideo? = nil
-    if let track = tracks.first(where: { $0.mediaType == .video }) {
-      video = try await readVideo(track)
+    if let videoTrack {
+      video = try await readVideo(videoTrack)
     }
     var audio: ProbeAudio? = nil
-    if let track = tracks.first(where: { $0.mediaType == .audio }) {
-      audio = try await readAudio(track)
+    if let audioTrack {
+      audio = try await readAudio(audioTrack)
     }
-    return ProbeResult(durationMs: ms(duration), video: video, audio: audio)
+    return Media(
+      asset: asset, videoTrack: videoTrack, audioTrack: audioTrack,
+      result: ProbeResult(durationMs: ms(duration), video: video, audio: audio))
   }
 
   private static func readVideo(_ track: AVAssetTrack) async throws -> ProbeVideo {
@@ -70,7 +86,7 @@ enum Probe {
       channels: Double(asbd.mChannelsPerFrame))
   }
 
-  private static func ms(_ time: CMTime) -> Double {
+  static func ms(_ time: CMTime) -> Double {
     time.isNumeric ? (time.seconds * 1000).rounded() : -1
   }
 

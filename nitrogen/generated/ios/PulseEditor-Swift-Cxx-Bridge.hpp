@@ -8,8 +8,16 @@
 #pragma once
 
 // Forward declarations of C++ defined types
+// Forward declaration of `HybridMergeJobSpec` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
 // Forward declaration of `HybridPulseEditorSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridPulseEditorSpec; }
+// Forward declaration of `MergeClip` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct MergeClip; }
+// Forward declaration of `MergeCrop` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct MergeCrop; }
+// Forward declaration of `MergeResult` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct MergeResult; }
 // Forward declaration of `ProbeAudio` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
 // Forward declaration of `ProbeResult` to properly resolve imports.
@@ -20,11 +28,17 @@ namespace margelo::nitro::pulseeditor { struct ProbeVideo; }
 namespace margelo::nitro::pulseeditor { enum class Transfer; }
 
 // Forward declarations of Swift defined types
+// Forward declaration of `HybridMergeJobSpec_cxx` to properly resolve imports.
+namespace PulseEditor { class HybridMergeJobSpec_cxx; }
 // Forward declaration of `HybridPulseEditorSpec_cxx` to properly resolve imports.
 namespace PulseEditor { class HybridPulseEditorSpec_cxx; }
 
 // Include C++ defined types
+#include "HybridMergeJobSpec.hpp"
 #include "HybridPulseEditorSpec.hpp"
+#include "MergeClip.hpp"
+#include "MergeCrop.hpp"
+#include "MergeResult.hpp"
 #include "ProbeAudio.hpp"
 #include "ProbeResult.hpp"
 #include "ProbeVideo.hpp"
@@ -37,6 +51,7 @@ namespace PulseEditor { class HybridPulseEditorSpec_cxx; }
 #include <memory>
 #include <optional>
 #include <string>
+#include <vector>
 
 /**
  * Contains specialized versions of C++ templated types so they can be accessed from Swift,
@@ -44,6 +59,114 @@ namespace PulseEditor { class HybridPulseEditorSpec_cxx; }
  */
 namespace margelo::nitro::pulseeditor::bridge::swift {
 
+  // pragma MARK: std::shared_ptr<Promise<MergeResult>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<MergeResult>>`.
+   */
+  using std__shared_ptr_Promise_MergeResult__ = std::shared_ptr<Promise<MergeResult>>;
+  inline std::shared_ptr<Promise<MergeResult>> create_std__shared_ptr_Promise_MergeResult__() noexcept {
+    return Promise<MergeResult>::create();
+  }
+  inline PromiseHolder<MergeResult> wrap_std__shared_ptr_Promise_MergeResult__(std::shared_ptr<Promise<MergeResult>> promise) noexcept {
+    return PromiseHolder<MergeResult>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const MergeResult& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const MergeResult&)>`.
+   */
+  using Func_void_MergeResult = std::function<void(const MergeResult& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const MergeResult& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_MergeResult_Wrapper final {
+  public:
+    explicit Func_void_MergeResult_Wrapper(std::function<void(const MergeResult& /* result */)>&& func): _function(std::make_unique<std::function<void(const MergeResult& /* result */)>>(std::move(func))) {}
+    inline void call(MergeResult result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const MergeResult& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_MergeResult create_Func_void_MergeResult(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_MergeResult_Wrapper wrap_Func_void_MergeResult(Func_void_MergeResult value) noexcept {
+    return Func_void_MergeResult_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::function<void(const std::exception_ptr& /* error */)>
+  /**
+   * Specialized version of `std::function<void(const std::exception_ptr&)>`.
+   */
+  using Func_void_std__exception_ptr = std::function<void(const std::exception_ptr& /* error */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::exception_ptr& / * error * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__exception_ptr_Wrapper final {
+  public:
+    explicit Func_void_std__exception_ptr_Wrapper(std::function<void(const std::exception_ptr& /* error */)>&& func): _function(std::make_unique<std::function<void(const std::exception_ptr& /* error */)>>(std::move(func))) {}
+    inline void call(std::exception_ptr error) const noexcept {
+      _function->operator()(error);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::exception_ptr& /* error */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__exception_ptr create_Func_void_std__exception_ptr(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__exception_ptr_Wrapper wrap_Func_void_std__exception_ptr(Func_void_std__exception_ptr value) noexcept {
+    return Func_void_std__exception_ptr_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::function<void(double /* progress */)>
+  /**
+   * Specialized version of `std::function<void(double)>`.
+   */
+  using Func_void_double = std::function<void(double /* progress */)>;
+  /**
+   * Wrapper class for a `std::function<void(double / * progress * /)>`, this can be used from Swift.
+   */
+  class Func_void_double_Wrapper final {
+  public:
+    explicit Func_void_double_Wrapper(std::function<void(double /* progress */)>&& func): _function(std::make_unique<std::function<void(double /* progress */)>>(std::move(func))) {}
+    inline void call(double progress) const noexcept {
+      _function->operator()(progress);
+    }
+  private:
+    std::unique_ptr<std::function<void(double /* progress */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_double create_Func_void_double(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_double_Wrapper wrap_Func_void_double(Func_void_double value) noexcept {
+    return Func_void_double_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridMergeJobSpec>
+  /**
+   * Specialized version of `std::shared_ptr<HybridMergeJobSpec>`.
+   */
+  using std__shared_ptr_HybridMergeJobSpec_ = std::shared_ptr<HybridMergeJobSpec>;
+  std::shared_ptr<HybridMergeJobSpec> create_std__shared_ptr_HybridMergeJobSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
+  void* NON_NULL get_std__shared_ptr_HybridMergeJobSpec_(std__shared_ptr_HybridMergeJobSpec_ cppType);
+  
+  // pragma MARK: std::weak_ptr<HybridMergeJobSpec>
+  using std__weak_ptr_HybridMergeJobSpec_ = std::weak_ptr<HybridMergeJobSpec>;
+  inline std__weak_ptr_HybridMergeJobSpec_ weakify_std__shared_ptr_HybridMergeJobSpec_(const std::shared_ptr<HybridMergeJobSpec>& strong) noexcept { return strong; }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<MergeResult>>>
+  using Result_std__shared_ptr_Promise_MergeResult___ = Result<std::shared_ptr<Promise<MergeResult>>>;
+  inline Result_std__shared_ptr_Promise_MergeResult___ create_Result_std__shared_ptr_Promise_MergeResult___(const std::shared_ptr<Promise<MergeResult>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<MergeResult>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_MergeResult___ create_Result_std__shared_ptr_Promise_MergeResult___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<MergeResult>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<void>
+  using Result_void_ = Result<void>;
+  inline Result_void_ create_Result_void_() noexcept {
+    return Result<void>::withValue();
+  }
+  inline Result_void_ create_Result_void_(const std::exception_ptr& error) noexcept {
+    return Result<void>::withError(error);
+  }
+  
   // pragma MARK: std::optional<ProbeVideo>
   /**
    * Specialized version of `std::optional<ProbeVideo>`.
@@ -108,26 +231,30 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
     return Func_void_ProbeResult_Wrapper(std::move(value));
   }
   
-  // pragma MARK: std::function<void(const std::exception_ptr& /* error */)>
+  // pragma MARK: std::optional<MergeCrop>
   /**
-   * Specialized version of `std::function<void(const std::exception_ptr&)>`.
+   * Specialized version of `std::optional<MergeCrop>`.
    */
-  using Func_void_std__exception_ptr = std::function<void(const std::exception_ptr& /* error */)>;
+  using std__optional_MergeCrop_ = std::optional<MergeCrop>;
+  inline std::optional<MergeCrop> create_std__optional_MergeCrop_(const MergeCrop& value) noexcept {
+    return std::optional<MergeCrop>(value);
+  }
+  inline bool has_value_std__optional_MergeCrop_(const std::optional<MergeCrop>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline MergeCrop get_std__optional_MergeCrop_(const std::optional<MergeCrop>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::vector<MergeClip>
   /**
-   * Wrapper class for a `std::function<void(const std::exception_ptr& / * error * /)>`, this can be used from Swift.
+   * Specialized version of `std::vector<MergeClip>`.
    */
-  class Func_void_std__exception_ptr_Wrapper final {
-  public:
-    explicit Func_void_std__exception_ptr_Wrapper(std::function<void(const std::exception_ptr& /* error */)>&& func): _function(std::make_unique<std::function<void(const std::exception_ptr& /* error */)>>(std::move(func))) {}
-    inline void call(std::exception_ptr error) const noexcept {
-      _function->operator()(error);
-    }
-  private:
-    std::unique_ptr<std::function<void(const std::exception_ptr& /* error */)>> _function;
-  } SWIFT_NONCOPYABLE;
-  Func_void_std__exception_ptr create_Func_void_std__exception_ptr(void* NON_NULL swiftClosureWrapper) noexcept;
-  inline Func_void_std__exception_ptr_Wrapper wrap_Func_void_std__exception_ptr(Func_void_std__exception_ptr value) noexcept {
-    return Func_void_std__exception_ptr_Wrapper(std::move(value));
+  using std__vector_MergeClip_ = std::vector<MergeClip>;
+  inline std::vector<MergeClip> create_std__vector_MergeClip_(size_t size) noexcept {
+    std::vector<MergeClip> vector;
+    vector.reserve(size);
+    return vector;
   }
   
   // pragma MARK: std::shared_ptr<HybridPulseEditorSpec>
@@ -149,6 +276,15 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
   }
   inline Result_std__shared_ptr_Promise_ProbeResult___ create_Result_std__shared_ptr_Promise_ProbeResult___(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<Promise<ProbeResult>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<HybridMergeJobSpec>>
+  using Result_std__shared_ptr_HybridMergeJobSpec__ = Result<std::shared_ptr<HybridMergeJobSpec>>;
+  inline Result_std__shared_ptr_HybridMergeJobSpec__ create_Result_std__shared_ptr_HybridMergeJobSpec__(const std::shared_ptr<HybridMergeJobSpec>& value) noexcept {
+    return Result<std::shared_ptr<HybridMergeJobSpec>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_HybridMergeJobSpec__ create_Result_std__shared_ptr_HybridMergeJobSpec__(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<HybridMergeJobSpec>>::withError(error);
   }
 
 } // namespace margelo::nitro::pulseeditor::bridge::swift

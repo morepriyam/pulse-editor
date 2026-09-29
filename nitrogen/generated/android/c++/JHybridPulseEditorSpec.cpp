@@ -15,6 +15,16 @@ namespace margelo::nitro::pulseeditor { struct ProbeVideo; }
 namespace margelo::nitro::pulseeditor { enum class Transfer; }
 // Forward declaration of `ProbeAudio` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
+// Forward declaration of `HybridMergeJobSpec` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
+// Forward declaration of `MergeClip` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct MergeClip; }
+// Forward declaration of `MergeCrop` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct MergeCrop; }
+// Forward declaration of `MergeOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct MergeOptions; }
+// Forward declaration of `MergeAudio` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct MergeAudio; }
 
 #include "ProbeResult.hpp"
 #include <NitroModules/Promise.hpp>
@@ -28,6 +38,18 @@ namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
 #include "JTransfer.hpp"
 #include "ProbeAudio.hpp"
 #include "JProbeAudio.hpp"
+#include <memory>
+#include "HybridMergeJobSpec.hpp"
+#include "JHybridMergeJobSpec.hpp"
+#include "MergeClip.hpp"
+#include <vector>
+#include "JMergeClip.hpp"
+#include "MergeCrop.hpp"
+#include "JMergeCrop.hpp"
+#include "MergeOptions.hpp"
+#include "JMergeOptions.hpp"
+#include "MergeAudio.hpp"
+#include "JMergeAudio.hpp"
 
 namespace margelo::nitro::pulseeditor {
 
@@ -77,6 +99,20 @@ namespace margelo::nitro::pulseeditor {
       });
       return __promise;
     }();
+  }
+  std::shared_ptr<HybridMergeJobSpec> JHybridPulseEditorSpec::createMerge(const std::vector<MergeClip>& clips, const MergeOptions& options) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JHybridMergeJobSpec::JavaPart>(jni::alias_ref<jni::JArrayClass<JMergeClip>> /* clips */, jni::alias_ref<JMergeOptions> /* options */)>("createMerge");
+    auto __result = method(_javaPart, [&](auto&& __input) {
+      size_t __size = __input.size();
+      jni::local_ref<jni::JArrayClass<JMergeClip>> __array = jni::JArrayClass<JMergeClip>::newArray(__size);
+      for (size_t __i = 0; __i < __size; __i++) {
+        const auto& __element = __input[__i];
+        auto __elementJni = JMergeClip::fromCpp(__element);
+        __array->setElement(__i, *__elementJni);
+      }
+      return __array;
+    }(clips), JMergeOptions::fromCpp(options));
+    return __result->getJHybridMergeJobSpec();
   }
 
 } // namespace margelo::nitro::pulseeditor

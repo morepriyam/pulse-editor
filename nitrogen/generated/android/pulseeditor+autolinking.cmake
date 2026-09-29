@@ -33,8 +33,10 @@ target_sources(
   # Autolinking Setup
   ../nitrogen/generated/android/pulseeditorOnLoad.cpp
   # Shared Nitrogen C++ sources
+  ../nitrogen/generated/shared/c++/HybridMergeJobSpec.cpp
   ../nitrogen/generated/shared/c++/HybridPulseEditorSpec.cpp
   # Android-specific Nitrogen C++ sources
+  ../nitrogen/generated/android/c++/JHybridMergeJobSpec.cpp
   ../nitrogen/generated/android/c++/JHybridPulseEditorSpec.cpp
 )
 

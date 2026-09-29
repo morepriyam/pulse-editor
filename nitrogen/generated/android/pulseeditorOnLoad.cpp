@@ -15,6 +15,8 @@
 #include <fbjni/fbjni.h>
 #include <NitroModules/HybridObjectRegistry.hpp>
 
+#include "JHybridMergeJobSpec.hpp"
+#include "JFunc_void_double.hpp"
 #include "JHybridPulseEditorSpec.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
 
@@ -40,6 +42,8 @@ void registerAllNatives() {
   using namespace margelo::nitro::pulseeditor;
 
   // Register native JNI methods
+  margelo::nitro::pulseeditor::JHybridMergeJobSpec::CxxPart::registerNatives();
+  margelo::nitro::pulseeditor::JFunc_void_double_cxx::registerNatives();
   margelo::nitro::pulseeditor::JHybridPulseEditorSpec::CxxPart::registerNatives();
 
   // Register Nitro Hybrid Objects

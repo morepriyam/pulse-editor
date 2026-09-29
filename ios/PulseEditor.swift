@@ -8,6 +8,10 @@ class PulseEditor: HybridPulseEditorSpec {
       try await Probe.read(fileURL(uri))
     }
   }
+
+  public func createMerge(clips: [MergeClip], options: MergeOptions) throws -> (any HybridMergeJobSpec) {
+    return MergeJob(clips: clips, options: options)
+  }
 }
 
 /// `file://` URI or bare path → file URL.

@@ -20,6 +20,16 @@ namespace margelo::nitro::pulseeditor { struct ProbeVideo; }
 namespace margelo::nitro::pulseeditor { enum class Transfer; }
 // Forward declaration of `ProbeAudio` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
+// Forward declaration of `HybridMergeJobSpec` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
+// Forward declaration of `MergeClip` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct MergeClip; }
+// Forward declaration of `MergeCrop` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct MergeCrop; }
+// Forward declaration of `MergeOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct MergeOptions; }
+// Forward declaration of `MergeAudio` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct MergeAudio; }
 
 #include "ProbeResult.hpp"
 #include <NitroModules/Promise.hpp>
@@ -28,6 +38,13 @@ namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
 #include <string>
 #include "Transfer.hpp"
 #include "ProbeAudio.hpp"
+#include <memory>
+#include "HybridMergeJobSpec.hpp"
+#include "MergeClip.hpp"
+#include <vector>
+#include "MergeCrop.hpp"
+#include "MergeOptions.hpp"
+#include "MergeAudio.hpp"
 
 #include "PulseEditor-Swift-Cxx-Umbrella.hpp"
 
@@ -81,6 +98,14 @@ namespace margelo::nitro::pulseeditor {
     // Methods
     inline std::shared_ptr<Promise<ProbeResult>> probe(const std::string& uri) override {
       auto __result = _swiftPart.probe(uri);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<HybridMergeJobSpec> createMerge(const std::vector<MergeClip>& clips, const MergeOptions& options) override {
+      auto __result = _swiftPart.createMerge(clips, std::forward<decltype(options)>(options));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

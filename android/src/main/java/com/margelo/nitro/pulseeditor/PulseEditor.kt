@@ -10,6 +10,9 @@ class PulseEditor : HybridPulseEditorSpec() {
     return Promise.async { Probe.read(context(), uri) }
   }
 
+  override fun createMerge(clips: Array<MergeClip>, options: MergeOptions): HybridMergeJobSpec =
+    MergeJob(clips, options)
+
   private fun context() =
     NitroModules.applicationContext ?: throw IllegalStateException("React context not ready")
 }

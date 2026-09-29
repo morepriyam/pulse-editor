@@ -43,6 +43,69 @@ export interface ProbeResult {
   audio?: ProbeAudio;
 }
 
+/** A crop rectangle, normalized 0–1, in the clip's frame after its edit rotation and flip. */
+export interface MergeCrop {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** One clip of a merge and its edit. */
+export interface MergeClip {
+  /** `file://` URI or bare path. */
+  uri: string;
+  /** Trim window in the source, ms. `endMs <= startMs` means the whole clip. */
+  startMs: number;
+  endMs: number;
+  /** Playback speed, 0.25–4 (1 = unchanged). Pitch is kept natural. */
+  speed: number;
+  muted: boolean;
+  /** Edit rotation, clockwise: 0, 90, 180 or 270. */
+  rotation: number;
+  /** Mirror horizontally, after the rotation. */
+  flipped: boolean;
+  crop?: MergeCrop;
+}
+
+export interface MergeAudio {
+  sampleRate: number;
+  channels: number;
+}
+
+export interface MergeOptions {
+  /** Output canvas (display size) and frame rate, e.g. 1080×1920 @ 30. */
+  width: number;
+  height: number;
+  fps: number;
+  /** Video bitrate in bits per second for anything that gets encoded. Clips already at or
+   * below it can join without re-encoding. */
+  bitrate: number;
+  /** Audio layout for anything that gets encoded (the recorder's). */
+  audio: MergeAudio;
+}
+
+export interface MergeResult {
+  /** `file://` URI of the merged MP4 (faststart), in the caches directory. */
+  uri: string;
+  durationMs: number;
+  /** `false` when the clips were joined without re-encoding. */
+  encoded: boolean;
+  /** Average video bitrate of the output, bits per second. */
+  bitrate: number;
+}
+
+/** One merge run: start it once, cancel it any time. */
+export interface MergeJob extends HybridObject<{
+  ios: 'swift';
+  android: 'kotlin';
+}> {
+  /** Run the merge. `onProgress` gets 0–1. Rejects with "Merge cancelled" after `cancel()`. */
+  start(onProgress: (progress: number) => void): Promise<MergeResult>;
+  /** Stop the merge and delete its partial output. Safe to call at any time. */
+  cancel(): void;
+}
+
 export interface PulseEditor extends HybridObject<{
   ios: 'swift';
   android: 'kotlin';
@@ -52,4 +115,7 @@ export interface PulseEditor extends HybridObject<{
    * (AVFoundation / Media3). Rejects when the platform can't open the file.
    */
   probe(uri: string): Promise<ProbeResult>;
+
+  /** Prepare a merge of `clips`, in order, applying each clip's edit. Call `start` to run it. */
+  createMerge(clips: MergeClip[], options: MergeOptions): MergeJob;
 }
