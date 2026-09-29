@@ -20,6 +20,10 @@ namespace margelo::nitro::pulseeditor { struct ProbeVideo; }
 namespace margelo::nitro::pulseeditor { enum class Transfer; }
 // Forward declaration of `ProbeAudio` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
+// Forward declaration of `AudioPCM` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct AudioPCM; }
+// Forward declaration of `ArrayBufferHolder` to properly resolve imports.
+namespace NitroModules { class ArrayBufferHolder; }
 // Forward declaration of `HybridMergeJobSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
 // Forward declaration of `MergeClip` to properly resolve imports.
@@ -38,6 +42,9 @@ namespace margelo::nitro::pulseeditor { struct MergeAudio; }
 #include <string>
 #include "Transfer.hpp"
 #include "ProbeAudio.hpp"
+#include "AudioPCM.hpp"
+#include <NitroModules/ArrayBuffer.hpp>
+#include <NitroModules/ArrayBufferHolder.hpp>
 #include <memory>
 #include "HybridMergeJobSpec.hpp"
 #include "MergeClip.hpp"
@@ -98,6 +105,14 @@ namespace margelo::nitro::pulseeditor {
     // Methods
     inline std::shared_ptr<Promise<ProbeResult>> probe(const std::string& uri) override {
       auto __result = _swiftPart.probe(uri);
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<AudioPCM>> extractAudio(const std::string& uri, double sampleRate) override {
+      auto __result = _swiftPart.extractAudio(uri, std::forward<decltype(sampleRate)>(sampleRate));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

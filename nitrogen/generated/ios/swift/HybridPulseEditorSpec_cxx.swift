@@ -144,6 +144,25 @@ open class HybridPulseEditorSpec_cxx {
   }
   
   @inline(__always)
+  public final func extractAudio(uri: std.string, sampleRate: Double) -> bridge.Result_std__shared_ptr_Promise_AudioPCM___ {
+    do {
+      let __result = try self.__implementation.extractAudio(uri: String(uri), sampleRate: sampleRate)
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_AudioPCM__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_AudioPCM__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_AudioPCM__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_AudioPCM___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_AudioPCM___(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
   public final func createMerge(clips: bridge.std__vector_MergeClip_, options: MergeOptions) -> bridge.Result_std__shared_ptr_HybridMergeJobSpec__ {
     do {
       let __result = try self.__implementation.createMerge(clips: clips.map({ __item in __item }), options: options)

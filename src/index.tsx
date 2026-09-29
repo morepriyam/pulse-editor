@@ -1,5 +1,6 @@
 import { editor } from './editor';
 import type {
+  AudioPCM,
   MergeClip,
   MergeOptions,
   MergeResult,
@@ -7,6 +8,7 @@ import type {
 } from './PulseEditor.nitro';
 
 export type {
+  AudioPCM,
   MergeAudio,
   MergeClip,
   MergeCrop,
@@ -27,6 +29,21 @@ export function probe(uri: string): Promise<ProbeResult> {
     return Promise.reject(new Error('File path cannot be empty.'));
   }
   return editor.probe(uri);
+}
+
+/**
+ * Decode a local file's audio to 16-bit signed little-endian mono PCM, in memory, at
+ * `sampleRate` (default 16 kHz, what whisper.cpp takes): ready for whisper.rn's
+ * `transcribeData` / `detectSpeechData`. `data` is empty when the file has no audio track.
+ */
+export function extractAudio(
+  uri: string,
+  { sampleRate = 16000 }: { sampleRate?: number } = {}
+): Promise<AudioPCM> {
+  if (!uri?.trim().length) {
+    return Promise.reject(new Error('File path cannot be empty.'));
+  }
+  return editor.extractAudio(uri, sampleRate);
 }
 
 export interface MergeControls {

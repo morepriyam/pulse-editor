@@ -8,6 +8,10 @@
 #pragma once
 
 // Forward declarations of C++ defined types
+// Forward declaration of `ArrayBufferHolder` to properly resolve imports.
+namespace NitroModules { class ArrayBufferHolder; }
+// Forward declaration of `AudioPCM` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct AudioPCM; }
 // Forward declaration of `HybridMergeJobSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
 // Forward declaration of `HybridPulseEditorSpec` to properly resolve imports.
@@ -34,6 +38,7 @@ namespace PulseEditor { class HybridMergeJobSpec_cxx; }
 namespace PulseEditor { class HybridPulseEditorSpec_cxx; }
 
 // Include C++ defined types
+#include "AudioPCM.hpp"
 #include "HybridMergeJobSpec.hpp"
 #include "HybridPulseEditorSpec.hpp"
 #include "MergeClip.hpp"
@@ -43,6 +48,8 @@ namespace PulseEditor { class HybridPulseEditorSpec_cxx; }
 #include "ProbeResult.hpp"
 #include "ProbeVideo.hpp"
 #include "Transfer.hpp"
+#include <NitroModules/ArrayBuffer.hpp>
+#include <NitroModules/ArrayBufferHolder.hpp>
 #include <NitroModules/Promise.hpp>
 #include <NitroModules/PromiseHolder.hpp>
 #include <NitroModules/Result.hpp>
@@ -231,6 +238,40 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
     return Func_void_ProbeResult_Wrapper(std::move(value));
   }
   
+  // pragma MARK: std::shared_ptr<Promise<AudioPCM>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<AudioPCM>>`.
+   */
+  using std__shared_ptr_Promise_AudioPCM__ = std::shared_ptr<Promise<AudioPCM>>;
+  inline std::shared_ptr<Promise<AudioPCM>> create_std__shared_ptr_Promise_AudioPCM__() noexcept {
+    return Promise<AudioPCM>::create();
+  }
+  inline PromiseHolder<AudioPCM> wrap_std__shared_ptr_Promise_AudioPCM__(std::shared_ptr<Promise<AudioPCM>> promise) noexcept {
+    return PromiseHolder<AudioPCM>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const AudioPCM& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const AudioPCM&)>`.
+   */
+  using Func_void_AudioPCM = std::function<void(const AudioPCM& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const AudioPCM& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_AudioPCM_Wrapper final {
+  public:
+    explicit Func_void_AudioPCM_Wrapper(std::function<void(const AudioPCM& /* result */)>&& func): _function(std::make_unique<std::function<void(const AudioPCM& /* result */)>>(std::move(func))) {}
+    inline void call(AudioPCM result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const AudioPCM& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_AudioPCM create_Func_void_AudioPCM(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_AudioPCM_Wrapper wrap_Func_void_AudioPCM(Func_void_AudioPCM value) noexcept {
+    return Func_void_AudioPCM_Wrapper(std::move(value));
+  }
+  
   // pragma MARK: std::optional<MergeCrop>
   /**
    * Specialized version of `std::optional<MergeCrop>`.
@@ -276,6 +317,15 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
   }
   inline Result_std__shared_ptr_Promise_ProbeResult___ create_Result_std__shared_ptr_Promise_ProbeResult___(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<Promise<ProbeResult>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<AudioPCM>>>
+  using Result_std__shared_ptr_Promise_AudioPCM___ = Result<std::shared_ptr<Promise<AudioPCM>>>;
+  inline Result_std__shared_ptr_Promise_AudioPCM___ create_Result_std__shared_ptr_Promise_AudioPCM___(const std::shared_ptr<Promise<AudioPCM>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<AudioPCM>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_AudioPCM___ create_Result_std__shared_ptr_Promise_AudioPCM___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<AudioPCM>>>::withError(error);
   }
   
   // pragma MARK: Result<std::shared_ptr<HybridMergeJobSpec>>

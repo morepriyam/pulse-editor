@@ -55,6 +55,7 @@ namespace margelo::nitro::pulseeditor {
   public:
     // Methods
     std::shared_ptr<Promise<ProbeResult>> probe(const std::string& uri) override;
+    std::shared_ptr<Promise<AudioPCM>> extractAudio(const std::string& uri, double sampleRate) override;
     std::shared_ptr<HybridMergeJobSpec> createMerge(const std::vector<MergeClip>& clips, const MergeOptions& options) override;
 
   private:

@@ -36,6 +36,10 @@ abstract class HybridPulseEditorSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun extractAudio(uri: String, sampleRate: Double): Promise<AudioPCM>
+  
+  @DoNotStrip
+  @Keep
   abstract fun createMerge(clips: Array<MergeClip>, options: MergeOptions): HybridMergeJobSpec
 
   // Default implementation of `HybridObject.toString()`

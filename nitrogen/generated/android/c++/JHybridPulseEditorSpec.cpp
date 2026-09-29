@@ -15,6 +15,8 @@ namespace margelo::nitro::pulseeditor { struct ProbeVideo; }
 namespace margelo::nitro::pulseeditor { enum class Transfer; }
 // Forward declaration of `ProbeAudio` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
+// Forward declaration of `AudioPCM` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct AudioPCM; }
 // Forward declaration of `HybridMergeJobSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
 // Forward declaration of `MergeClip` to properly resolve imports.
@@ -38,6 +40,10 @@ namespace margelo::nitro::pulseeditor { struct MergeAudio; }
 #include "JTransfer.hpp"
 #include "ProbeAudio.hpp"
 #include "JProbeAudio.hpp"
+#include "AudioPCM.hpp"
+#include "JAudioPCM.hpp"
+#include <NitroModules/ArrayBuffer.hpp>
+#include <NitroModules/JArrayBuffer.hpp>
 #include <memory>
 #include "HybridMergeJobSpec.hpp"
 #include "JHybridMergeJobSpec.hpp"
@@ -91,6 +97,22 @@ namespace margelo::nitro::pulseeditor {
       auto __promise = Promise<ProbeResult>::create();
       __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
         auto __result = jni::static_ref_cast<JProbeResult>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<AudioPCM>> JHybridPulseEditorSpec::extractAudio(const std::string& uri, double sampleRate) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* uri */, double /* sampleRate */)>("extractAudio");
+    auto __result = method(_javaPart, jni::make_jstring(uri), sampleRate);
+    return [&]() {
+      auto __promise = Promise<AudioPCM>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JAudioPCM>(__boxedResult);
         __promise->resolve(__result->toCpp());
       });
       __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {

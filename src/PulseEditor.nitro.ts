@@ -95,6 +95,14 @@ export interface MergeResult {
   bitrate: number;
 }
 
+/** A file's audio as 16-bit signed little-endian mono PCM. */
+export interface AudioPCM {
+  /** The samples; empty when the file has no audio track. */
+  data: ArrayBuffer;
+  sampleRate: number;
+  durationMs: number;
+}
+
 /** One merge run: start it once, cancel it any time. */
 export interface MergeJob extends HybridObject<{
   ios: 'swift';
@@ -115,6 +123,12 @@ export interface PulseEditor extends HybridObject<{
    * (AVFoundation / Media3). Rejects when the platform can't open the file.
    */
   probe(uri: string): Promise<ProbeResult>;
+
+  /**
+   * Decode a local file's audio track to 16-bit mono PCM at `sampleRate`, downmixed and
+   * band-limited resampled, in memory. Turned down as a whole only if the downmix would clip.
+   */
+  extractAudio(uri: string, sampleRate: number): Promise<AudioPCM>;
 
   /** Prepare a merge of `clips`, in order, applying each clip's edit. Call `start` to run it. */
   createMerge(clips: MergeClip[], options: MergeOptions): MergeJob;

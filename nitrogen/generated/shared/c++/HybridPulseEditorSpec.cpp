@@ -15,6 +15,7 @@ namespace margelo::nitro::pulseeditor {
     // load custom methods/properties
     registerHybrids(this, [](Prototype& prototype) {
       prototype.registerHybridMethod("probe", &HybridPulseEditorSpec::probe);
+      prototype.registerHybridMethod("extractAudio", &HybridPulseEditorSpec::extractAudio);
       prototype.registerHybridMethod("createMerge", &HybridPulseEditorSpec::createMerge);
     });
   }

@@ -8,6 +8,8 @@
 #pragma once
 
 // Forward declarations of C++ defined types
+// Forward declaration of `AudioPCM` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct AudioPCM; }
 // Forward declaration of `HybridMergeJobSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
 // Forward declaration of `HybridPulseEditorSpec` to properly resolve imports.
@@ -32,6 +34,7 @@ namespace margelo::nitro::pulseeditor { struct ProbeVideo; }
 namespace margelo::nitro::pulseeditor { enum class Transfer; }
 
 // Include C++ defined types
+#include "AudioPCM.hpp"
 #include "HybridMergeJobSpec.hpp"
 #include "HybridPulseEditorSpec.hpp"
 #include "MergeAudio.hpp"
@@ -43,6 +46,7 @@ namespace margelo::nitro::pulseeditor { enum class Transfer; }
 #include "ProbeResult.hpp"
 #include "ProbeVideo.hpp"
 #include "Transfer.hpp"
+#include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/Promise.hpp>
 #include <NitroModules/Result.hpp>
 #include <exception>

@@ -63,6 +63,14 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
     };
   }
   
+  // pragma MARK: std::function<void(const AudioPCM& /* result */)>
+  Func_void_AudioPCM create_Func_void_AudioPCM(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PulseEditor::Func_void_AudioPCM::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const AudioPCM& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
   // pragma MARK: std::shared_ptr<HybridPulseEditorSpec>
   std::shared_ptr<HybridPulseEditorSpec> create_std__shared_ptr_HybridPulseEditorSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
     PulseEditor::HybridPulseEditorSpec_cxx swiftPart = PulseEditor::HybridPulseEditorSpec_cxx::fromUnsafe(swiftUnsafePointer);
