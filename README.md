@@ -12,19 +12,29 @@ The native video engine behind [Pulse](https://github.com/mieweb/pulse): fast, s
 
 Pulse is moving every native video method it uses from its react-native-video-trim fork into pulse-editor, **one method at a time**. Each method is added here, switched over in the app, and tested on a device before the next one starts. The trim editor UI moves last.
 
-| Step | pulse-editor | Replaces (RNVT) | iOS | Android |
-|---|---|---|---|---|
-| 1 | `probe` | `probeVideo`, `isValidFile` | ✅ Tested on device | ✅ Tested on device (Galaxy S24 Ultra, Android 16) |
-| 2 | `merge`: fast join (trims, mute), cancel | `merge` (no-re-encode path), `onMergeProgress` | ✅ Tested on device | ✅ Tested on device (join, trims, mute); cancel on emulator |
-| 3 | `merge`: edited clips (rotate, flip, crop, speed): selective render | `merge` with `clipEdits` | ✅ Tested on device (iPhone 17 Pro Max) | ✅ Tested on device (one hardware encode) |
-| 4 | `merge`: full encode (clips off the recorder's format, lower bitrate) | the re-encode fallback | ✅ Tested on device | ✅ Tested on emulator |
-| 5 | `conform`: import normalization, including HDR | `compress`, `cancelCompress` | Planned | Planned |
-| 6 | `extractAudio` (feeds whisper.rn's `transcribeData` / `detectSpeechData`) | `extractAudio` | ✅ Tested on device | ✅ Tested on device |
-| 7 | `thumbnail` | `getFrameAt` | Planned | Planned |
-| 8 | `<PulsePreview>`: composition player | the preview screen | Planned | Planned |
-| 9 | Multi-clip timeline editor, in React Native on `<PulsePreview>` (see [The timeline editor](#the-timeline-editor-plan)) | the clip preview and `showEditor` (RNVT's per-clip editor) | **Last** | **Last** |
+✅ done · ⏳ left to do · 📋 planned. Devices: **iPhone 17 Pro Max** (iOS) and **Galaxy S24 Ultra, Android 16** (Android); "macOS" = the same iOS code run on a Mac against references; "emulator" = Android 17 emulator.
 
-Pulse still falls back to RNVT if pulse-editor's `merge` throws, until both platforms have been tested on real devices.
+| # | Step | Replaces (RNVT) | iOS | Android | Where (Pulse) |
+|---|---|---|---|---|---|
+| 1 | `probe` | `probeVideo`, `isValidFile` | ✅ iPhone: recordings, upright + letterboxed imports, HDR import, preview sizing, recording rescue · iOS: all 24 fixtures read correctly | ✅ S24: recordings (codec, rotation, fps, bitrate, audio); emulator: fixtures | #240 |
+| 2 | `merge`: join, trims, mute | `merge` (copy path) | ✅ iPhone: 3-clip join (90 ms), trims, muted clip, 2- and 8-min drafts (0.66 s, 2.4–5.2 s); macOS: audio matches the original within 0.1 ms | ✅ S24: 3-clip join (0.65 s, exact length), trims, muted clip; emulator: same fixtures | #240 |
+|  | `merge`: cancel | (not possible in RNVT) | ✅ iPhone: cancel mid-merge; macOS: no files left behind | ✅ emulator · ⏳ S24: next device run | #240 |
+| 3 | `merge`: edited clips (rotate, flip, crop, 2×, 0.5×) | `merge` with clip edits | ✅ iPhone: rotate + flip + crop + 0.5× + mute, trim + 2× (only edited clips rendered, lengths within a frame); macOS: every rotation/flip/crop frame by frame, exact durations, natural pitch | ✅ S24: rotate + flip, crop, 2×, 0.5×, mute (one hardware encode, lengths within a frame, 5.6–6.2 Mbps); emulator: frames identical to iOS | #240 |
+| 4 | `merge`: full encode | the re-encode path | ✅ iPhone: mixed (20 clips) and wild-imports (12 clips: HDR, VFR, Opus, no audio) seed drafts → H.264 1080×1920 30 fps, SDR, audio in sync; macOS: 2 Mbps target → 1.98 Mbps | ✅ S24: every edited export above runs this path · emulator: mixed HEVC / 60 fps / 4K / landscape / 5.1 draft · ⏳ a mixed-format draft on the S24 | #240 |
+| 5 | `extractAudio` → Whisper captions | `extractAudio` | ✅ iPhone: captions (extract 80–180 ms, VAD 128 ms, Whisper 123 ms); macOS: PCM vs FFmpeg reference within 0.1 ms; local whisper.cpp 1.9.3 gives the same transcripts | ✅ S24: captions (extract 0.4–0.8 s, Whisper 1.5 s on CPU); emulator: length and speech onset exact vs FFmpeg; local whisper.cpp gives the same transcripts | #240 |
+| | Preview pitch fix for 2× / 0.5× clips | | not affected | ✅ S24: preview at 2× | #240 |
+| | whisper.rn audit cleanups (VAD comment, real CPU fallback) | | ⏳ | ⏳ | #240 |
+| | Remove the RNVT merge fallback (never triggered in testing) | `merge` | ⏳ after the S24 cancel run | ⏳ | #240 |
+| | Tune Whisper: `maxThreads` 4 vs 6, q8_0 models on Android | | ⏳ next device run | ⏳ next device run | #240 |
+| 6 | `conform`: import normalization, HDR | `compress`, `cancelCompress` | 📋 | 📋 (RNVT's fails on the S24 today) | next PR |
+| 7 | Per-clip audio: WAV + waveform on save, Whisper later from the WAV | whole-draft transcription | 📋 | 📋 | own PR |
+| 8 | `thumbnail` | `getFrameAt` | 📋 | 📋 | later |
+| 9 | Cover selector: a video frame or a device photo |  | 📋 | 📋 | later |
+| 10 | `<PulsePreview>`: composition player | the clip preview | 📋 | 📋 | later |
+| 11 | Timeline editor UI (React Native; see [The timeline editor](#the-timeline-editor-plan)) | the clip preview + `showEditor` | 📋 last | 📋 last | later |
+| 12 | Remove RNVT and FFmpeg | the fork | 📋 | 📋 | last |
+
+Pulse still falls back to RNVT if pulse-editor's `merge` throws. It never triggered in testing, and it comes out after the Android cancel run.
 
 RNVT's file helpers (`deleteFile`, `cleanFiles`, `saveToDocuments`) don't move here; Pulse uses `expo-file-system` for those.
 
@@ -87,9 +97,9 @@ A screen to choose the pulse's final thumbnail: the poster that's uploaded with 
 
 | Piece | From |
 |---|---|
-| Playback across clips with edits, preview == export | `<PulsePreview>` (step 8) |
-| Thumbnails along each clip, and the cover selector's frames | `thumbnail` (step 7) |
-| Waveform, captions, speech regions | `extractAudio` (done) + the per-clip audio job in Pulse |
+| Playback across clips with edits, preview == export | `<PulsePreview>` (step 10) |
+| Thumbnails along each clip, and the cover selector's frames | `thumbnail` (step 8) |
+| Waveform, captions, speech regions | `extractAudio` (done) + the per-clip audio job in Pulse (step 7) |
 | Rendering the edits at export | `merge` (done) |
 
 ## `probe`
