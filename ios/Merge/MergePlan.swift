@@ -8,8 +8,10 @@ struct MergePlan {
     case encode(reasons: [String])
   }
 
-  /// A VBR encode overshoots its target; clips this far above the chosen bitrate still count as at it.
-  static let bitrateTolerance = 1.25
+  /// A VBR encode overshoots its target: recordings aimed at 5 Mbps average 6–7 Mbps. Clips up to
+  /// this multiple of the chosen bitrate still count as at it (1.6× of 5 Mbps is the 8 Mbps an
+  /// import may carry and still pass through untouched in Pulse's import rules).
+  static let bitrateTolerance = 1.6
 
   let path: Path
 
