@@ -1,9 +1,8 @@
 import AVFoundation
 
 /// Decode an asset's audio timeline and encode it as one AAC track. Gaps in the timeline come out
-/// as real silence, which is why the join uses this for muted clips: a gap left as an MP4 empty
-/// edit plays as silence in Apple players, but FFmpeg-based players (Chrome, most servers) ignore
-/// mid-track empty edits and shift the following audio early.
+/// as real silence, which is why the join uses this for muted clips: the output's audio is then
+/// continuous instead of relying on players to honour an empty stretch in the edit list.
 enum AudioEncode {
   static func run(_ asset: AVAsset, audio: MergeAudio, to output: URL, progress: @escaping @Sendable (Double) -> Void) async throws {
     try? FileManager.default.removeItem(at: output)
