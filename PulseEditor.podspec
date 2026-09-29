@@ -19,6 +19,10 @@ Pod::Spec.new do |s|
     "cpp/**/*.{hpp,cpp}",
   ]
 
+  # Platform media stack only: AVFoundation (+ Core Media / Video, VideoToolbox for hardware
+  # encode/decode). No FFmpeg.
+  s.frameworks = "AVFoundation", "CoreMedia", "CoreVideo", "VideoToolbox"
+
   s.dependency 'React-jsi'
   s.dependency 'React-callinvoker'
 
