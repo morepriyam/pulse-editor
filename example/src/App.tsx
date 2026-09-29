@@ -1,12 +1,12 @@
 import { Text, View, StyleSheet } from 'react-native';
-import { multiply } from 'pulse-editor';
+import { hello } from 'pulse-editor';
 
-const result = multiply(3, 7);
+const result = hello();
 
 export default function App() {
   return (
     <View style={styles.container}>
-      <Text>Result: {result}</Text>
+      <Text>{result}</Text>
     </View>
   );
 }

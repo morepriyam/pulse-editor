@@ -4,6 +4,6 @@ import type { PulseEditor } from './PulseEditor.nitro';
 const PulseEditorHybridObject =
   NitroModules.createHybridObject<PulseEditor>('PulseEditor');
 
-export function multiply(a: number, b: number): number {
-  return PulseEditorHybridObject.multiply(a, b);
+export function hello(): string {
+  return PulseEditorHybridObject.hello();
 }

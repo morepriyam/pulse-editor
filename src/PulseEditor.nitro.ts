@@ -4,5 +4,5 @@ export interface PulseEditor extends HybridObject<{
   ios: 'swift';
   android: 'kotlin';
 }> {
-  multiply(a: number, b: number): number;
+  hello(): string;
 }
