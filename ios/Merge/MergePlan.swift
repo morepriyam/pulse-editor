@@ -4,7 +4,7 @@ import Foundation
 /// - join: every clip shares one format that fits the output, and none has a rendered edit.
 /// - selective: the clips share that format, but some have a rotate / flip / crop / speed edit:
 ///   only those are rendered (into the shared format), then everything joins.
-/// - encode: the clips don't share a format that fits (the full encode, not built yet).
+/// - encode: the clips don't share a format that fits: the whole timeline is encoded once.
 struct MergePlan {
   enum Path {
     case join

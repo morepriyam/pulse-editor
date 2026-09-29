@@ -1,9 +1,9 @@
 import AVFoundation
 
-/// The format a rendered clip is written in: the draft's own (the recorder's), so it joins the
-/// copied clips like a recording.
+/// The format rendered video is written in.
 struct RenderTarget {
-  /// Coded size and orientation tag, e.g. 1920×1080 tagged 270° for a portrait iPhone recording.
+  /// Coded size and orientation tag: the draft's own (e.g. 1920×1080 tagged 270° for a portrait
+  /// iPhone recording) when the result joins other clips, or the upright canvas for a full encode.
   let size: CGSize
   let transform: CGAffineTransform
   /// The display canvas, e.g. 1080×1920.
@@ -13,53 +13,68 @@ struct RenderTarget {
   let audio: MergeAudio
 }
 
-/// Render one clip with its edit (trim, speed, rotate, flip, crop, mute) into `target`'s format:
-/// AVMutableComposition (trim, scaleTimeRange for speed) → AVVideoComposition (the geometry) →
-/// AVAssetReader → AVAssetWriter (H.264 at the chosen bitrate, AAC with natural pitch).
+/// Render clips, in order, with their edits (trim, speed, rotate, flip, crop, mute) into one file
+/// in `target`'s format:
+/// AVMutableComposition (each clip trimmed into its slot, scaleTimeRange for speed) →
+/// AVVideoComposition (one instruction per clip carrying its geometry) → AVAssetReader →
+/// AVAssetWriter (H.264 at the chosen bitrate, AAC with natural pitch).
 enum Render {
-  static func clip(
-    _ clip: MergeClip, _ media: Probe.Media, target: RenderTarget, to output: URL,
-    progress: @escaping @Sendable (Double) -> Void
-  ) async throws {
+  /// Returns the rendered duration.
+  @discardableResult
+  static func timeline(
+    _ items: [(clip: MergeClip, media: Probe.Media)], target: RenderTarget, to output: URL,
+    faststart: Bool, progress: @escaping @Sendable (Double) -> Void
+  ) async throws -> CMTime {
     try? FileManager.default.removeItem(at: output)
-    guard let sourceVideo = media.videoTrack else { throw MergeError.failed("Clip has no video.") }
-    let (sourceSize, sourceTransform, sourceRange) = try await sourceVideo.load(.naturalSize, .preferredTransform, .timeRange)
-    let range = Join.trimRange(startMs: clip.startMs, endMs: clip.endMs, in: sourceRange)
-
-    // The clip on its own timeline: trimmed, then retimed.
     let composition = AVMutableComposition()
     guard let video = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
       throw MergeError.failed("Couldn't create the video track.")
     }
-    try video.insertTimeRange(range, of: sourceVideo, at: .zero)
-    var audio: AVMutableCompositionTrack?
-    if !clip.muted, let sourceAudio = media.audioTrack {
-      let overlap = range.intersection(try await sourceAudio.load(.timeRange))
-      if overlap.duration > .zero,
-         let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) {
-        try track.insertTimeRange(overlap, of: sourceAudio, at: overlap.start - range.start)
-        audio = track
-      }
-    }
-    if abs(clip.speed - 1) > 0.0001 {
-      composition.scaleTimeRange(
-        CMTimeRange(start: .zero, duration: range.duration),
-        toDuration: CMTimeMultiplyByFloat64(range.duration, multiplier: 1 / clip.speed))
-    }
-    let duration = composition.duration
+    let hasAudio = items.contains { !$0.clip.muted && $0.media.audioTrack != nil }
+    let audio = hasAudio
+      ? composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
+      : nil
 
-    // The picture: one layer instruction carrying the whole geometry.
-    let geometry = MergeGeometry(
-      clip: clip, sourceSize: sourceSize, sourceTransform: sourceTransform,
-      targetSize: target.size, targetTransform: target.transform, canvas: target.canvas)
-    let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: video)
-    layer.setTransform(geometry.transform, at: .zero)
-    if let crop = geometry.sourceCrop { layer.setCropRectangle(crop, at: .zero) }
-    let instruction = AVMutableVideoCompositionInstruction()
-    instruction.timeRange = CMTimeRange(start: .zero, duration: duration)
-    instruction.layerInstructions = [layer]
+    var instructions: [AVVideoCompositionInstruction] = []
+    var cursor = CMTime.zero
+    for (clip, media) in items {
+      guard let sourceVideo = media.videoTrack else { throw MergeError.failed("A clip has no video.") }
+      let (sourceSize, sourceTransform, sourceRange) = try await sourceVideo.load(.naturalSize, .preferredTransform, .timeRange)
+      let range = Join.trimRange(startMs: clip.startMs, endMs: clip.endMs, in: sourceRange)
+
+      // The clip's slot: trimmed in at the cursor, then retimed in place.
+      try video.insertTimeRange(range, of: sourceVideo, at: cursor)
+      if let audio, !clip.muted, let sourceAudio = media.audioTrack {
+        let overlap = range.intersection(try await sourceAudio.load(.timeRange))
+        if overlap.duration > .zero {
+          try audio.insertTimeRange(overlap, of: sourceAudio, at: cursor + (overlap.start - range.start))
+        }
+      }
+      var slot = range.duration
+      if abs(clip.speed - 1) > 0.0001 {
+        let scaled = CMTimeMultiplyByFloat64(slot, multiplier: 1 / clip.speed)
+        composition.scaleTimeRange(CMTimeRange(start: cursor, duration: slot), toDuration: scaled)
+        slot = scaled
+      }
+
+      // The clip's picture: its own geometry for its slot.
+      let geometry = MergeGeometry(
+        clip: clip, sourceSize: sourceSize, sourceTransform: sourceTransform,
+        targetSize: target.size, targetTransform: target.transform, canvas: target.canvas)
+      let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: video)
+      layer.setTransform(geometry.transform, at: cursor)
+      if let crop = geometry.sourceCrop { layer.setCropRectangle(crop, at: cursor) }
+      let instruction = AVMutableVideoCompositionInstruction()
+      instruction.timeRange = CMTimeRange(start: cursor, duration: slot)
+      instruction.layerInstructions = [layer]
+      instructions.append(instruction)
+
+      cursor = cursor + slot
+    }
+    let duration = cursor
+
     let videoComposition = AVMutableVideoComposition()
-    videoComposition.instructions = [instruction]
+    videoComposition.instructions = instructions
     videoComposition.renderSize = target.size
     // At most the target rate, whatever the source timing (a 2× clip doesn't become 60 fps).
     videoComposition.frameDuration = CMTime(value: 1, timescale: CMTimeScale(target.fps.rounded()))
@@ -78,6 +93,7 @@ enum Render {
     reader.add(videoOutput)
 
     let writer = try AVAssetWriter(outputURL: output, fileType: .mp4)
+    writer.shouldOptimizeForNetworkUse = faststart
     let videoInput = AVAssetWriterInput(
       mediaType: .video, outputSettings: EncodeSettings.h264(size: target.size, fps: target.fps, bitrate: target.bitrate))
     videoInput.expectsMediaDataInRealTime = false
@@ -99,5 +115,6 @@ enum Render {
     try await SampleTransfer.run(
       reader: reader, writer: writer, pairs: pairs, duration: duration,
       frameDuration: videoComposition.frameDuration, progress: progress)
+    return duration
   }
 }

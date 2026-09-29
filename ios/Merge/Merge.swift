@@ -25,9 +25,43 @@ enum Merge {
       }
       return try await Join.run(segments, options: options, reencodeAudio: false, encoded: false) { progress($0) }
     case .selective(let render):
-      return try await selective(clips, media, render: Set(render), options: options, progress: progress)
-    case .encode(let reasons):
-      throw MergeError.unsupported("This merge needs a full encode, which isn't built yet: \(reasons.joined(separator: "; "))")
+      do {
+        return try await selective(clips, media, render: Set(render), options: options, progress: progress)
+      } catch where !(error is CancellationError) && !Task.isCancelled {
+        // Safety net: anything the selective path can't do (a render that didn't come out in the
+        // draft's format, a join that failed its checks) gets one full encode instead.
+        return try await encode(clips, media, options: options, progress: progress)
+      }
+    case .encode:
+      return try await encode(clips, media, options: options, progress: progress)
+    }
+  }
+
+  /// Render the whole timeline once onto the upright canvas at the chosen bitrate: for clips
+  /// that don't share a format that fits, and as the selective path's fallback.
+  private static func encode(
+    _ clips: [MergeClip], _ media: [Probe.Media], options: MergeOptions, progress: MergeProgress
+  ) async throws -> MergeResult {
+    let canvas = CGSize(width: options.width, height: options.height)
+    let target = RenderTarget(
+      size: canvas, transform: .identity, canvas: canvas,
+      fps: options.fps, bitrate: options.bitrate, audio: options.audio)
+    let output = try outputURL()
+    do {
+      let duration = try await Render.timeline(
+        Array(zip(clips, media)).map { (clip: $0, media: $1) }, target: target, to: output,
+        faststart: true) { progress($0 * 0.98) }
+      let out = try await Probe.load(output)
+      let expectedMs = Probe.ms(duration)
+      guard let v = out.result.video, v.codec == "h264", v.width == options.width, v.height == options.height,
+            abs(out.result.durationMs - expectedMs) <= max(500, expectedMs * 0.01) else {
+        throw MergeError.failed("The encoded video didn't come out as expected.")
+      }
+      progress(1)
+      return MergeResult(uri: output.absoluteString, durationMs: out.result.durationMs, encoded: true, bitrate: v.bitrate)
+    } catch {
+      try? FileManager.default.removeItem(at: output)
+      throw error
     }
   }
 
@@ -57,7 +91,9 @@ enum Merge {
         let output = try outputURL()
         group.addTask {
           do {
-            try await Render.clip(clips[i], media[i], target: target, to: output) { renderProgress.update(slot, $0) }
+            try await Render.timeline([(clips[i], media[i])], target: target, to: output, faststart: false) {
+              renderProgress.update(slot, $0)
+            }
           } catch {
             try? FileManager.default.removeItem(at: output)
             throw error
@@ -145,13 +181,12 @@ final class WeightedProgress: @unchecked Sendable {
 enum MergeError: LocalizedError {
   case cancelled
   case invalid(String)
-  case unsupported(String)
   case failed(String)
 
   var errorDescription: String? {
     switch self {
     case .cancelled: return "Merge cancelled"
-    case .invalid(let why), .unsupported(let why), .failed(let why): return why
+    case .invalid(let why), .failed(let why): return why
     }
   }
 }
