@@ -17,7 +17,7 @@ enum ExtractAudio {
     }
     // Precise timing, so the buffer covers the track to its last sample.
     let asset = AVURLAsset(url: url, options: [AVURLAssetPreferPreciseDurationAndTimingKey: true])
-    guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
+    guard let track = try await Probe.primaryAudioTrack(of: asset) else {
       return PCM(data: nil, byteCount: 0, durationMs: 0)
     }
     let timeRange = try await track.load(.timeRange)

@@ -24,7 +24,7 @@ enum Probe {
     }
 
     let videoTrack = tracks.first(where: { $0.mediaType == .video })
-    let audioTrack = tracks.first(where: { $0.mediaType == .audio })
+    let audioTrack = try await primaryAudioTrack(of: asset)
     var video: ProbeVideo? = nil
     if let videoTrack {
       video = try await readVideo(videoTrack)
@@ -84,6 +84,22 @@ enum Probe {
       codec: audioCodec(asbd.mFormatID),
       sampleRate: asbd.mSampleRate,
       channels: Double(asbd.mChannelsPerFrame))
+  }
+
+  /**
+   * The audio track to read: never Apple's spatial-audio APAC track (iPhone videos carry it next
+   * to the stereo AAC one, and it can't be decoded everywhere), preferring the enabled AAC track,
+   * then any enabled one, then any playable one.
+   */
+  static func primaryAudioTrack(of asset: AVAsset) async throws -> AVAssetTrack? {
+    var candidates: [(track: AVAssetTrack, enabled: Bool, aac: Bool)] = []
+    for track in try await asset.loadTracks(withMediaType: .audio) {
+      let (formats, enabled, playable) = try await track.load(.formatDescriptions, .isEnabled, .isPlayable)
+      let subtype = formats.first.map { CMFormatDescriptionGetMediaSubType($0) }
+      guard playable, subtype != kAudioFormatAPAC else { continue }
+      candidates.append((track, enabled, subtype == kAudioFormatMPEG4AAC))
+    }
+    return (candidates.first { $0.enabled && $0.aac } ?? candidates.first { $0.enabled } ?? candidates.first)?.track
   }
 
   static func ms(_ time: CMTime) -> Double {
