@@ -2,7 +2,6 @@ package com.margelo.nitro.pulseeditor
 
 import android.content.Context
 import android.media.MediaFormat
-import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.Format
@@ -12,7 +11,6 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.mediacodec.MediaCodecUtil
 import androidx.media3.inspector.MediaExtractorCompat
 import androidx.media3.inspector.MetadataRetriever
-import java.io.File
 import kotlinx.coroutines.guava.await
 
 /**
@@ -23,7 +21,7 @@ import kotlinx.coroutines.guava.await
 @OptIn(UnstableApi::class)
 object Probe {
   suspend fun read(context: Context, uri: String): ProbeResult {
-    MetadataRetriever.Builder(context, MediaItem.fromUri(toUri(uri))).build().use { retriever ->
+    MetadataRetriever.Builder(context, MediaItem.fromUri(mediaUri(uri))).build().use { retriever ->
       val groups = retriever.retrieveTrackGroups().await()
       val durationUs = retriever.retrieveDurationUs().await()
       val formats = (0 until groups.length).map { groups[it].getFormat(0) }
@@ -72,7 +70,7 @@ object Probe {
   private fun videoTrackDurationMs(context: Context, uri: String): Double? {
     val extractor = MediaExtractorCompat(context)
     try {
-      extractor.setDataSource(toUri(uri), 0)
+      extractor.setDataSource(mediaUri(uri), 0)
       val format = (0 until extractor.trackCount).map(extractor::getTrackFormat)
         .firstOrNull { it.getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true } ?: return null
       return if (format.containsKey(MediaFormat.KEY_DURATION)) format.getLong(MediaFormat.KEY_DURATION) / 1000.0 else null
@@ -96,8 +94,4 @@ object Probe {
     MimeTypes.AUDIO_OPUS -> "opus"
     else -> mime?.substringAfter('/') ?: ""
   }
-
-  /** `file://` / `content://` URI or bare path → Uri. */
-  private fun toUri(uri: String): Uri =
-    if (uri.startsWith("/")) Uri.fromFile(File(uri)) else Uri.parse(uri)
 }

@@ -210,16 +210,17 @@ Media3 can't mix copied and re-encoded clips in one export, and its copy mode is
 | Path | When | What happens |
 |---|---|---|
 | **Fast join** | No clip is trimmed or has a rendered edit, and every clip shares one H.264/AAC format that fits, at most 1.6× the chosen bitrate | One `Transformer` export of an `EditedMediaItemSequence` with `setTransmuxVideo`. Audio is copied too, unless a clip is muted or has no sound; then audio alone is encoded, with generated silence. |
-| **Full encode** | Anything else, and the fast join's fallback | One hardware encode of the whole timeline: `ClippingConfiguration` trims, `SpeedParameters` (natural pitch), `ScaleAndRotateTransformation` / `Crop` / `Presentation` (letterbox) effects on the upright frame, `setFrameRate` cap, H.264 at the chosen bitrate via `DefaultEncoderFactory`. Audio is mixed to the recorder's layout, with an explicit 5.1 → stereo downmix. |
+| **Full encode** | Anything else, and the fast join's fallback | One hardware encode of the whole timeline: `ClippingConfiguration` trims, `SpeedParameters` (natural pitch), `ScaleAndRotateTransformation` / `Crop` / `Presentation` (letterbox) effects on the upright frame, `setFrameRate` cap, H.264 at the chosen bitrate via `DefaultEncoderFactory`. Audio is mixed to the recorder's layout (an explicit 5.1 → stereo downmix) and resampled with the same band-limited filter `extractAudio` uses, not Sonic's linear interpolation. |
 
-- **Threading:** `Transformer` runs on the main looper, as Media3 requires. Progress comes from polling `getProgress`; cancel calls `Transformer.cancel()` and deletes the partial file.
-- **Verification:** every output is checked with `probe` (H.264, the canvas, the expected duration) and must be faststart.
+- **Shared export code (`transcode/`), for merge and conform:** `Transformer` runs on the main looper, as Media3 requires. Decoder fallback is on, so a decoder that fails to start hands over to the next one. Encoding stays landscape plus a rotation tag (Media3's default, since more encoders support it). Progress comes from polling `getProgress`; cancel calls `Transformer.cancel()` and deletes the partial file.
+- **Verification:** every output is checked with `probe` (H.264, the canvas, the expected duration) and must be faststart. A failed check names any encoder fallback Media3 applied.
 - **Known difference from iOS:** slowed-down clips come out at a variable frame rate (Media3's frame rate setting only caps it). They play correctly.
 
 ### Tested
 - **Android, on an emulator (Android 17, arm64, software codecs), same fixtures as iOS:**
   - fast join of 3 clips without re-encoding, and with a muted last clip (silent);
   - trims; every rotation, flip and crop, and combinations (frames identical to iOS);
+  - resampling 44.1 → 48 kHz: a 10 kHz tone's image at 13.9 kHz is 117 dB down (Sonic left it 21 dB down); the refactor to shared export code left every video frame and all audio timing unchanged;
   - 2× and 0.5× with natural pitch;
   - a mixed HEVC / 60 fps / 4K / landscape / 5.1-audio draft;
   - cancel.

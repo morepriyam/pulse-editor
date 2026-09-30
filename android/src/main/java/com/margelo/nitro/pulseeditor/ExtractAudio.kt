@@ -4,11 +4,9 @@ import android.content.Context
 import android.media.AudioFormat
 import android.media.MediaCodec
 import android.media.MediaFormat
-import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.inspector.MediaExtractorCompat
-import java.io.File
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.abs
@@ -32,7 +30,7 @@ object ExtractAudio {
     require(sampleRate in 8000..192_000) { "Sample rate $sampleRate is out of range." }
     val extractor = MediaExtractorCompat(context)
     try {
-      extractor.setDataSource(toUri(uri), 0)
+      extractor.setDataSource(mediaUri(uri), 0)
       val track = (0 until extractor.trackCount).firstOrNull {
         extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
       } ?: return Pcm(ByteBuffer.allocateDirect(0), 0.0)
@@ -140,7 +138,7 @@ object ExtractAudio {
   }
 
   /** Growable float buffer for the resampled output. */
-  class FloatSink(initialCapacity: Int) {
+  class FloatSink(initialCapacity: Int) : SampleSink {
     private var samples = FloatArray(max(4096, initialCapacity))
     private var count = 0
 
@@ -148,7 +146,7 @@ object ExtractAudio {
       if (length < count) count = max(0, length)
     }
 
-    fun add(value: Float) {
+    override fun add(value: Float) {
       if (count == samples.size) samples = samples.copyOf(samples.size * 2)
       samples[count++] = value
     }
@@ -164,6 +162,4 @@ object ExtractAudio {
       return Pcm(data, (count * 1000.0 / sampleRate).roundToInt().toDouble())
     }
   }
-
-  private fun toUri(uri: String): Uri = if (uri.startsWith("/")) Uri.fromFile(File(uri)) else Uri.parse(uri)
 }

@@ -6,6 +6,11 @@ import kotlin.math.cos
 import kotlin.math.min
 import kotlin.math.sin
 
+/** Where [Resampler] writes its output samples. */
+internal fun interface SampleSink {
+  fun add(value: Float)
+}
+
 /**
  * Streaming band-limited resampler for a mono float signal: a Blackman-windowed sinc low-pass
  * (cutoff just under the lower Nyquist, so downsampling doesn't alias) evaluated polyphase from
@@ -56,7 +61,7 @@ internal class Resampler(inputRate: Int, outputRate: Int) {
   }
 
   /** Feed `count` samples of `input` from `offset`, appending every output they complete. */
-  fun process(input: FloatArray, offset: Int, count: Int, out: ExtractAudio.FloatSink) {
+  fun process(input: FloatArray, offset: Int, count: Int, out: SampleSink) {
     if (up == down) {
       for (i in offset until offset + count) out.add(input[i])
       return
@@ -69,7 +74,7 @@ internal class Resampler(inputRate: Int, outputRate: Int) {
   }
 
   /** Flush the tail: outputs up to the input's end, filtered against trailing silence. */
-  fun finish(out: ExtractAudio.FloatSink) {
+  fun finish(out: SampleSink) {
     if (up == down) return
     val total = (inputCount * up + down - 1) / down
     ensure(length + half)
@@ -77,7 +82,7 @@ internal class Resampler(inputRate: Int, outputRate: Int) {
     drain(out, length + half, total)
   }
 
-  private fun drain(out: ExtractAudio.FloatSink, available: Int, limit: Long = Long.MAX_VALUE) {
+  private fun drain(out: SampleSink, available: Int, limit: Long = Long.MAX_VALUE) {
     while (base + 2 * half <= available && outputCount < limit) {
       val taps = table[if (phases == up) phase else (phase.toLong() * phases / up).toInt()]
       var acc = 0f

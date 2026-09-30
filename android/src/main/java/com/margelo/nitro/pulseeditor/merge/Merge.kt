@@ -10,8 +10,9 @@ import com.margelo.nitro.pulseeditor.MergeOptions
 import com.margelo.nitro.pulseeditor.MergeResult
 import com.margelo.nitro.pulseeditor.Probe
 import com.margelo.nitro.pulseeditor.ProbeResult
+import com.margelo.nitro.pulseeditor.transcode.Transcode
+import com.margelo.nitro.pulseeditor.transcode.isFaststart
 import java.io.File
-import java.io.RandomAccessFile
 import java.util.UUID
 import kotlin.math.abs
 import kotlin.math.max
@@ -51,27 +52,34 @@ object Merge {
   ): MergeResult {
     val output = outputFile(context)
     try {
-      val result = MergeExport.run(context, clips, media, options, join, output) { progress(it * 0.98) }
-      return withContext(Dispatchers.IO) { verify(context, output, result, expectedMs, options) }.also { progress(1.0) }
+      val outcome = MergeExport.run(context, clips, media, options, join, output) { progress(it * 0.98) }
+      return withContext(Dispatchers.IO) { verify(context, output, outcome, expectedMs, options) }.also { progress(1.0) }
     } catch (e: Throwable) {
       output.delete()
       throw e
     }
   }
 
-  /** Reject silent assembly bugs: the right length, the canvas, H.264, and moov before mdat. */
-  private suspend fun verify(context: Context, output: File, result: ExportResult, expectedMs: Double, options: MergeOptions): MergeResult {
+  /**
+   * Reject silent assembly bugs: the right length, the canvas, H.264, and moov before mdat. A
+   * rejection names any encoder fallback Media3 applied, the likely cause.
+   */
+  private suspend fun verify(
+    context: Context, output: File, outcome: Transcode.Outcome, expectedMs: Double, options: MergeOptions,
+  ): MergeResult {
+    fun fail(reason: String) = MergeException((listOf(reason) + outcome.fallbacks).joinToString("; "))
+    val result = outcome.result
     val probed = Probe.read(context, Uri.fromFile(output).toString())
-    val v = probed.video ?: throw MergeException("The merged video has no video track.")
+    val v = probed.video ?: throw fail("The merged video has no video track.")
     val swapped = v.rotation.toInt() % 180 != 0
     val (w, h) = if (swapped) v.height to v.width else v.width to v.height
     if (v.codec != "h264" || w != options.width || h != options.height) {
-      throw MergeException("The merged video came out ${v.codec} ${w.toInt()}x${h.toInt()}.")
+      throw fail("The merged video came out ${v.codec} ${w.toInt()}x${h.toInt()}.")
     }
     if (abs(probed.durationMs - expectedMs) > max(500.0, expectedMs * 0.01)) {
-      throw MergeException("The merged video is ${probed.durationMs.toInt()} ms, expected ${expectedMs.toInt()} ms.")
+      throw fail("The merged video is ${probed.durationMs.toInt()} ms, expected ${expectedMs.toInt()} ms.")
     }
-    if (!isFaststart(output)) throw MergeException("The merged video isn't faststart.")
+    if (!isFaststart(output)) throw fail("The merged video isn't faststart.")
     return MergeResult(
       uri = Uri.fromFile(output).toString(),
       durationMs = probed.durationMs,
@@ -84,30 +92,6 @@ object Merge {
   private fun clipMs(clip: MergeClip, media: ProbeResult): Double {
     val window = if (clip.endMs > clip.startMs) minOf(clip.endMs, media.durationMs) - clip.startMs else media.durationMs
     return window / clip.speed
-  }
-
-  /** True when the top-level `moov` box comes before `mdat` (progressive playback). */
-  private fun isFaststart(file: File): Boolean = RandomAccessFile(file, "r").use { f ->
-    var offset = 0L
-    val header = ByteArray(16)
-    while (offset + 8 <= f.length()) {
-      f.seek(offset)
-      f.readFully(header, 0, 8)
-      var size = ((header[0].toLong() and 0xff) shl 24) or ((header[1].toLong() and 0xff) shl 16) or
-        ((header[2].toLong() and 0xff) shl 8) or (header[3].toLong() and 0xff)
-      val type = String(header, 4, 4, Charsets.US_ASCII)
-      if (size == 1L) {
-        f.readFully(header, 8, 8)
-        size = (8 until 16).fold(0L) { acc, i -> (acc shl 8) or (header[i].toLong() and 0xff) }
-      } else if (size == 0L) {
-        size = f.length() - offset
-      }
-      if (type == "moov") return@use true
-      if (type == "mdat") return@use false
-      if (size < 8) return@use false
-      offset += size
-    }
-    false
   }
 
   private fun outputFile(context: Context): File =
