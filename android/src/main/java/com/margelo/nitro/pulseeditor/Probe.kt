@@ -1,11 +1,16 @@
 package com.margelo.nitro.pulseeditor
 
 import android.content.Context
+import android.media.MediaFormat
 import android.net.Uri
+import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.Format
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.mediacodec.MediaCodecUtil
+import androidx.media3.inspector.MediaExtractorCompat
 import androidx.media3.inspector.MetadataRetriever
 import java.io.File
 import kotlinx.coroutines.guava.await
@@ -15,6 +20,7 @@ import kotlinx.coroutines.guava.await
  * use): reads the header, never decodes, so a probe costs a few milliseconds. One retriever per
  * item, closed with `use`, futures awaited — the usage the Media3 Inspector guide recommends.
  */
+@OptIn(UnstableApi::class)
 object Probe {
   suspend fun read(context: Context, uri: String): ProbeResult {
     MetadataRetriever.Builder(context, MediaItem.fromUri(toUri(uri))).build().use { retriever ->
@@ -24,7 +30,9 @@ object Probe {
       if (formats.isEmpty()) throw IllegalArgumentException("No media tracks in $uri")
 
       val durationMs = if (durationUs == C.TIME_UNSET) -1.0 else durationUs / 1000.0
-      val video = formats.firstOrNull { MimeTypes.isVideo(it.sampleMimeType) }?.let { readVideo(it, durationMs) }
+      val video = formats.firstOrNull { MimeTypes.isVideo(it.sampleMimeType) }?.let {
+        readVideo(it, videoTrackDurationMs(context, uri) ?: durationMs)
+      }
       val audio = formats.firstOrNull { MimeTypes.isAudio(it.sampleMimeType) }?.let(::readAudio)
       return ProbeResult(durationMs = durationMs, video = video, audio = audio)
     }
@@ -38,7 +46,7 @@ object Probe {
     }
     val luma = f.colorInfo?.lumaBitdepth ?: Format.NO_VALUE
     return ProbeVideo(
-      codec = videoCodec(f.sampleMimeType),
+      codec = videoCodec(f),
       width = f.width.toDouble(),
       height = f.height.toDouble(),
       rotation = (((f.rotationDegrees % 360) + 360) % 360).toDouble(),
@@ -57,7 +65,27 @@ object Probe {
     channels = f.channelCount.toDouble(),
   )
 
-  private fun videoCodec(mime: String?) = when (mime) {
+  /**
+   * The first video track's own duration, from its track header: audio can outlast the picture,
+   * and the Inspector only exposes the container's. Media3's extractor reports it per track.
+   */
+  private fun videoTrackDurationMs(context: Context, uri: String): Double? {
+    val extractor = MediaExtractorCompat(context)
+    try {
+      extractor.setDataSource(toUri(uri), 0)
+      val format = (0 until extractor.trackCount).map(extractor::getTrackFormat)
+        .firstOrNull { it.getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true } ?: return null
+      return if (format.containsKey(MediaFormat.KEY_DURATION)) format.getLong(MediaFormat.KEY_DURATION) / 1000.0 else null
+    } finally {
+      extractor.release()
+    }
+  }
+
+  /**
+   * Dolby Vision profiles with a backward-compatible base layer (iPhone HDR is 8.4, HEVC) and
+   * MV-HEVC report the codec that base layer is in, the one a plain decoder plays.
+   */
+  private fun videoCodec(f: Format) = when (val mime = MediaCodecUtil.getAlternativeCodecMimeType(f) ?: f.sampleMimeType) {
     MimeTypes.VIDEO_H264 -> "h264"
     MimeTypes.VIDEO_H265 -> "hevc"
     else -> mime?.substringAfter('/') ?: ""

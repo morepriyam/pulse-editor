@@ -130,7 +130,7 @@ type ProbeResult = {
     bitrate: number;      // bits per second; -1 when unknown
     bitDepth: number;     // 8, or 10 for HDR sources
     transfer: 'sdr' | 'hlg' | 'pq';
-    durationMs: number;   // the video track's own (the container's on Android)
+    durationMs: number;   // the video track's own
   };
   audio?: {
     codec: string;        // 'aac' | 'opus', or the platform's id for anything else

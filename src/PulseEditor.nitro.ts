@@ -22,7 +22,7 @@ export interface ProbeVideo {
   /** Bits per luma sample: 8, or 10 for HDR sources. */
   bitDepth: number;
   transfer: Transfer;
-  /** The video track's own duration (the container's on Android). */
+  /** The video track's own duration. */
   durationMs: number;
 }
 
