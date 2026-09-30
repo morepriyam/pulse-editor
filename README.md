@@ -276,7 +276,7 @@ Pulse consumes this repo as a git submodule at `modules/pulse-editor` and reads 
 - **Where to edit:** make changes in the submodule inside Pulse, then commit and push here.
 - **When the spec changes:** after editing `src/PulseEditor.nitro.ts`, run `yarn install` and `yarn nitrogen`. Commit the regenerated `nitrogen/generated/` files, because Pulse builds from source and needs them.
 - **Updating Pulse:** in Pulse, `git add modules/pulse-editor` to record the new commit.
-- **Minimum OS versions:** they follow the app's (iOS 16.4, Android API 24). Newer APIs are used behind per-method version checks, so older phones keep working.
+- **Minimum OS versions:** they follow the app's (iOS 16.4, Android 10 / API 29). API 29 is the lowest where Media3 tone-maps HDR (OpenGL); newer APIs are used behind per-method version checks.
 
 ## License
 

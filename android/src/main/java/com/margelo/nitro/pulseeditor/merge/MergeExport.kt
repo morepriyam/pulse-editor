@@ -2,7 +2,6 @@ package com.margelo.nitro.pulseeditor.merge
 
 import android.content.Context
 import android.net.Uri
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import androidx.annotation.OptIn
@@ -125,7 +124,7 @@ object MergeExport {
       .setTransmuxVideo(join)
       .setTransmuxAudio(join && everyClipSounds)
     // HDR sources are tone-mapped to SDR (inputs are normally conformed to SDR already).
-    if (!join && Build.VERSION.SDK_INT >= 29 && media.any { it.video?.transfer != null && it.video?.transfer != Transfer.SDR }) {
+    if (!join && media.any { it.video?.transfer != null && it.video?.transfer != Transfer.SDR }) {
       builder.setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
     }
     return builder.build()

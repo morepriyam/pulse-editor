@@ -1,7 +1,7 @@
 buildscript {
   ext.PulseEditor = [
     kotlinVersion: "2.0.21",
-    minSdkVersion: 24,
+    minSdkVersion: 29,
     compileSdkVersion: 36,
     media3Version: "1.11.1"
   ]
