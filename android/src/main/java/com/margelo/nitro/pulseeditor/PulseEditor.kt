@@ -4,6 +4,8 @@ import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.NitroModules
 import com.margelo.nitro.core.ArrayBuffer
 import com.margelo.nitro.core.Promise
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @DoNotStrip
 class PulseEditor : HybridPulseEditorSpec() {
@@ -13,7 +15,8 @@ class PulseEditor : HybridPulseEditorSpec() {
 
   override fun extractAudio(uri: String, sampleRate: Double): Promise<AudioPCM> {
     return Promise.async {
-      val pcm = ExtractAudio.read(context(), uri, sampleRate.toInt())
+      // Decoding a long file takes seconds of blocking MediaCodec calls: off the CPU pool.
+      val pcm = withContext(Dispatchers.IO) { ExtractAudio.read(context(), uri, sampleRate.toInt()) }
       AudioPCM(ArrayBuffer.wrap(pcm.data), sampleRate, pcm.durationMs)
     }
   }

@@ -15,37 +15,52 @@ import java.nio.ByteOrder
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.PI
 import kotlin.math.cos
+import kotlin.math.sin
 
 /**
  * An AAC encoder's real priming: how many samples come out before the first input sample. The
  * output's edit list has to say exactly this for players to start the audio in sync. Media3 only
  * knows one encoder (c2.android.aac.encoder, where it assumes FDK's 1600-sample algorithmic
  * delay, yet the stream carries 2048 on the emulator: audio 9.4 ms late) and assumes 0 for every
- * other encoder. So it's measured, once per encoder and layout: a short tone burst through the
- * encoder, decoded back with no delay information, located by cross-correlation.
+ * other encoder. So it's measured, once per encoder and layout: a short chirp through the
+ * encoder, decoded back with no delay information, located by cross-correlation (a chirp has one
+ * sharp correlation peak; a pure tone's runner-up, one period away, scored 0.9 of the peak).
+ *
+ * It runs inside Media3's encoder factory, on its thread, so it's bounded: 2 s at most, and a
+ * failed measurement is remembered (Media3's own value is used) instead of retried every export.
  */
 internal object AacPriming {
   private const val TIMEOUT_US = 10_000L
+  private const val DEADLINE_NS = 2_000_000_000L
+  private const val FAILED = -1
   private val measured = ConcurrentHashMap<String, Int>()
 
   /** The encoder's priming in samples, or null when it couldn't be measured. */
   fun samples(encoderName: String, sampleRate: Int, channels: Int): Int? {
     val key = "$encoderName/$sampleRate/$channels"
-    measured[key]?.let { return it }
-    // Any AAC encoder primes at least one 1024-sample frame; a smaller result means the decoder
-    // dropped the priming itself, so it can't be trusted.
-    return runCatching { measure(encoderName, sampleRate, channels) }.getOrNull()
-      ?.takeIf { it in 1024..8192 }
-      ?.also { measured[key] = it }
+    val priming = measured.getOrPut(key) {
+      // Any AAC encoder primes at least one 1024-sample frame; a smaller result means the decoder
+      // dropped the priming itself, so it can't be trusted.
+      runCatching { measure(encoderName, sampleRate, channels, System.nanoTime() + DEADLINE_NS) }.getOrNull()
+        ?.takeIf { it in 1024..8192 } ?: FAILED
+    }
+    return priming.takeIf { it != FAILED }
   }
 
-  private fun measure(encoderName: String, sampleRate: Int, channels: Int): Int {
+  private fun measure(encoderName: String, sampleRate: Int, channels: Int, deadline: Long): Int {
     val burstAt = sampleRate / 4
-    val burst = FloatArray(sampleRate / 100) { i -> (0.5 * cos(2 * PI * 1000 * i / sampleRate)).toFloat() }
+    // 10 ms linear chirp, 500 Hz → 5 kHz, Hann-windowed.
+    val length = sampleRate / 100
+    val burst = FloatArray(length) { i ->
+      val t = i.toDouble() / sampleRate
+      val sweep = 4500.0 / (length.toDouble() / sampleRate)
+      val window = 0.5 - 0.5 * cos(2 * PI * i / (length - 1))
+      (0.5 * window * sin(2 * PI * (500 * t + sweep * t * t / 2))).toFloat()
+    }
     val input = ShortArray(sampleRate / 2 * channels)
     for (i in burst.indices) for (c in 0 until channels) input[(burstAt + i) * channels + c] = (burst[i] * 32767).toInt().toShort()
-    val (csd, frames) = encode(encoderName, sampleRate, channels, input)
-    val decoded = decode(sampleRate, channels, csd, frames)
+    val (csd, frames) = encode(encoderName, sampleRate, channels, input, deadline)
+    val decoded = decode(sampleRate, channels, csd, frames, deadline)
     // The lag at which the decoded audio best matches the burst.
     var best = 0
     var bestScore = Double.NEGATIVE_INFINITY
@@ -57,7 +72,7 @@ internal object AacPriming {
     return best
   }
 
-  private fun encode(name: String, sampleRate: Int, channels: Int, pcm: ShortArray): Pair<ByteBuffer, List<ByteArray>> {
+  private fun encode(name: String, sampleRate: Int, channels: Int, pcm: ShortArray, deadline: Long): Pair<ByteBuffer, List<ByteArray>> {
     val codec = MediaCodec.createByCodecName(name)
     try {
       val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, sampleRate, channels).apply {
@@ -74,6 +89,7 @@ internal object AacPriming {
       var inputDone = false
       var framesIn = 0L
       while (true) {
+        check(System.nanoTime() < deadline) { "AAC priming measurement timed out." }
         if (!inputDone) {
           val index = codec.dequeueInputBuffer(TIMEOUT_US)
           if (index >= 0) {
@@ -110,7 +126,7 @@ internal object AacPriming {
   }
 
   /** Decodes every frame, priming included (the format carries no encoder delay), to channel 0. */
-  private fun decode(sampleRate: Int, channels: Int, csd: ByteBuffer, frames: List<ByteArray>): FloatArray {
+  private fun decode(sampleRate: Int, channels: Int, csd: ByteBuffer, frames: List<ByteArray>, deadline: Long): FloatArray {
     val codec = MediaCodec.createDecoderByType(MediaFormat.MIMETYPE_AUDIO_AAC)
     try {
       val format = MediaFormat.createAudioFormat(MediaFormat.MIMETYPE_AUDIO_AAC, sampleRate, channels).apply {
@@ -123,6 +139,7 @@ internal object AacPriming {
       var next = 0
       var outChannels = channels
       while (true) {
+        check(System.nanoTime() < deadline) { "AAC priming measurement timed out." }
         if (next <= frames.size) {
           val index = codec.dequeueInputBuffer(TIMEOUT_US)
           if (index >= 0) {

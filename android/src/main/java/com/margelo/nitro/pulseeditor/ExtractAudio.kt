@@ -57,8 +57,10 @@ object ExtractAudio {
       var encoding = AudioFormat.ENCODING_PCM_16BIT
       // The encoder's priming samples, which the container says to drop (Media3 sets the key on
       // every API level; the MediaFormat constant is API 30+). Some decoders drop them already,
-      // so what's left to skip is read off the first decoded buffer's timestamp.
-      val delayFrames = if (format.containsKey(ENCODER_DELAY)) format.getInteger(ENCODER_DELAY) else 0
+      // so what's left to skip is read off the first decoded buffer's timestamp. Opus decoders
+      // always drop the stream's pre-skip themselves (from its header), so nothing is left.
+      val opus = format.getString(MediaFormat.KEY_MIME) == MediaFormat.MIMETYPE_AUDIO_OPUS
+      val delayFrames = if (!opus && format.containsKey(ENCODER_DELAY)) format.getInteger(ENCODER_DELAY) else 0
       var firstInputUs = -1L
       var skipFrames = -1
       var resampler = Resampler(inputRate, sampleRate)
@@ -97,7 +99,7 @@ object ExtractAudio {
           val frames = info.size / (bytesPerSample * channels)
           if (skipFrames < 0 && frames > 0) {
             val decodedFrom = ((info.presentationTimeUs - max(firstInputUs, 0L)) * inputRate / 1_000_000.0).roundToInt()
-            skipFrames = max(0, delayFrames - decodedFrom)
+            skipFrames = (delayFrames - decodedFrom).coerceIn(0, delayFrames)
           }
           val skip = minOf(max(skipFrames, 0), frames)
           skipFrames -= skip
