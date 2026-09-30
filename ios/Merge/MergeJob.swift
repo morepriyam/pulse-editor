@@ -28,11 +28,13 @@ final class MergeJob: HybridMergeJobSpec {
       return task
     }
     return Promise.async {
-      do {
-        return try await task.value
-      } catch {
-        if task.isCancelled { throw MergeError.cancelled }
-        throw error
+      try await withJSError {
+        do {
+          return try await task.value
+        } catch {
+          if task.isCancelled { throw MergeError.cancelled }
+          throw error
+        }
       }
     }
   }

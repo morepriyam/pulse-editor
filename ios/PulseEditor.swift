@@ -5,13 +5,13 @@ import NitroModules
 class PulseEditor: HybridPulseEditorSpec {
   public func probe(uri: String) throws -> Promise<ProbeResult> {
     return Promise.async(.userInitiated) {
-      try await Probe.read(fileURL(uri))
+      try await withJSError { try await Probe.read(fileURL(uri)) }
     }
   }
 
   public func extractAudio(uri: String, sampleRate: Double) throws -> Promise<AudioPCM> {
     return Promise.async(.userInitiated) {
-      let pcm = try await ExtractAudio.read(fileURL(uri), sampleRate: sampleRate)
+      let pcm = try await withJSError { try await ExtractAudio.read(fileURL(uri), sampleRate: sampleRate) }
       let data = pcm.data.map { data in
         ArrayBuffer.wrap(dataWithoutCopy: data, size: pcm.byteCount, onDelete: { free(data) })
       } ?? ArrayBuffer.allocate(size: 0)
@@ -21,6 +21,18 @@ class PulseEditor: HybridPulseEditorSpec {
 
   public func createMerge(clips: [MergeClip], options: MergeOptions) throws -> (any HybridMergeJobSpec) {
     return MergeJob(clips: clips, options: options)
+  }
+}
+
+/// Runs `work`, turning any error into the message JS sees: Nitro describes other errors with
+/// `String(describing:)` (`failed("…")`, `Error Domain=… Code=…`), a `RuntimeError` as its message.
+func withJSError<T>(_ work: () async throws -> T) async throws -> T {
+  do {
+    return try await work()
+  } catch let error as RuntimeError {
+    throw error
+  } catch {
+    throw RuntimeError(error.localizedDescription)
   }
 }
 

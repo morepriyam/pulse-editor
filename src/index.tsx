@@ -21,6 +21,20 @@ export type {
 } from './PulseEditor.nitro';
 
 /**
+ * A native failure as a plain Error with just its message. Android errors reach JS as the Kotlin
+ * exception's class name and stack trace ("com.….MergeException: The merged … at …(Merge.kt:70)").
+ */
+function nativeError(error: unknown): Error {
+  let message = error instanceof Error ? error.message : String(error);
+  message = message.split(/\n\s*at /)[0]!.trim();
+  // Qualified exception class names in front of the message, e.g. "java.io.IOException: ".
+  while (/^([A-Za-z_$][\w$]*\.)+[\w$]+: /.test(message)) {
+    message = message.replace(/^([A-Za-z_$][\w$]*\.)+[\w$]+: /, '');
+  }
+  return new Error(message);
+}
+
+/**
  * Read a local media file's metadata (codec, coded size, rotation, fps, HDR, audio layout,
  * durations). Accepts a `file://` URI or a bare path. Rejects when the file can't be opened.
  */
@@ -28,7 +42,9 @@ export function probe(uri: string): Promise<ProbeResult> {
   if (!uri?.trim().length) {
     return Promise.reject(new Error('File path cannot be empty.'));
   }
-  return editor.probe(uri);
+  return editor.probe(uri).catch((e) => {
+    throw nativeError(e);
+  });
 }
 
 /**
@@ -43,7 +59,9 @@ export function extractAudio(
   if (!uri?.trim().length) {
     return Promise.reject(new Error('File path cannot be empty.'));
   }
-  return editor.extractAudio(uri, sampleRate);
+  return editor.extractAudio(uri, sampleRate).catch((e) => {
+    throw nativeError(e);
+  });
 }
 
 export interface MergeControls {
@@ -74,6 +92,8 @@ export async function merge(
   signal?.addEventListener('abort', cancel);
   try {
     return await job.start(onProgress ?? (() => {}));
+  } catch (e) {
+    throw nativeError(e);
   } finally {
     signal?.removeEventListener('abort', cancel);
   }
