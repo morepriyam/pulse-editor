@@ -24,8 +24,13 @@ class PulseEditor: HybridPulseEditorSpec {
   }
 }
 
-/// `file://` URI or bare path → file URL.
+/// `file://` URI (percent-encoded or not) or bare path → file URL. A `file://` URI is read as a
+/// path, so a `#` or `?` in a file name isn't taken for a fragment or query.
 func fileURL(_ uri: String) -> URL {
+  if uri.hasPrefix("file://") {
+    let path = String(uri.dropFirst("file://".count))
+    return URL(fileURLWithPath: path.removingPercentEncoding ?? path)
+  }
   if let url = URL(string: uri), url.scheme != nil { return url }
   return URL(fileURLWithPath: uri)
 }

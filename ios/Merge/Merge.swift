@@ -4,12 +4,19 @@ import AVFoundation
 enum Merge {
   static func run(_ clips: [MergeClip], _ options: MergeOptions, progress: MergeProgress) async throws -> MergeResult {
     guard !clips.isEmpty else { throw MergeError.invalid("No clips to merge.") }
+    removeStaleOutputs()
     progress(0)
 
     // Read all clips concurrently, keeping their order.
     let media: [Probe.Media] = try await withThrowingTaskGroup(of: (Int, Probe.Media).self) { group in
       for (i, clip) in clips.enumerated() {
-        group.addTask { (i, try await Probe.load(fileURL(clip.uri))) }
+        group.addTask {
+          do {
+            return (i, try await Probe.load(fileURL(clip.uri)))
+          } catch {
+            throw MergeError.clip(i, clip.uri, error)
+          }
+        }
       }
       var loaded = [Probe.Media?](repeating: nil, count: clips.count)
       for try await (i, m) in group { loaded[i] = m }
@@ -25,11 +32,17 @@ enum Merge {
       }
       return try await Join.run(segments, options: options, reencodeAudio: false, encoded: false) { progress($0) }
     case .selective(let render):
+      // Our renders don't reorder frames (no B-frames). A clip that does can't be copied next to
+      // them: FFmpeg-based players mis-decode the mix. Camera recordings don't; such a draft
+      // (e.g. an H.264 import from another encoder) is encoded instead.
+      if try await reordersFrames(media, except: render) {
+        return try await encode(clips, media, options: options, progress: progress)
+      }
       do {
-        return try await selective(clips, media, render: Set(render), options: options, progress: progress)
+        return try await selective(clips, media, render: render, options: options, progress: progress)
       } catch where !(error is CancellationError) && !Task.isCancelled {
         // Safety net: anything the selective path can't do (a render that didn't come out in the
-        // draft's format, a join that failed its checks) gets one full encode instead.
+        // draft's format, a join that failed its checks) gets a full encode instead.
         return try await encode(clips, media, options: options, progress: progress)
       }
     case .encode:
@@ -37,8 +50,32 @@ enum Merge {
     }
   }
 
-  /// Render the whole timeline once onto the upright canvas at the chosen bitrate: for clips
-  /// that don't share a format that fits, and as the selective path's fallback.
+  /// Render only the edited clips, into the draft's own format, then join everything. Rendered
+  /// clips carry our encoder's H.264 settings next to the camera's, which Apple's passthrough join
+  /// supports.
+  private static func selective(
+    _ clips: [MergeClip], _ media: [Probe.Media], render: [Int], options: MergeOptions, progress: MergeProgress
+  ) async throws -> MergeResult {
+    let reference = media[0].videoTrack!
+    let (size, transform) = try await reference.load(.naturalSize, .preferredTransform)
+    let target = RenderTarget(
+      size: size, transform: transform, canvas: CGSize(width: options.width, height: options.height),
+      fps: options.fps, bitrate: options.bitrate, audio: options.audio)
+    return try await renderAndJoin(clips, media, render: render, target: target, options: options, progress: progress)
+  }
+
+  /// Whether any clip that would be copied (not in `render`) has out-of-order frames.
+  private static func reordersFrames(_ media: [Probe.Media], except render: [Int]) async throws -> Bool {
+    for (i, m) in media.enumerated() where !render.contains(i) {
+      if try await m.videoTrack?.load(.requiresFrameReordering) == true { return true }
+    }
+    return false
+  }
+
+  /// Every clip rendered onto the upright canvas, then joined: for clips that don't share a format
+  /// that fits, and as the selective path's fallback. Each clip is rendered on its own: rendering
+  /// a whole timeline in one composition stalls AVFoundation's audio mix reader for good when a
+  /// sped-up clip meets a clip in another audio format, and plays that clip's audio at 1×.
   private static func encode(
     _ clips: [MergeClip], _ media: [Probe.Media], options: MergeOptions, progress: MergeProgress
   ) async throws -> MergeResult {
@@ -46,46 +83,24 @@ enum Merge {
     let target = RenderTarget(
       size: canvas, transform: .identity, canvas: canvas,
       fps: options.fps, bitrate: options.bitrate, audio: options.audio)
-    let output = try outputURL()
-    do {
-      let duration = try await Render.timeline(
-        Array(zip(clips, media)).map { (clip: $0, media: $1) }, target: target, to: output,
-        faststart: true) { progress($0 * 0.98) }
-      let out = try await Probe.load(output)
-      let expectedMs = Probe.ms(duration)
-      guard let v = out.result.video, v.codec == "h264", v.width == options.width, v.height == options.height,
-            abs(out.result.durationMs - expectedMs) <= max(500, expectedMs * 0.01) else {
-        throw MergeError.failed("The encoded video didn't come out as expected.")
-      }
-      progress(1)
-      return MergeResult(uri: output.absoluteString, durationMs: out.result.durationMs, encoded: true, bitrate: v.bitrate)
-    } catch {
-      try? FileManager.default.removeItem(at: output)
-      throw error
-    }
+    return try await renderAndJoin(clips, media, render: Array(clips.indices), target: target, options: options, progress: progress)
   }
 
-  /// Render only the edited clips into the draft's own format, then join everything. Rendered
-  /// clips carry our encoder's H.264 settings next to the camera's, which Apple's passthrough join
-  /// supports; the audio is re-encoded once over the whole timeline so it has a single setup.
-  private static func selective(
-    _ clips: [MergeClip], _ media: [Probe.Media], render: Set<Int>, options: MergeOptions, progress: MergeProgress
+  /// Render the clips in `render` into `target`'s format, then join them with the others. The
+  /// audio is re-encoded once over the whole timeline, so the output has a single audio setup.
+  private static func renderAndJoin(
+    _ clips: [MergeClip], _ media: [Probe.Media], render: [Int], target: RenderTarget,
+    options: MergeOptions, progress: MergeProgress
   ) async throws -> MergeResult {
-    let reference = media[0].videoTrack!
-    let (size, transform) = try await reference.load(.naturalSize, .preferredTransform)
-    let target = RenderTarget(
-      size: size, transform: transform, canvas: CGSize(width: options.width, height: options.height),
-      fps: options.fps, bitrate: options.bitrate, audio: options.audio)
-
     // Rendering is most of the work: 0–0.8 of the bar, weighted by each clip's length.
-    let weights = render.sorted().map { i in max(1, clips[i].endMs > clips[i].startMs ? clips[i].endMs - clips[i].startMs : media[i].result.durationMs) }
+    let weights = render.map { i in max(1, clips[i].endMs > clips[i].startMs ? clips[i].endMs - clips[i].startMs : media[i].result.durationMs) }
     let renderProgress = WeightedProgress(weights: weights) { progress($0 * 0.8) }
 
     var rendered: [Int: URL] = [:]
     defer { for url in rendered.values { try? FileManager.default.removeItem(at: url) } }
     try await withThrowingTaskGroup(of: (Int, URL).self) { group in
       // Two at a time: enough to overlap the work without overloading the hardware encoder.
-      var pending = render.sorted().enumerated().makeIterator()
+      var pending = render.enumerated().makeIterator()
       func next() throws {
         guard let (slot, i) = pending.next() else { return }
         let output = try outputURL()
@@ -96,7 +111,8 @@ enum Merge {
             }
           } catch {
             try? FileManager.default.removeItem(at: output)
-            throw error
+            if error is CancellationError { throw error }
+            throw MergeError.clip(i, clips[i].uri, error)
           }
           return (i, output)
         }
@@ -109,7 +125,8 @@ enum Merge {
       }
     }
 
-    // Every rendered clip must come out in the draft's exact layout, or the join can't use it.
+    // Every rendered clip must come out in the target's exact layout, or the join can't use it.
+    let rotation = Probe.rotation(of: target.transform)
     var segments: [Join.Segment] = []
     for (i, clip) in clips.enumerated() {
       guard let url = rendered[i] else {
@@ -117,8 +134,8 @@ enum Merge {
         continue
       }
       let out = try await Probe.load(url)
-      guard let v = out.result.video, let ref = media[0].result.video,
-            v.codec == "h264", v.width == ref.width, v.height == ref.height, v.rotation == ref.rotation else {
+      guard let v = out.result.video, v.codec == "h264", v.width == target.size.width, v.height == target.size.height,
+            v.rotation == rotation else {
         throw MergeError.failed("Clip \(i + 1) rendered in the wrong format.")
       }
       segments.append(Join.Segment(media: out))
@@ -126,17 +143,35 @@ enum Merge {
     return try await Join.run(segments, options: options, reencodeAudio: true, encoded: true) { progress(0.8 + $0 * 0.2) }
   }
 
+  /// Where merges write: a folder of their own in the caches directory.
+  private static var outputDirectory: URL {
+    FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+      .appendingPathComponent("pulse-editor", isDirectory: true)
+  }
+
   /// A fresh output file in the caches directory.
   static func outputURL() throws -> URL {
-    let dir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-      .appendingPathComponent("pulse-editor", isDirectory: true)
-    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-    return dir.appendingPathComponent("merge-\(UUID().uuidString).mp4")
+    try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
+    return outputDirectory.appendingPathComponent("merge-\(UUID().uuidString).mp4")
+  }
+
+  /// Deletes merge files a killed app left behind (a finished merge is moved out by its caller).
+  private static func removeStaleOutputs() {
+    let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
+    let files = (try? FileManager.default.contentsOfDirectory(
+      at: outputDirectory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+    for file in files where file.lastPathComponent.hasPrefix("merge-") {
+      let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
+      if let modified, modified < cutoff { try? FileManager.default.removeItem(at: file) }
+    }
   }
 }
 
-/// Progress that only ever moves forward, so a later phase can never make the bar jump back.
+/// Progress that only ever moves forward, so a later phase can never make the bar jump back, and
+/// is reported in steps of at least 0.5% (a frame-by-frame render would otherwise send JS
+/// hundreds of updates a second).
 final class MergeProgress: @unchecked Sendable {
+  private static let step = 0.005
   private let report: (Double) -> Void
   private let lock = NSLock()
   private var last = -1.0
@@ -146,7 +181,7 @@ final class MergeProgress: @unchecked Sendable {
   func callAsFunction(_ value: Double) {
     let clamped = min(max(value, 0), 1)
     let send: Bool = lock.withLock {
-      guard clamped > last else { return false }
+      guard clamped > last, clamped - last >= Self.step || clamped == 1 || last < 0 else { return false }
       last = clamped
       return true
     }
@@ -188,5 +223,10 @@ enum MergeError: LocalizedError {
     case .cancelled: return "Merge cancelled"
     case .invalid(let why), .failed(let why): return why
     }
+  }
+
+  /// A clip's failure, naming the clip (its position and file name).
+  static func clip(_ index: Int, _ uri: String, _ error: Error) -> MergeError {
+    .failed("Clip \(index + 1) (\(fileURL(uri).lastPathComponent)): \(error.localizedDescription)")
   }
 }

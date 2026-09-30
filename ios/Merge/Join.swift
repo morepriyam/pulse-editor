@@ -35,7 +35,7 @@ enum Join {
     var cursor = CMTime.zero
     for segment in segments {
       let video = segment.media.videoTrack!
-      let range = trimRange(startMs: segment.startMs, endMs: segment.endMs, in: try await video.load(.timeRange))
+      let range = try trimRange(startMs: segment.startMs, endMs: segment.endMs, in: try await video.load(.timeRange))
       try videoOut.insertTimeRange(range, of: video, at: cursor)
 
       // A muted segment (or one without sound, or sound shorter than its picture) leaves a gap.
@@ -81,12 +81,15 @@ enum Join {
     }
   }
 
-  /// The window inside a source video track (the whole track when unset or invalid).
-  static func trimRange(startMs: Double, endMs: Double, in track: CMTimeRange) -> CMTimeRange {
+  /// The window inside a source video track (the whole track when unset). A window that starts at
+  /// or past the track's end is an error, not the whole clip.
+  static func trimRange(startMs: Double, endMs: Double, in track: CMTimeRange) throws -> CMTimeRange {
     guard endMs > startMs else { return track }
     let start = track.start + CMTime(value: CMTimeValue(startMs.rounded()), timescale: 1000)
     let end = CMTimeMinimum(track.start + CMTime(value: CMTimeValue(endMs.rounded()), timescale: 1000), track.end)
-    guard start < end else { return track }
+    guard start < end else {
+      throw MergeError.invalid("The trim starts at \(Int(startMs)) ms, past the end of the video (\(Probe.ms(track.duration)) ms).")
+    }
     return CMTimeRange(start: start, end: end)
   }
 

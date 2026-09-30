@@ -51,8 +51,11 @@ enum SampleTransfer {
                   }
                   guard session.reader.status == .reading, session.writer.status == .writing,
                         let sample = pair.output.copyNextSampleBuffer() else {
-                    // Drained: pad to the full duration once, then finish.
-                    if !state.padded, session.reader.status == .completed, let last = state.last {
+                    // Drained: pad to the full duration once, then finish. This output can be done
+                    // while another is still reading, so the reader is `.reading` or `.completed`
+                    // (not failed or cancelled).
+                    let drained = session.reader.status == .reading || session.reader.status == .completed
+                    if !state.padded, drained, let last = state.last {
                       state.padded = true
                       state.pending = Self.padding(after: last, to: duration, video: fill)
                       if !state.pending.isEmpty { continue }
@@ -208,7 +211,9 @@ enum EncodeSettings {
     ]
   }
 
-  /// H.264 High, the chosen average bitrate, a keyframe every 2 s, BT.709 SDR.
+  /// H.264 High, the chosen average bitrate, a keyframe every 2 s, BT.709 SDR. No B-frames: the
+  /// camera writes none, and FFmpeg-based players (browsers, servers) mis-decode a joined file
+  /// whose rendered clips reorder frames and whose camera clips don't.
   static func h264(size: CGSize, fps: Double, bitrate: Double) -> [String: Any] {
     [
       AVVideoCodecKey: AVVideoCodecType.h264,
@@ -220,6 +225,7 @@ enum EncodeSettings {
         AVVideoH264EntropyModeKey: AVVideoH264EntropyModeCABAC,
         AVVideoExpectedSourceFrameRateKey: Int(fps.rounded()),
         AVVideoMaxKeyFrameIntervalDurationKey: 2,
+        AVVideoAllowFrameReorderingKey: false,
       ],
       AVVideoColorPropertiesKey: [
         AVVideoColorPrimariesKey: AVVideoColorPrimaries_ITU_R_709_2,

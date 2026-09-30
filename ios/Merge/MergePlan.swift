@@ -50,6 +50,7 @@ struct MergePlan {
         continue
       }
       if v.codec != "h264" { reasons.append("clip \(n) is \(v.codec), not h264") }
+      if v.transfer != .sdr || v.bitDepth > 8 { reasons.append("clip \(n) is HDR or 10-bit") }
       if v.mirrored { reasons.append("clip \(n) is mirrored") }
       let swapped = Int(v.rotation) % 180 != 0
       let (w, h) = swapped ? (v.height, v.width) : (v.width, v.height)

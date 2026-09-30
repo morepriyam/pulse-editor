@@ -40,7 +40,7 @@ enum Render {
     for (clip, media) in items {
       guard let sourceVideo = media.videoTrack else { throw MergeError.failed("A clip has no video.") }
       let (sourceSize, sourceTransform, sourceRange) = try await sourceVideo.load(.naturalSize, .preferredTransform, .timeRange)
-      let range = Join.trimRange(startMs: clip.startMs, endMs: clip.endMs, in: sourceRange)
+      let range = try Join.trimRange(startMs: clip.startMs, endMs: clip.endMs, in: sourceRange)
 
       // The clip's slot: trimmed in at the cursor, then retimed in place.
       try video.insertTimeRange(range, of: sourceVideo, at: cursor)
