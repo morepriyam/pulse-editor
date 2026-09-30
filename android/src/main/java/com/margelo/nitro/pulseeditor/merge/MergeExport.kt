@@ -16,6 +16,7 @@ import androidx.media3.common.audio.ChannelMixingAudioProcessor
 import androidx.media3.common.audio.ChannelMixingMatrix
 import androidx.media3.common.audio.SonicAudioProcessor
 import androidx.media3.common.audio.SpeedProvider
+import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.Crop
 import androidx.media3.effect.Presentation
@@ -50,7 +51,7 @@ import kotlinx.coroutines.suspendCancellableCoroutine
  *   on the upright frame), capped at the frame rate, then H.264 at the chosen bitrate.
  * Transformer is driven from the main looper, as Media3 requires one application thread.
  */
-@OptIn(UnstableApi::class)
+@OptIn(UnstableApi::class, ExperimentalApi::class)
 object MergeExport {
   suspend fun run(
     context: Context, clips: List<MergeClip>, media: List<ProbeResult>, options: MergeOptions,
