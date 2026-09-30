@@ -126,7 +126,7 @@ type ProbeResult = {
     width: number;        // coded (before rotation)
     height: number;
     rotation: number;     // clockwise: 0 | 90 | 180 | 270
-    mirrored: boolean;    // iOS only; always false on Android
+    mirrored: boolean;    // the display matrix mirrors the frame
     fps: number;          // average; -1 when unknown
     bitrate: number;      // bits per second; -1 when unknown
     bitDepth: number;     // 8, or 10 for HDR sources

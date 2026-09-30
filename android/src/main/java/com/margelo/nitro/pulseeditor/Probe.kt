@@ -42,7 +42,7 @@ object Probe {
       width = f.width.toDouble(),
       height = f.height.toDouble(),
       rotation = (((f.rotationDegrees % 360) + 360) % 360).toDouble(),
-      mirrored = false,
+      mirrored = f.mirrorHorizontal,
       fps = if (f.frameRate > 0) f.frameRate.toDouble() else -1.0,
       bitrate = if (f.averageBitrate > 0) f.averageBitrate.toDouble() else f.bitrate.toDouble(),
       bitDepth = (if (luma > 0) luma else if (transfer == Transfer.SDR) 8 else 10).toDouble(),

@@ -13,7 +13,7 @@ export interface ProbeVideo {
   height: number;
   /** Clockwise rotation to display it upright: 0, 90, 180 or 270. */
   rotation: number;
-  /** The display transform also mirrors the frame (iOS only; always false on Android). */
+  /** The display transform also mirrors the frame (its matrix has a negative determinant). */
   mirrored: boolean;
   /** Average frame rate, -1 when unknown. */
   fps: number;
