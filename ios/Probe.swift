@@ -58,16 +58,14 @@ enum Probe {
     let bitDepth = (extensions[kCMFormatDescriptionExtension_BitsPerComponent] as? NSNumber)?.intValue
       ?? (transfer == .sdr ? 8 : 10)
 
-    // Clockwise display rotation from the track matrix (UIKit's y-down space), snapped to 90°.
-    let degrees = atan2(Double(transform.b), Double(transform.a)) * 180 / .pi
-    let rotation = (Int((degrees / 90).rounded()) * 90 % 360 + 360) % 360
-    let mirrored = transform.a * transform.d - transform.b * transform.c < 0
+    let mirrored = isMirrored(transform)
+    let rotation = Self.rotation(of: transform)
 
     return ProbeVideo(
       codec: format.map { videoCodec(CMFormatDescriptionGetMediaSubType($0)) } ?? "",
       width: Double(size.width),
       height: Double(size.height),
-      rotation: Double(rotation),
+      rotation: rotation,
       mirrored: mirrored,
       fps: fps > 0 ? Double(fps) : -1,
       bitrate: dataRate > 0 ? Double(dataRate).rounded() : -1,
@@ -100,6 +98,23 @@ enum Probe {
       candidates.append((track, enabled, subtype == kAudioFormatMPEG4AAC))
     }
     return (candidates.first { $0.enabled && $0.aac } ?? candidates.first { $0.enabled } ?? candidates.first)?.track
+  }
+
+  /// The display matrix mirrors the frame (a negative determinant).
+  static func isMirrored(_ t: CGAffineTransform) -> Bool {
+    t.a * t.d - t.b * t.c < 0
+  }
+
+  /**
+   * Clockwise display rotation of a track matrix (UIKit's y-down space), snapped to 90°. A
+   * mirroring matrix is read as a rotation followed by a horizontal flip (the contract's order,
+   * and what Media3 reports on Android), so the flip is taken out first: [a b; c d] = R·F with
+   * F = [-1 0; 0 1] gives R = [-a b; -c d].
+   */
+  static func rotation(of t: CGAffineTransform) -> Double {
+    let a = isMirrored(t) ? -t.a : t.a
+    let degrees = atan2(Double(t.b), Double(a)) * 180 / .pi
+    return Double((Int((degrees / 90).rounded()) * 90 % 360 + 360) % 360)
   }
 
   static func ms(_ time: CMTime) -> Double {
