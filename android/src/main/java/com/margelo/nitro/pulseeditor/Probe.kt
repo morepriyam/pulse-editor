@@ -11,7 +11,10 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.mediacodec.MediaCodecUtil
 import androidx.media3.inspector.MediaExtractorCompat
 import androidx.media3.inspector.MetadataRetriever
+import kotlin.math.roundToLong
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.guava.await
+import kotlinx.coroutines.withContext
 
 /**
  * Container and track metadata from Media3's extractors (the same ones the player and Transformer
@@ -20,7 +23,12 @@ import kotlinx.coroutines.guava.await
  */
 @OptIn(UnstableApi::class)
 object Probe {
-  suspend fun read(context: Context, uri: String): ProbeResult {
+  /** A probed file, plus the video track's Media3 format for callers that need more (merge). */
+  class Probed(val result: ProbeResult, val videoFormat: Format?)
+
+  suspend fun read(context: Context, uri: String): ProbeResult = load(context, uri).result
+
+  suspend fun load(context: Context, uri: String): Probed {
     MetadataRetriever.Builder(context, MediaItem.fromUri(mediaUri(uri))).build().use { retriever ->
       val groups = retriever.retrieveTrackGroups().await()
       val durationUs = retriever.retrieveDurationUs().await()
@@ -28,11 +36,12 @@ object Probe {
       if (formats.isEmpty()) throw IllegalArgumentException("No media tracks in $uri")
 
       val durationMs = if (durationUs == C.TIME_UNSET) -1.0 else durationUs / 1000.0
-      val video = formats.firstOrNull { MimeTypes.isVideo(it.sampleMimeType) }?.let {
-        readVideo(it, videoTrackDurationMs(context, uri) ?: durationMs)
+      val videoFormat = formats.firstOrNull { MimeTypes.isVideo(it.sampleMimeType) }
+      val video = videoFormat?.let {
+        readVideo(it, withContext(Dispatchers.IO) { videoTrackDurationMs(context, uri) } ?: durationMs)
       }
       val audio = formats.firstOrNull { MimeTypes.isAudio(it.sampleMimeType) }?.let(::readAudio)
-      return ProbeResult(durationMs = durationMs, video = video, audio = audio)
+      return Probed(ProbeResult(durationMs = durationMs, video = video, audio = audio), videoFormat)
     }
   }
 
@@ -49,7 +58,8 @@ object Probe {
       height = f.height.toDouble(),
       rotation = (((f.rotationDegrees % 360) + 360) % 360).toDouble(),
       mirrored = f.mirrorHorizontal,
-      fps = if (f.frameRate > 0) f.frameRate.toDouble() else -1.0,
+      // Rounded to 0.001: the container's rate is a float (30 fps reads 30.000001907).
+      fps = if (f.frameRate > 0) (f.frameRate * 1000.0).roundToLong() / 1000.0 else -1.0,
       bitrate = if (f.averageBitrate > 0) f.averageBitrate.toDouble() else f.bitrate.toDouble(),
       bitDepth = (if (luma > 0) luma else if (transfer == Transfer.SDR) 8 else 10).toDouble(),
       transfer = transfer,

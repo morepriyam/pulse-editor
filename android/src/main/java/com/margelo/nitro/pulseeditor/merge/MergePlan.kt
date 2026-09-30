@@ -1,8 +1,13 @@
 package com.margelo.nitro.pulseeditor.merge
 
+import androidx.annotation.OptIn
+import androidx.media3.common.Format
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.container.NalUnitUtil
 import com.margelo.nitro.pulseeditor.MergeClip
 import com.margelo.nitro.pulseeditor.MergeOptions
 import com.margelo.nitro.pulseeditor.ProbeResult
+import com.margelo.nitro.pulseeditor.Transfer
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -11,16 +16,17 @@ import kotlin.math.roundToInt
  * mix copied and re-encoded clips in one export, and its copy mode isn't frame-accurate at a
  * trimmed start (it begins at the previous keyframe), so the join is only for untrimmed clips
  * with no rendered edit that already share one format fitting the output. Everything else is one
- * hardware encode.
+ * hardware encode. The join's audio is always encoded, so audio never blocks it.
  */
+@OptIn(UnstableApi::class)
 object MergePlan {
   /** A VBR encode overshoots its target: recordings aimed at 5 Mbps average 6–7 Mbps. Clips up
    * to this multiple of the chosen bitrate still count as at it (see the iOS MergePlan). */
   private const val BITRATE_TOLERANCE = 1.6
 
-  fun canJoin(clips: List<MergeClip>, media: List<ProbeResult>, options: MergeOptions): Boolean =
+  fun canJoin(clips: List<MergeClip>, media: List<ProbeResult>, formats: List<Format?>, options: MergeOptions): Boolean =
     clips.indices.none { needsRender(clips[it]) || isTrimmed(clips[it], media[it]) } &&
-      joinBlockers(media, options).isEmpty()
+      joinBlockers(media, formats, options).isEmpty()
 
   /** Edits that change pixels or timing, so the clip can't be copied. */
   fun needsRender(clip: MergeClip): Boolean =
@@ -36,10 +42,9 @@ object MergePlan {
     clip.endMs > clip.startMs && (clip.startMs > 1 || clip.endMs < media.durationMs - 50)
 
   /** Why these clips can't be joined without re-encoding (empty when they can). */
-  fun joinBlockers(media: List<ProbeResult>, options: MergeOptions): List<String> {
+  fun joinBlockers(media: List<ProbeResult>, formats: List<Format?>, options: MergeOptions): List<String> {
     val reasons = mutableListOf<String>()
     val first = media.firstOrNull()?.video ?: return listOf("clip 1 has no video")
-    val firstAudio = media.firstNotNullOfOrNull { it.audio }
     media.forEachIndexed { i, m ->
       val n = i + 1
       val v = m.video ?: run { reasons += "clip $n has no video"; return@forEachIndexed }
@@ -52,13 +57,28 @@ object MergePlan {
       }
       if (v.fps > 0 && v.fps.roundToInt() != options.fps.roundToInt()) reasons += "clip $n is ${v.fps.roundToInt()} fps"
       if (v.bitrate > options.bitrate * BITRATE_TOLERANCE) reasons += "clip $n bitrate is above the chosen one"
-      m.audio?.let { a ->
-        if (a.codec != "aac") reasons += "clip $n audio is ${a.codec}"
-        if (firstAudio != null && (a.sampleRate != firstAudio.sampleRate || a.channels != firstAudio.channels)) {
-          reasons += "clip $n audio layout differs"
-        }
-      }
+      if (v.transfer != Transfer.SDR || v.bitDepth > 8) reasons += "clip $n is HDR or 10-bit"
+      if (i > 0 && !sharesParameterSets(formats[0], formats[i])) reasons += "clip $n was encoded with other H.264 settings than clip 1"
     }
     return reasons
+  }
+
+  /**
+   * Whether `next` decodes with `first`'s H.264 parameter sets. A join writes only the first clip's
+   * SPS/PPS, so a clip from another encoder setup would be decoded wrongly (measured: a joined
+   * Constrained Baseline clip after a High one came out as garbage, with no error). Media3's own
+   * rule for appending (MuxerWrapper.getMostCompatibleInitializationData): identical, or the
+   * same PPS and the same SPS except a level no higher than the first's.
+   */
+  private fun sharesParameterSets(first: Format?, next: Format?): Boolean {
+    if (first == null || next == null) return false
+    if (first.initializationDataEquals(next)) return true
+    val a = first.initializationData
+    val b = next.initializationData
+    if (a.size != 2 || b.size != 2 || !a[1].contentEquals(b[1]) || a[0].size != b[0].size) return false
+    // SPS: start code, NAL header, profile_idc, constraint flags, then level_idc.
+    val level = NalUnitUtil.NAL_START_CODE.size + 3
+    if (level >= a[0].size) return false
+    return a[0].indices.all { it == level || a[0][it] == b[0][it] } && a[0][level] >= b[0][level]
   }
 }

@@ -16,29 +16,51 @@ internal fun audioProcessors(sampleRate: Int, channels: Int): List<AudioProcesso
 }
 
 /**
- * `input` channels → `output` channels. Media3's built-in coefficients cover only some pairs
- * (not 5.1 → stereo, the iPhone 17 Pro's recording layout), so the rest are given here.
- * Coefficients are one row per input channel, one column per output channel. Decoded channel
- * order is Android's: FL FR FC LFE BL BR.
+ * `input` channels → `output` channels, one row of coefficients per input channel. To stereo (and
+ * mono, half of each side) it uses the coefficients iOS's merge applies (measured with a click on
+ * each 5.1 channel): front left/right at full level, centre into both sides at −3 dB, surrounds
+ * into their own side at −3 dB, LFE left out. Other outputs use Media3's matrices where it has
+ * them, else each input keeps its channel (mono feeding both sides).
  */
 @OptIn(UnstableApi::class)
 private fun mixingMatrix(input: Int, output: Int): ChannelMixingMatrix {
-  runCatching { return ChannelMixingMatrix.createForConstantGain(input, output) }
   val m = Array(input) { FloatArray(output) }
-  if (input == 6 && output == 2) {
-    // ITU-R BS.775 downmix without LFE, scaled so a full-scale signal can't clip.
-    val c = 0.7071f
-    val scale = 1f / (1f + 2 * c)
-    m[0][0] = scale; m[1][1] = scale              // front left / right
-    m[2][0] = c * scale; m[2][1] = c * scale      // centre into both
-    m[4][0] = c * scale; m[5][1] = c * scale      // surrounds into their side
-  } else if (input < output) {
-    // Upmix: each input keeps its channel; mono also feeds the right channel.
-    for (i in 0 until input) m[i][i] = 1f
-    if (input == 1 && output >= 2) m[0][1] = 1f
-  } else {
-    // Downmix: fold input i into output i % output, averaged.
-    for (i in 0 until input) m[i][i % output] = 1f / ((input + output - 1 - i % output) / output)
+  if (output <= 2 && input > 2) {
+    for ((i, role) in roles(input).withIndex()) {
+      val (left, right) = when (role) {
+        Role.LEFT -> 1f to 0f
+        Role.RIGHT -> 0f to 1f
+        Role.CENTER -> MINUS_3_DB to MINUS_3_DB
+        Role.SURROUND_LEFT -> MINUS_3_DB to 0f
+        Role.SURROUND_RIGHT -> 0f to MINUS_3_DB
+        Role.LFE -> 0f to 0f
+      }
+      if (output == 2) {
+        m[i][0] = left
+        m[i][1] = right
+      } else {
+        m[i][0] = (left + right) / 2
+      }
+    }
+    return ChannelMixingMatrix(input, output, m.flatMap { it.asList() }.toFloatArray())
   }
+  runCatching { return ChannelMixingMatrix.createForConstantGain(input, output) }
+  for (i in 0 until minOf(input, output)) m[i][i] = 1f
+  if (input == 1 && output >= 2) m[0][1] = 1f
   return ChannelMixingMatrix(input, output, m.flatMap { it.asList() }.toFloatArray())
+}
+
+private enum class Role { LEFT, RIGHT, CENTER, SURROUND_LEFT, SURROUND_RIGHT, LFE }
+
+private const val MINUS_3_DB = 0.70710677f
+
+/** What each decoded channel is, in Android's channel order for that count. */
+private fun roles(channels: Int): List<Role> = when (channels) {
+  3 -> listOf(Role.LEFT, Role.RIGHT, Role.CENTER)
+  4 -> listOf(Role.LEFT, Role.RIGHT, Role.SURROUND_LEFT, Role.SURROUND_RIGHT)
+  5 -> listOf(Role.LEFT, Role.RIGHT, Role.CENTER, Role.SURROUND_LEFT, Role.SURROUND_RIGHT)
+  6 -> listOf(Role.LEFT, Role.RIGHT, Role.CENTER, Role.LFE, Role.SURROUND_LEFT, Role.SURROUND_RIGHT)
+  7 -> listOf(Role.LEFT, Role.RIGHT, Role.CENTER, Role.LFE, Role.SURROUND_LEFT, Role.SURROUND_RIGHT, Role.CENTER)
+  else -> listOf(Role.LEFT, Role.RIGHT, Role.CENTER, Role.LFE, Role.SURROUND_LEFT, Role.SURROUND_RIGHT) +
+    List(channels - 6) { if (it % 2 == 0) Role.SURROUND_LEFT else Role.SURROUND_RIGHT }
 }

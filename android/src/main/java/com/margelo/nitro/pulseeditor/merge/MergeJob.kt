@@ -54,12 +54,14 @@ class MergeJob(
 
 /** Progress that only ever moves forward, so a later phase can never make the bar jump back. */
 class MergeProgress(private val report: (Double) -> Unit) {
-  private var last = -1.0
+  /** The furthest value reported so far (0 before any). */
+  val last: Double get() = synchronized(this) { maxOf(sent, 0.0) }
+  private var sent = -1.0
 
   operator fun invoke(value: Double) {
     val clamped = value.coerceIn(0.0, 1.0)
     val send = synchronized(this) {
-      if (clamped > last) { last = clamped; true } else false
+      if (clamped > sent) { sent = clamped; true } else false
     }
     if (send) report(clamped)
   }

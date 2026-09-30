@@ -13,6 +13,7 @@ import androidx.media3.transformer.DefaultDecoderFactory
 import androidx.media3.transformer.DefaultEncoderFactory
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
+import androidx.media3.transformer.InAppMp4Muxer
 import androidx.media3.transformer.ProgressHolder
 import androidx.media3.transformer.TransformationRequest
 import androidx.media3.transformer.Transformer
@@ -37,7 +38,11 @@ import kotlinx.coroutines.suspendCancellableCoroutine
  */
 @OptIn(UnstableApi::class)
 internal object Transcode {
-  class Settings(val bitrate: Int, val portrait: Boolean = false)
+  /**
+   * `durationMs` is the output's expected length: it sizes the space kept at the front of the file
+   * for the index (moov), see [moovReserveBytes].
+   */
+  class Settings(val bitrate: Int, val durationMs: Double, val portrait: Boolean = false)
 
   class Outcome(val result: ExportResult, val fallbacks: List<String>)
 
@@ -107,10 +112,26 @@ internal object Transcode {
       .setAudioMimeType(MimeTypes.AUDIO_AAC)
       .setAssetLoaderFactory(DefaultAssetLoaderFactory(context, decoders, Clock.DEFAULT, /* logSessionId= */ null))
       .setEncoderFactory(encoders)
+      .setMuxerFactory(InAppMp4Muxer.Factory().setFreeSpaceAfterFileTypeBoxBytes(moovReserveBytes(settings.durationMs)))
       .setPortraitEncodingEnabled(settings.portrait)
       .addListener(listener)
       .build()
   }
+
+  /**
+   * Extra space for the index at the front of the file, beyond the 400 KB Media3 always keeps. Its
+   * muxer writes one chunk per sample, so the index grows by about 1.2 KB a second (measured:
+   * 349 KB for a 5-minute join); past ~5.5 minutes it no longer fits and goes to the end.
+   * [moveMoovToFront] then moves it into this space.
+   */
+  private fun moovReserveBytes(durationMs: Double): Int {
+    val needed = durationMs / 1000 * MOOV_BYTES_PER_SECOND
+    return maxOf(0.0, needed - MEDIA3_MOOV_RESERVE_BYTES + MOOV_MARGIN_BYTES).toInt()
+  }
+
+  private const val MOOV_BYTES_PER_SECOND = 1_500.0
+  private const val MEDIA3_MOOV_RESERVE_BYTES = 400_000.0
+  private const val MOOV_MARGIN_BYTES = 64_000.0
 
   private fun describe(original: TransformationRequest, fallback: TransformationRequest): String {
     val changes = mutableListOf<String>()

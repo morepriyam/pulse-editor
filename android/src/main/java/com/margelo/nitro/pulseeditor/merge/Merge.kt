@@ -12,6 +12,7 @@ import com.margelo.nitro.pulseeditor.Probe
 import com.margelo.nitro.pulseeditor.ProbeResult
 import com.margelo.nitro.pulseeditor.transcode.Transcode
 import com.margelo.nitro.pulseeditor.transcode.isFaststart
+import com.margelo.nitro.pulseeditor.transcode.moveMoovToFront
 import java.io.File
 import java.util.UUID
 import kotlin.math.abs
@@ -28,32 +29,50 @@ import kotlinx.coroutines.withContext
 object Merge {
   suspend fun run(context: Context, clips: List<MergeClip>, options: MergeOptions, progress: MergeProgress): MergeResult {
     if (clips.isEmpty()) throw MergeException("No clips to merge.")
+    removeStaleOutputs(context)
     progress(0.0)
-    val media = coroutineScope {
-      clips.map { clip -> async(Dispatchers.IO) { Probe.read(context, clip.uri) } }.awaitAll()
+    val probed = coroutineScope {
+      clips.mapIndexed { i, clip ->
+        async(Dispatchers.IO) {
+          try {
+            Probe.load(context, clip.uri)
+          } catch (e: CancellationException) {
+            throw e
+          } catch (e: Exception) {
+            throw clipFailure(i, clip, e)
+          }
+        }
+      }.awaitAll()
     }
+    val media = probed.map { it.result }
     val expectedMs = clips.zip(media).sumOf { (clip, m) -> MergePlan.timelineMs(clip, m) }
 
-    if (MergePlan.canJoin(clips, media, options)) {
+    if (MergePlan.canJoin(clips, media, probed.map { it.videoFormat }, options)) {
       try {
-        return export(context, clips, media, options, join = true, expectedMs, progress)
+        return export(context, clips, media, options, join = true, expectedMs) { progress(it) }
       } catch (e: CancellationException) {
         throw e
       } catch (e: Exception) {
-        // Safety net: a join that failed or didn't check out gets one full encode instead.
+        // Safety net: a join that failed or didn't check out gets one full encode instead. Its
+        // progress carries on from where the join got to (the bar never goes back).
+        val from = progress.last
+        return export(context, clips, media, options, join = false, expectedMs) { progress(from + (1 - from) * it) }
       }
     }
-    return export(context, clips, media, options, join = false, expectedMs, progress)
+    return export(context, clips, media, options, join = false, expectedMs) { progress(it) }
   }
 
   private suspend fun export(
     context: Context, clips: List<MergeClip>, media: List<ProbeResult>, options: MergeOptions,
-    join: Boolean, expectedMs: Double, progress: MergeProgress,
+    join: Boolean, expectedMs: Double, progress: (Double) -> Unit,
   ): MergeResult {
     val output = outputFile(context)
     try {
-      val outcome = MergeExport.run(context, clips, media, options, join, output) { progress(it * 0.98) }
-      return withContext(Dispatchers.IO) { verify(context, output, outcome, expectedMs, options) }.also { progress(1.0) }
+      val outcome = MergeExport.run(context, clips, media, options, join, expectedMs, output) { progress(it * 0.98) }
+      return withContext(Dispatchers.IO) {
+        moveMoovToFront(output)
+        verify(context, output, outcome, expectedMs, options)
+      }.also { progress(1.0) }
     } catch (e: Throwable) {
       output.delete()
       throw e
@@ -88,6 +107,21 @@ object Merge {
     )
   }
 
-  private fun outputFile(context: Context): File =
-    File(File(context.cacheDir, "pulse-editor"), "merge-${UUID.randomUUID()}.mp4")
+  private fun outputDirectory(context: Context) = File(context.cacheDir, "pulse-editor")
+
+  private fun outputFile(context: Context): File = File(outputDirectory(context), "merge-${UUID.randomUUID()}.mp4")
+
+  /** Deletes merge files a killed app left behind (a finished merge is moved out by its caller). */
+  private fun removeStaleOutputs(context: Context) {
+    val cutoff = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+    outputDirectory(context).listFiles { file -> file.name.startsWith("merge-") && file.lastModified() < cutoff }
+      ?.forEach { it.delete() }
+  }
+
+  /** A clip's failure, naming the clip (its position and file name). */
+  private fun clipFailure(index: Int, clip: MergeClip, e: Exception): MergeException {
+    val name = clip.uri.substringAfterLast('/')
+    val reason = generateSequence(e as Throwable) { it.cause }.last().message ?: e.javaClass.simpleName
+    return MergeException("Clip ${index + 1} ($name): $reason")
+  }
 }
