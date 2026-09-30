@@ -210,10 +210,14 @@ Media3 can't mix copied and re-encoded clips in one export, and its copy mode is
 
 | Path | When | What happens |
 |---|---|---|
-| **Fast join** | No clip is trimmed or has a rendered edit, and every clip shares one H.264/AAC format that fits, at most 1.6× the chosen bitrate | One `Transformer` export of an `EditedMediaItemSequence` with `setTransmuxVideo`. Audio is copied too, unless a clip is muted or has no sound; then audio alone is encoded, with generated silence. |
+| **Fast join** | No clip is trimmed or has a rendered edit, and every clip shares one H.264/AAC format that fits, at most 1.6× the chosen bitrate | One `Transformer` export of an `EditedMediaItemSequence` with `setTransmuxVideo`: video is copied, audio is encoded (see audio sync below). |
 | **Full encode** | Anything else, and the fast join's fallback | One hardware encode of the whole timeline: `ClippingConfiguration` trims, `SpeedParameters` (natural pitch), `ScaleAndRotateTransformation` / `Crop` / `Presentation` (letterbox) effects on the upright frame, `setFrameRate` cap, H.264 at the chosen bitrate via `DefaultEncoderFactory`. Audio is mixed to the recorder's layout (an explicit 5.1 → stereo downmix) and resampled with the same band-limited filter `extractAudio` uses, not Sonic's linear interpolation. |
 
 - **Shared export code (`transcode/`), for merge and conform:** `Transformer` runs on the main looper, as Media3 requires. Decoder fallback is on, so a decoder that fails to start hands over to the next one. Encoding stays landscape plus a rotation tag (Media3's default, since more encoders support it). Progress comes from polling `getProgress`; cancel calls `Transformer.cancel()` and deletes the partial file.
+- **Audio sync:** two Media3 gaps are closed, both measured with flash/click fixtures (audio minus video per event).
+  - Each clip's decoded or copied AAC keeps the source encoder's end padding (up to 1024 samples), and Media3 only ever pads short audio, so every clip pushed the next clip's audio later (join of three 4 s clips: 0 → 10.7 → 21.4 ms). Each clip's audio is now cut to the clip's length (`TrimAudioProcessor`); in a join the audio is therefore encoded, because copied AAC can't be cut mid-frame.
+  - Media3 declares the output's encoder delay as 1600 samples for `c2.android.aac.encoder` and 0 for any other encoder, but the emulator's encoder primes 2048 (audio 9.4 ms late). Each AAC encoder's priming is now measured once (a tone burst encoded and decoded back, `AacPriming`) and written as the encoder delay.
+  - After: every event within 0.0 ms in joins, 44.1/48 kHz mixes and clips whose audio track is 200 ms longer or shorter than the video; within 3 ms inside 2× and 0.5× clips, with nothing carried into the next clip.
 - **Verification:** every output is checked with `probe` (H.264, the canvas, the expected duration) and must be faststart. A failed check names any encoder fallback Media3 applied.
 - **Known difference from iOS:** slowed-down clips come out at a variable frame rate (Media3's frame rate setting only caps it). They play correctly.
 

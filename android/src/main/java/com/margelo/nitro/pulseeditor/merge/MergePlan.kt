@@ -26,6 +26,12 @@ object MergePlan {
   fun needsRender(clip: MergeClip): Boolean =
     (clip.rotation.roundToInt() % 360) != 0 || clip.flipped || clip.crop != null || abs(clip.speed - 1) > 0.0001
 
+  /** What a clip contributes to the timeline, ms: its window at its speed. */
+  fun timelineMs(clip: MergeClip, media: ProbeResult): Double {
+    val window = if (clip.endMs > clip.startMs) minOf(clip.endMs, media.durationMs) - clip.startMs else media.durationMs
+    return window / clip.speed
+  }
+
   fun isTrimmed(clip: MergeClip, media: ProbeResult): Boolean =
     clip.endMs > clip.startMs && (clip.startMs > 1 || clip.endMs < media.durationMs - 50)
 

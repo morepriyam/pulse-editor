@@ -29,7 +29,9 @@ import kotlinx.coroutines.suspendCancellableCoroutine
  * - decoder fallback on, so a decoder that fails to start hands over to the next one (a Dolby
  *   Vision decoder to the plain HEVC decoder for the base layer, say);
  * - portrait encoding only when asked: Media3 encodes portrait as landscape plus a rotation tag
- *   by default, because more encoders support landscape.
+ *   by default, because more encoders support landscape;
+ * - the AAC encoder's measured priming as its encoder delay ([AacPriming]), so the audio starts in
+ *   sync.
  * Progress is polled every 100 ms. Cancelling the coroutine cancels the export and deletes the
  * partial output. Any fallback Media3's encoder factory applied is returned with the result.
  */
@@ -92,11 +94,13 @@ internal object Transcode {
 
   private fun transformer(context: Context, settings: Settings, listener: Transformer.Listener): Transformer {
     val decoders = DefaultDecoderFactory.Builder(context).setEnableDecoderFallback(true).build()
-    val encoders = DefaultEncoderFactory.Builder(context)
-      .setRequestedVideoEncoderSettings(
-        VideoEncoderSettings.Builder().setBitrate(settings.bitrate).setiFrameIntervalSeconds(2f).build(),
-      )
-      .build()
+    val encoders = PrimingCorrectedEncoderFactory(
+      DefaultEncoderFactory.Builder(context)
+        .setRequestedVideoEncoderSettings(
+          VideoEncoderSettings.Builder().setBitrate(settings.bitrate).setiFrameIntervalSeconds(2f).build(),
+        )
+        .build(),
+    )
     return Transformer.Builder(context)
       .setLooper(Looper.getMainLooper())
       .setVideoMimeType(MimeTypes.VIDEO_H264)

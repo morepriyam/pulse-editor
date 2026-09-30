@@ -21,21 +21,23 @@ import com.margelo.nitro.pulseeditor.MergeOptions
 import com.margelo.nitro.pulseeditor.ProbeResult
 import com.margelo.nitro.pulseeditor.Transfer
 import com.margelo.nitro.pulseeditor.mediaUri
+import com.margelo.nitro.pulseeditor.transcode.TrimAudioProcessor
 import com.margelo.nitro.pulseeditor.transcode.Transcode
 import com.margelo.nitro.pulseeditor.transcode.audioProcessors
 import java.io.File
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 /**
  * One Media3 Transformer export of the whole timeline: an EditedMediaItemSequence of the clips.
- * - join: `setTransmuxVideo` copies every clip's samples (audio too, unless a clip is muted or
- *   silent: then audio alone is encoded, with generated silence).
+ * - join: `setTransmuxVideo` copies every clip's video samples.
  * - encode: each clip is trimmed (ClippingConfiguration), retimed with natural pitch
  *   (SpeedParameters), rotated / flipped / cropped and letterboxed onto the canvas (effects run
- *   on the upright frame), capped at the frame rate, and every clip's audio brought to the
- *   recorder's layout (Media3 needs one layout across a sequence).
- * [Transcode] runs the export: H.264 at the chosen bitrate, AAC.
+ *   on the upright frame) and capped at the frame rate.
+ * Audio is encoded either way: each clip's audio is cut to the clip's length ([TrimAudioProcessor])
+ * and brought to the recorder's layout (Media3 needs one layout across a sequence), silence for
+ * muted or silent clips. [Transcode] runs the export: H.264 at the chosen bitrate, AAC.
  */
 @OptIn(UnstableApi::class, ExperimentalApi::class)
 internal object MergeExport {
@@ -51,10 +53,9 @@ internal object MergeExport {
     val hasAudio = clips.zip(media).any { (clip, m) -> !clip.muted && m.audio != null }
     val trackTypes = if (hasAudio) setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO) else setOf(C.TRACK_TYPE_VIDEO)
     val sequence = EditedMediaItemSequence.Builder(trackTypes).addItems(items).build()
-    val everyClipSounds = clips.zip(media).all { (clip, m) -> !clip.muted && m.audio != null }
-    val builder = Composition.Builder(sequence)
-      .setTransmuxVideo(join)
-      .setTransmuxAudio(join && everyClipSounds)
+    // Audio is always encoded, even in a join: copied AAC keeps each source's end padding, which
+    // can't be cut mid-frame, so every clip would push the next clip's audio later.
+    val builder = Composition.Builder(sequence).setTransmuxVideo(join)
     // HDR sources are tone-mapped to SDR (inputs are normally conformed to SDR already).
     if (!join && media.any { it.video?.transfer != null && it.video?.transfer != Transfer.SDR }) {
       builder.setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
@@ -73,13 +74,16 @@ internal object MergeExport {
       )
     }
     val item = EditedMediaItem.Builder(mediaItem.build()).setRemoveAudio(clip.muted)
-    if (join) return item.build()
+    // Each clip's audio ends exactly where its video does, in the recorder's layout.
+    val audio = listOf(TrimAudioProcessor((MergePlan.timelineMs(clip, media) * 1000).roundToLong())) +
+      audioProcessors(options.audio.sampleRate.roundToInt(), options.audio.channels.roundToInt())
+    if (join) return item.setEffects(Effects(audio, emptyList())).build()
 
     if (abs(clip.speed - 1) > 0.0001) {
       item.setSpeed(SpeedParameters(ConstantSpeed(clip.speed.toFloat()), /* shouldMaintainPitch= */ true))
     }
     item.setFrameRate(options.fps.roundToInt())
-    item.setEffects(Effects(audioProcessors(options.audio.sampleRate.roundToInt(), options.audio.channels.roundToInt()), videoEffects(clip, options)))
+    item.setEffects(Effects(audio, videoEffects(clip, options)))
     return item.build()
   }
 

@@ -32,7 +32,7 @@ object Merge {
     val media = coroutineScope {
       clips.map { clip -> async(Dispatchers.IO) { Probe.read(context, clip.uri) } }.awaitAll()
     }
-    val expectedMs = clips.zip(media).sumOf { (clip, m) -> clipMs(clip, m) }
+    val expectedMs = clips.zip(media).sumOf { (clip, m) -> MergePlan.timelineMs(clip, m) }
 
     if (MergePlan.canJoin(clips, media, options)) {
       try {
@@ -86,12 +86,6 @@ object Merge {
       encoded = result.videoConversionProcess != ExportResult.CONVERSION_PROCESS_TRANSMUXED,
       bitrate = if (result.averageVideoBitrate > 0) result.averageVideoBitrate.toDouble() else v.bitrate,
     )
-  }
-
-  /** What a clip contributes to the timeline: its window at its speed. */
-  private fun clipMs(clip: MergeClip, media: ProbeResult): Double {
-    val window = if (clip.endMs > clip.startMs) minOf(clip.endMs, media.durationMs) - clip.startMs else media.durationMs
-    return window / clip.speed
   }
 
   private fun outputFile(context: Context): File =
