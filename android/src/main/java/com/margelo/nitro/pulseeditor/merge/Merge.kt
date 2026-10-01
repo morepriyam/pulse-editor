@@ -57,6 +57,7 @@ object Merge {
       } catch (e: Exception) {
         // Safety net: a join that failed or didn't check out gets one full encode instead. Its
         // progress carries on from where the join got to (the bar never goes back).
+        Log.w("PulseEditor", "Join failed, encoding instead: ${e.message}", e)
         val from = progress.last
         return export(context, clips, media, options, join = false, expectedMs) { progress(from + (1 - from) * it) }
       }

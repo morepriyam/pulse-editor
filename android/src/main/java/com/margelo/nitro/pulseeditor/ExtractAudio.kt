@@ -74,37 +74,42 @@ object ExtractAudio {
       val scratch = Scratch()
       val info = MediaCodec.BufferInfo()
       var inputDone = false
-      while (true) {
-        // Queue input without waiting, and wait for output only when no input could be queued:
-        // waiting on both every turn spent most of the time idle (24 s of AAC took ~2 s on the
-        // emulator).
-        var queued = false
-        if (!inputDone) {
+      // Keep the codec full: queue every free input buffer and take every ready output each turn,
+      // waiting only when a turn moved nothing. Each buffer is a round trip to the codec's
+      // process, so one frame in flight at a time cost ~2 ms a frame (S24: 2 minutes in 9 s).
+      var outputDone = false
+      while (!outputDone) {
+        var progressed = false
+        while (!inputDone) {
           val index = codec.dequeueInputBuffer(0)
-          if (index >= 0) {
-            queued = true
-            val size = extractor.readSampleData(codec.getInputBuffer(index)!!, 0)
-            if (size < 0) {
-              codec.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-              inputDone = true
-            } else {
-              if (firstInputUs < 0) firstInputUs = extractor.sampleTime
-              codec.queueInputBuffer(index, 0, size, extractor.sampleTime, 0)
-              extractor.advance()
-            }
+          if (index < 0) break
+          progressed = true
+          val size = extractor.readSampleData(codec.getInputBuffer(index)!!, 0)
+          if (size < 0) {
+            codec.queueInputBuffer(index, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
+            inputDone = true
+          } else {
+            if (firstInputUs < 0) firstInputUs = extractor.sampleTime
+            codec.queueInputBuffer(index, 0, size, extractor.sampleTime, 0)
+            extractor.advance()
           }
         }
-        val index = codec.dequeueOutputBuffer(info, if (queued) 0 else TIMEOUT_US)
-        if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-          val f = codec.outputFormat
-          channels = f.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-          encoding = if (f.containsKey(MediaFormat.KEY_PCM_ENCODING)) f.getInteger(MediaFormat.KEY_PCM_ENCODING) else AudioFormat.ENCODING_PCM_16BIT
-          val rate = f.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-          if (rate != inputRate) {
-            inputRate = rate
-            resampler = Resampler(inputRate, sampleRate)
+        while (!outputDone) {
+          val index = codec.dequeueOutputBuffer(info, if (progressed) 0 else TIMEOUT_US)
+          if (index == MediaCodec.INFO_TRY_AGAIN_LATER) break
+          progressed = true
+          if (index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+            val f = codec.outputFormat
+            channels = f.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+            encoding = if (f.containsKey(MediaFormat.KEY_PCM_ENCODING)) f.getInteger(MediaFormat.KEY_PCM_ENCODING) else AudioFormat.ENCODING_PCM_16BIT
+            val rate = f.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+            if (rate != inputRate) {
+              inputRate = rate
+              resampler = Resampler(inputRate, sampleRate)
+            }
+            continue
           }
-        } else if (index >= 0) {
+          if (index < 0) continue
           val buffer = codec.getOutputBuffer(index)!!.order(ByteOrder.nativeOrder())
           buffer.position(info.offset).limit(info.offset + info.size)
           val bytesPerSample = if (encoding == AudioFormat.ENCODING_PCM_FLOAT) 4 else 2
@@ -121,7 +126,7 @@ object ExtractAudio {
             resampler.process(mono, skip, frames - skip, out)
           }
           codec.releaseOutputBuffer(index, false)
-          if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) break
+          if (info.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM != 0) outputDone = true
         }
       }
       resampler.finish(out)

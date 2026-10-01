@@ -43,7 +43,8 @@ internal object Transcode {
    * `durationMs` is the output's expected length: it sizes the space kept at the front of the file
    * for the index (moov), see [moovReserveBytes].
    */
-  class Settings(val bitrate: Int, val durationMs: Double, val portrait: Boolean = false)
+  /** `copyVideo`: the composition copies its video (a join), so nothing should re-encode it. */
+  class Settings(val bitrate: Int, val durationMs: Double, val portrait: Boolean = false, val copyVideo: Boolean = false)
 
   class Outcome(val result: ExportResult, val fallbacks: List<String>)
 
@@ -130,6 +131,7 @@ internal object Transcode {
           VideoEncoderSettings.Builder().setBitrate(settings.bitrate).setiFrameIntervalSeconds(2f).build(),
         )
         .build(),
+      copyVideo = settings.copyVideo,
     )
     return Transformer.Builder(context)
       .setLooper(Looper.getMainLooper())

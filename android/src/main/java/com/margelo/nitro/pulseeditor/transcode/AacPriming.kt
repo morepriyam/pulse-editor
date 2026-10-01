@@ -183,7 +183,10 @@ internal object AacPriming {
  * ([AacPriming]) as the encoder delay, so the muxer writes the edit list players need.
  */
 @OptIn(UnstableApi::class, ExperimentalApi::class)
-internal class PrimingCorrectedEncoderFactory(private val encoders: Codec.EncoderFactory) : Codec.EncoderFactory {
+internal class PrimingCorrectedEncoderFactory(
+  private val encoders: Codec.EncoderFactory,
+  private val copyVideo: Boolean = false,
+) : Codec.EncoderFactory {
   override fun createForAudioEncoding(format: Format, logSessionId: LogSessionId?): Codec {
     val codec = encoders.createForAudioEncoding(format, logSessionId)
     if (codec.configurationFormat.sampleMimeType != MimeTypes.AUDIO_AAC) return codec
@@ -198,7 +201,10 @@ internal class PrimingCorrectedEncoderFactory(private val encoders: Codec.Encode
 
   override fun audioNeedsEncoding() = encoders.audioNeedsEncoding()
 
-  override fun videoNeedsEncoding() = encoders.videoNeedsEncoding()
+  // A one-clip composition ignores setTransmuxVideo and asks this instead, and the default factory
+  // says yes whenever encoder settings are given: a one-clip "join" was re-encoded (S24: 5.2 Mbps
+  // out of a 0.7 Mbps clip). A join says no; an encode keeps the default.
+  override fun videoNeedsEncoding() = !copyVideo && encoders.videoNeedsEncoding()
 
   private class PrimedCodec(private val codec: Codec, private val priming: Int) : Codec by codec {
     override fun getOutputFormat(): Format? = codec.outputFormat?.buildUpon()?.setEncoderDelay(priming)?.build()

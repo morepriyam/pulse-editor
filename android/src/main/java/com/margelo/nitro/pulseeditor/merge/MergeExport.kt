@@ -65,7 +65,7 @@ internal object MergeExport {
   ): Transcode.Outcome =
     Transcode.run(
       context, composition(clips, media, options, join), output,
-      Transcode.Settings(bitrate = options.bitrate.toInt(), durationMs = expectedMs), progress,
+      Transcode.Settings(bitrate = options.bitrate.toInt(), durationMs = expectedMs, copyVideo = join), progress,
     )
 
   private fun composition(clips: List<MergeClip>, media: List<ProbeResult>, options: MergeOptions, join: Boolean): Composition {
