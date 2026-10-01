@@ -30,7 +30,7 @@ enum Merge {
       let segments = zip(clips, media).map { clip, m in
         Join.Segment(media: m, startMs: clip.startMs, endMs: clip.endMs, muted: clip.muted)
       }
-      return try await Join.run(segments, options: options, reencodeAudio: false, encoded: false) { progress($0) }
+      return try await Join.run(segments, options: options, encoded: false) { progress($0) }
     case .selective(let render):
       // Our renders don't reorder frames (no B-frames). A clip that does can't be copied next to
       // them: FFmpeg-based players mis-decode the mix. Camera recordings don't; such a draft
@@ -140,7 +140,7 @@ enum Merge {
       }
       segments.append(Join.Segment(media: out))
     }
-    return try await Join.run(segments, options: options, reencodeAudio: true, encoded: true) { progress(0.8 + $0 * 0.2) }
+    return try await Join.run(segments, options: options, encoded: true) { progress(0.8 + $0 * 0.2) }
   }
 
   /// Where merges write: a folder of their own in the caches directory.

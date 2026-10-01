@@ -1,10 +1,12 @@
 import AVFoundation
 
-/// Joins clips that share one format by copying their samples (AVMutableComposition + a
-/// passthrough export), with trims as frame-accurate edit lists. Video is never decoded or
-/// encoded. Audio is copied too, unless the timeline has a gap (a muted clip, or one without
-/// sound) or mixes encoders: then the audio alone is re-encoded over the whole timeline, gaps as
-/// real silence (see AudioEncode), and joined with the copied video.
+/// Joins clips that share one format by copying their video samples (AVMutableComposition + a
+/// passthrough export), with trims as edit lists on frame boundaries; video is never decoded or
+/// encoded. Audio from more than one piece (or with a gap) is re-encoded once over the whole
+/// timeline (see AudioEncode), gaps as real silence: copied AAC would need one edit-list entry per
+/// clip to drop each clip's priming and end padding, which Apple players honour but FFmpeg-based
+/// ones (Chrome, servers) don't — they play every clip's padding and fall ~10 ms further behind per
+/// clip. A single piece has no seams, so its audio is copied.
 enum Join {
   /// One piece of the timeline: a source file, cut to a window (the whole file when unset).
   struct Segment {
@@ -15,7 +17,7 @@ enum Join {
   }
 
   static func run(
-    _ segments: [Segment], options: MergeOptions, reencodeAudio: Bool, encoded: Bool,
+    _ segments: [Segment], options: MergeOptions, encoded: Bool,
     progress: @escaping @Sendable (Double) -> Void
   ) async throws -> MergeResult {
     let composition = AVMutableComposition()
@@ -26,19 +28,22 @@ enum Join {
     let audioOut = hasAudio
       ? composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
       : nil
-    var audioGap = false
 
     // Every segment is in the draft's format (MergePlan checked; renders are verified), so one
     // track transform shows them all upright.
     videoOut.preferredTransform = try await segments[0].media.videoTrack!.load(.preferredTransform)
 
     var cursor = CMTime.zero
+    var audioPieces = 0
+    var audioGap = false
     for segment in segments {
       let video = segment.media.videoTrack!
-      let range = try trimRange(startMs: segment.startMs, endMs: segment.endMs, in: try await video.load(.timeRange))
+      let (timeRange, frame) = try await video.load(.timeRange, .minFrameDuration)
+      let range = try trimRange(startMs: segment.startMs, endMs: segment.endMs, in: timeRange, frame: frame)
       try videoOut.insertTimeRange(range, of: video, at: cursor)
 
-      // A muted segment (or one without sound, or sound shorter than its picture) leaves a gap.
+      // A muted segment (or one without sound, or sound shorter than its picture) leaves a gap,
+      // which the audio encode fills with silence.
       if let audioOut {
         var covered = CMTime.zero
         if !segment.muted, let audio = segment.media.audioTrack {
@@ -46,6 +51,7 @@ enum Join {
           if overlap.duration > .zero {
             try audioOut.insertTimeRange(overlap, of: audio, at: cursor + (overlap.start - range.start))
             covered = overlap.duration
+            audioPieces += 1
           }
         }
         if range.duration - covered > CMTime(value: 1, timescale: 10) { audioGap = true }
@@ -62,7 +68,7 @@ enum Join {
       // The composition reads the encoded audio through this asset; a track doesn't keep its
       // asset alive, so hold it until the export is done.
       var encodedAsset: AVAsset?
-      if let audioOut, audioGap || reencodeAudio {
+      if let audioOut, audioPieces > 1 || audioGap {
         let url = output.deletingPathExtension().appendingPathExtension("audio.mp4")
         encodedAudio = url
         try await AudioEncode.run(composition, audio: options.audio, to: url) { progress($0 * 0.3) }
@@ -82,11 +88,18 @@ enum Join {
   }
 
   /// The window inside a source video track (the whole track when unset). A window that starts at
-  /// or past the track's end is an error, not the whole clip.
-  static func trimRange(startMs: Double, endMs: Double, in track: CMTimeRange) throws -> CMTimeRange {
+  /// or past the track's end is an error, not the whole clip. With `frame`, both ends move to the
+  /// nearest frame boundary: a copied cut inside a frame is shown by Apple players but dropped by
+  /// FFmpeg-based ones, which then start the picture up to a frame after the sound.
+  static func trimRange(startMs: Double, endMs: Double, in track: CMTimeRange, frame: CMTime? = nil) throws -> CMTimeRange {
     guard endMs > startMs else { return track }
-    let start = track.start + CMTime(value: CMTimeValue(startMs.rounded()), timescale: 1000)
-    let end = CMTimeMinimum(track.start + CMTime(value: CMTimeValue(endMs.rounded()), timescale: 1000), track.end)
+    func at(_ ms: Double) -> CMTime {
+      let t = CMTime(value: CMTimeValue(ms.rounded()), timescale: 1000)
+      guard let frame, frame.isNumeric, frame > .zero else { return track.start + t }
+      return track.start + CMTimeMultiply(frame, multiplier: Int32((t.seconds / frame.seconds).rounded()))
+    }
+    let start = at(startMs)
+    let end = CMTimeMinimum(at(endMs), track.end)
     guard start < end else {
       throw MergeError.invalid("The trim starts at \(Int(startMs)) ms, past the end of the video (\(Probe.ms(track.duration)) ms).")
     }

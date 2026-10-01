@@ -78,9 +78,11 @@ internal object Transcode {
           }
 
           override fun onError(composition: Composition, result: ExportResult, exception: ExportException) {
+            // The message is generic ("Video frame processing error"); the cause chain says why.
+            Log.w("PulseEditor", "Export failed: ${exception.errorCodeName}", exception)
             main.removeCallbacks(poll)
             output.delete()
-            if (continuation.isActive) continuation.resumeWithException(exception)
+            if (continuation.isActive) continuation.resumeWithException(IllegalStateException(plainMessage(exception), exception))
           }
 
           override fun onFallbackApplied(
@@ -97,6 +99,27 @@ internal object Transcode {
         main.postDelayed(poll, 100)
       }
     }
+  }
+
+  /**
+   * What went wrong, in words a person can act on. Media3's own message can be a whole codec
+   * configuration dump; the full exception is logged (above) for diagnosis.
+   */
+  private fun plainMessage(e: ExportException): String = when (e.errorCode) {
+    ExportException.ERROR_CODE_DECODER_INIT_FAILED,
+    ExportException.ERROR_CODE_DECODING_FAILED,
+    ExportException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED -> "This phone couldn't decode one of the clips."
+    ExportException.ERROR_CODE_ENCODER_INIT_FAILED,
+    ExportException.ERROR_CODE_ENCODING_FAILED,
+    ExportException.ERROR_CODE_ENCODING_FORMAT_UNSUPPORTED -> "This phone's encoder couldn't encode the video."
+    ExportException.ERROR_CODE_VIDEO_FRAME_PROCESSING_FAILED -> "Couldn't process the video's frames."
+    ExportException.ERROR_CODE_AUDIO_PROCESSING_FAILED -> "Couldn't process the audio."
+    ExportException.ERROR_CODE_MUXING_FAILED,
+    ExportException.ERROR_CODE_MUXING_TIMEOUT,
+    ExportException.ERROR_CODE_MUXING_APPEND -> "Couldn't write the video file."
+    ExportException.ERROR_CODE_IO_FILE_NOT_FOUND -> "A clip's file is missing."
+    ExportException.ERROR_CODE_IO_NO_PERMISSION -> "A clip's file can't be read."
+    else -> if (e.errorCode in 2000..2999) "Couldn't read a clip's file." else "The video couldn't be exported."
   }
 
   private fun transformer(context: Context, settings: Settings, listener: Transformer.Listener): Transformer {

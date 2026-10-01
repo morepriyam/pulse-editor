@@ -1,6 +1,7 @@
 package com.margelo.nitro.pulseeditor.merge
 
 import android.content.Context
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.Effect
@@ -8,6 +9,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.SpeedParameters
 import androidx.media3.common.audio.AudioProcessor
 import androidx.media3.common.audio.SpeedProvider
+import androidx.media3.common.util.GlUtil
 import androidx.media3.common.util.ExperimentalApi
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.Crop
@@ -42,6 +44,21 @@ import kotlin.math.roundToLong
  */
 @OptIn(UnstableApi::class, ExperimentalApi::class)
 internal object MergeExport {
+  /**
+   * How HDR clips become SDR. Media3's OpenGL tone mapping needs the GPU's GL_EXT_YUV_target
+   * (most Android 10+ phones; not the emulator), and without it every HDR clip fails with a bare
+   * "Video frame processing error". There the HDR picture is read as SDR instead: it finishes, with
+   * flatter colours. Checked once per process.
+   */
+  private val hdrMode: Int by lazy {
+    if (GlUtil.isYuvTargetExtensionSupported()) {
+      Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL
+    } else {
+      Log.i("PulseEditor", "HDR tone mapping unavailable (no GL_EXT_YUV_target): HDR clips are read as SDR")
+      Composition.HDR_MODE_EXPERIMENTAL_FORCE_INTERPRET_HDR_AS_SDR
+    }
+  }
+
   suspend fun run(
     context: Context, clips: List<MergeClip>, media: List<ProbeResult>, options: MergeOptions,
     join: Boolean, expectedMs: Double, output: File, progress: (Double) -> Unit,
@@ -84,9 +101,7 @@ internal object MergeExport {
       }
       Composition.Builder(sequences).apply {
         // HDR sources are tone-mapped to SDR (inputs are normally conformed to SDR already).
-        if (media.any { it.video?.transfer != null && it.video?.transfer != Transfer.SDR }) {
-          setHdrMode(Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL)
-        }
+        if (media.any { it.video?.transfer != null && it.video?.transfer != Transfer.SDR }) setHdrMode(hdrMode)
       }
     }
     return builder.build()
