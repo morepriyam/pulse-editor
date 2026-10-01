@@ -290,6 +290,132 @@ What whisper.cpp takes, decoded in memory: no FFmpeg, no intermediate file, and 
   - the PCM's length matches the video's (14,799 vs 14,800 ms; 12,648 vs 12,660 ms); 80–180 ms on the iPhone and 0.4–0.8 s on the S24 for 6–15 s of audio;
   - the transcripts match a local run of the same whisper.cpp (1.9.3) with whisper.rn's exact settings on the same exports, and the iOS extractor's PCM matches an FFmpeg reference decode to 0.1 ms.
 
+## Benchmarks (on device)
+
+Measured on 2026-10-01 on an **iPhone 17 Pro Max** (iOS 26.5.1) and a **Galaxy S24 Ultra** (Android 16), each running a Pulse debug build of #240 with pulse-editor and react-native-video-trim (RNVT, what Pulse merged with before) side by side. The live copy of these tables is on [Pulse #242](https://github.com/mieweb/pulse/issues/242).
+
+**How it's measured.** A temporary bench screen in the Pulse debug build (kept out of the repo) runs the same drafts through both engines on the phone, alternating which goes first, two runs each, and reports the median. RNVT gets exactly what Pulse used to pass it (`merge(urls, { outputExt: 'mp4', ...REELS_TARGET, clipEdits })`). The outputs are pulled to a Mac and checked:
+
+- **Lip sync:** the sync drafts are built from `assets/dev/sync` clips, which flash white and click at the same instant every second. The worst audio − video offset over every event is read twice: as FFmpeg decodes the file (browsers, servers) and as AVFoundation does (Photos, Safari, iOS). Under one frame (33 ms) is in sync; a 2× clip can't do better than half a frame, because the source's frames land between the output's.
+- **Duration:** the output against the sum of the clips' windows.
+- **Playability:** faststart (`moov` before `mdat`) and FFmpeg decode errors.
+- **Drafts:** recorder-shaped test clips (H.264 1080p30 portrait, no B-frames, like real recordings), the seed drafts (`+ s2`–`+ s5`), and each phone's own recording.
+
+**What the phone runs found, and what changed** (all re-measured on the phones):
+
+- Android exports played 44 ms early on Apple players: Media3's muxer omits the AAC roll sample group, so AVFoundation trimmed the encoder priming twice (see How a merge runs (Android)). Fixed: 0.0 ms in both players.
+- iOS joins drifted ~10 ms per clip in browsers (copied AAC padding; Apple players were fine). Fixed by re-encoding multi-clip audio: 0.0 ms in both, at the cost of joins taking about twice RNVT's time on the iPhone (1.0 s for a 2-minute join).
+- Android extractAudio was ~2 ms per AAC frame (one frame per codec round trip); batching frames on Android 15+ made it 5–9× faster on the S24 (2-minute draft 9.0 → 1.0 s).
+- Android one-clip drafts were re-encoded instead of copied; now copied.
+- Android joins feed the audio encoder in larger buffers: 21–34% faster on the S24.
+- Recordings have no B-frames on either phone, so edited iPhone drafts take the selective path; the recorder-match test clips were regenerated to match.
+- Known and accepted: Android joins are audio-pipeline bound (~10× realtime on the S24; the rest of the phone is idle, Media3 processes audio serially). A trimmed clip on Android can end with a 1–2 ms sliver frame at a clip boundary (invisible; FFmpeg's strict check notes it).
+
+### Lip sync and output checks
+
+**iPhone 17 Pro Max (iOS 26.5.1)**: worst audio − video offset over every event, ms (+ = sound late)
+
+| Draft | pulse-editor, browsers (FFmpeg) | pulse-editor, Apple (AVFoundation) | RNVT, browsers | RNVT, Apple | pulse-editor output |
+|---|---|---|---|---|---|
+| Sync draft: join (4 × 12 s) | 0.0 | 0.0 | 32.0 | 0.0 | faststart, 0 decode errors |
+| Sync draft: 48 + 44.1 kHz audio | 0.1 | 0.1 | 32.0 | 0.0 | faststart, 0 decode errors |
+| Sync draft: rotate + crop + trim | 0.0 | 0.0 | 26.7 | 0.0 | faststart, 4 decode errors |
+| Sync draft: 2× / muted / 0.5×, 48 + 44.1 kHz | -25.0 | -25.0 | 496.5 | -58.5 | faststart, 0 decode errors |
+| Sync draft: trimmed starts | 0.0 | 0.0 | 27.4 | 0.0 | faststart, 0 decode errors |
+
+**Galaxy S24 Ultra (Android 16)**: worst audio − video offset over every event, ms (+ = sound late)
+
+| Draft | pulse-editor, browsers (FFmpeg) | pulse-editor, Apple (AVFoundation) | RNVT, browsers | RNVT, Apple | pulse-editor output |
+|---|---|---|---|---|---|
+| Sync draft: join (4 × 12 s) | 0.0 | 0.0 | -12.0 | -12.0 | faststart, 0 decode errors |
+| Sync draft: 48 + 44.1 kHz audio | 0.0 | 0.0 | 15.4 | 15.4 | faststart, 0 decode errors |
+| Sync draft: rotate + crop + trim | 0.0 | 0.0 | 10.7 | 10.7 | faststart, 0 decode errors |
+| Sync draft: 2× / muted / 0.5×, 48 + 44.1 kHz | -17.5 | -17.5 | -24.0 | -24.0 | faststart, 0 decode errors |
+| Sync draft: trimmed starts | 0.0 | 0.0 | -16.6 | -16.6 | faststart, 0 decode errors |
+
+### Speed
+
+**iPhone 17 Pro Max (iOS 26.5.1)**: median of 2 runs each, engines alternating
+
+| Draft | pulse-editor | RNVT | pulse-editor path | Output duration vs clips (pulse-editor / RNVT) |
+|---|---|---|---|---|
+| Join 3 recorder clips (18 s) | 213 ms | 91 ms | copied | +0 ms / +0 ms |
+| Join 20 clips (2 min) | 1.0 s | 584 ms | copied | +0 ms / +0 ms |
+| Join 20 clips (8 min) | 4.0 s | 2.1 s | copied | +0 ms / +0 ms |
+| 6 clips: trim, rotate+flip, crop, 2×, 0.5× muted | 3.1 s | 2.5 s | re-encoded (all or some clips) | +0 ms / +0 ms |
+| 20 clips, 6 in other formats (HEVC, 60 fps, 4K, landscape) | 17.6 s | 9.0 s | re-encoded (all or some clips) | +0 ms / +0 ms |
+| 12 hostile imports (HDR, Opus, no audio, VFR, 120 fps…) | 14.4 s | 27.8 s | re-encoded (all or some clips) | -81 ms / +198 ms |
+| Sync draft: join (4 × 12 s) | 374 ms | 205 ms | copied | +0 ms / +0 ms |
+| Sync draft: trimmed starts | 330 ms | 182 ms | copied | -20 ms / +0 ms |
+| Sync draft: 2× / muted / 0.5×, 48 + 44.1 kHz | 2.7 s | 2.3 s | re-encoded (all or some clips) | +0 ms / +0 ms |
+| Sync draft: rotate + crop + trim | 3.6 s | 3.0 s | re-encoded (all or some clips) | +0 ms / +0 ms |
+| Sync draft: 48 + 44.1 kHz audio | 506 ms | 269 ms | copied | +0 ms / +0 ms |
+
+**Galaxy S24 Ultra (Android 16)**: median of 2 runs each, engines alternating
+
+| Draft | pulse-editor | RNVT | pulse-editor path | Output duration vs clips (pulse-editor / RNVT) |
+|---|---|---|---|---|
+| Join 3 recorder clips (18 s) | 2.4 s | 3.8 s | copied | +5 ms / +48 ms |
+| Join 20 clips (2 min) | 12.2 s | 23.1 s | copied | +0 ms / +320 ms |
+| Join 20 clips (8 min) | 44.5 s | 78.6 s | copied | +0 ms / +0 ms |
+| 6 clips: trim, rotate+flip, crop, 2×, 0.5× muted | 4.4 s | 7.9 s | re-encoded (all or some clips) | +11 ms / +16 ms |
+| 20 clips, 6 in other formats (HEVC, 60 fps, 4K, landscape) | 17.9 s | 29.3 s | re-encoded (all or some clips) | +0 ms / +320 ms |
+| 12 hostile imports (HDR, Opus, no audio, VFR, 120 fps…) | 14.1 s | 24.1 s | re-encoded (all or some clips) | +0 ms / +36 ms |
+| Sync draft: join (4 × 12 s) | 4.1 s | 8.3 s | copied | +0 ms / +43 ms |
+| Sync draft: trimmed starts | 5.3 s | 7.4 s | re-encoded (all or some clips) | +5 ms / +58 ms |
+| Sync draft: 2× / muted / 0.5×, 48 + 44.1 kHz | 7.7 s | 8.0 s | re-encoded (all or some clips) | +5 ms / +9 ms |
+| Sync draft: rotate + crop + trim | 5.7 s | 8.8 s | re-encoded (all or some clips) | +16 ms / +11 ms |
+| Sync draft: 48 + 44.1 kHz audio | 4.5 s | 8.3 s | copied | +0 ms / +34 ms |
+
+### probe and extractAudio
+
+**iPhone 17 Pro Max (iOS 26.5.1)**
+
+| Method | pulse-editor | RNVT |
+|---|---|---|
+| probe, 26 test files (median, first read) | 12 ms | 108 ms |
+| extractAudio, 24 s 5.1 clip | 228 ms | 37 ms |
+| extractAudio, 2-minute draft | 464 ms | 82 ms |
+| extractAudio, 8 s Opus clip | 89 ms | 25 ms |
+| extractAudio, clip without audio | 2 ms | fails |
+
+**Galaxy S24 Ultra (Android 16)**
+
+| Method | pulse-editor | RNVT |
+|---|---|---|
+| probe, 26 test files (median, first read) | 29 ms | 117 ms |
+| extractAudio, 24 s 5.1 clip | 368 ms | 82 ms |
+| extractAudio, 2-minute draft | 990 ms | 181 ms |
+| extractAudio, 8 s Opus clip | 105 ms | 59 ms |
+| extractAudio, clip without audio | 5 ms | fails |
+
+### Real recordings
+
+**iPhone 17 Pro Max (iOS 26.5.1)**, its own recording
+
+| Draft | Time | Path | Output |
+|---|---|---|---|
+| Real recording × 3 (join) | 216 ms | copied | 23.30 s, 5.4 Mbps, 0 decode errors |
+| Real recording alone | 44 ms | copied | 7.77 s, 5.4 Mbps, 0 decode errors |
+| Real recordings: as is / rotated / trimmed / 2× | 2.0 s | re-encoded (all or some clips) | 23.93 s, 5.3 Mbps, 0 decode errors |
+
+**Galaxy S24 Ultra (Android 16)**, its own recording
+
+| Draft | Time | Path | Output |
+|---|---|---|---|
+| Real recording × 3 (join) | 2.5 s | copied | 22.31 s, 6.0 Mbps, 0 decode errors |
+| Real recording alone | 886 ms | copied | 7.47 s, 6.0 Mbps, 0 decode errors |
+| Real recordings: as is / rotated / trimmed / 2× | 3.4 s | re-encoded (all or some clips) | 23.10 s, 5.5 Mbps, 1 FFmpeg timestamp warning (see below) |
+
+**Reading the tables:**
+
+- RNVT's iOS joins are faster because they copy the audio, and that is what drifts in browsers (the +27–32 ms above). pulse-editor re-encodes it to stay in sync everywhere.
+- The two mixed-format rows (6 clips in other formats, 12 hostile imports) are formats `conform` will turn into recorder-format clips at import, so they won't reach a merge in Pulse once conform lands; they stay here as no-regression checks.
+- The 4 decode errors on the iPhone's rotate + crop + trim draft come from the test clips: they're x264-made, copied next to Apple-rendered clips. With Apple-encoded clips, as recordings are, the same draft has 0 (checked on macOS, and the iPhone's own recording has 0 above).
+- The S24 edited recording's one FFmpeg warning is a 1.7 ms frame where a trimmed clip ends just after a frame (invisible; players handle it).
+- RNVT's extractAudio writes a WAV at the source's rate, while pulse-editor returns 16 kHz mono ready for Whisper (band-limited resampling), so its times aren't like for like. RNVT can't read a clip without audio.
+- probe: RNVT's first read was slow in most runs (~110 ms) but 13 ms in one, so treat its probe time as a range.
+
 ## Development
 
 Pulse consumes this repo as a git submodule at `modules/pulse-editor` and reads its TypeScript source directly, so there's no build step.
