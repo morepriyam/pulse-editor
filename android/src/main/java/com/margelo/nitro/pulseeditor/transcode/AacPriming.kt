@@ -188,7 +188,12 @@ internal class PrimingCorrectedEncoderFactory(
   private val copyVideo: Boolean = false,
 ) : Codec.EncoderFactory {
   override fun createForAudioEncoding(format: Format, logSessionId: LogSessionId?): Codec {
-    val codec = encoders.createForAudioEncoding(format, logSessionId)
+    // Media3 fills each encoder input buffer before queueing it, and every queued buffer is a
+    // round trip to the codec's process (the default holds ~40 ms of PCM). In a join, where the
+    // audio is the only encoding, a larger buffer made exports 21-34% faster on the S24; with
+    // video also encoding, the bursts slowed exports by 5-15%, so encodes keep the default.
+    val requested = if (copyVideo) format.buildUpon().setMaxInputSize(JOIN_AUDIO_INPUT_BYTES).build() else format
+    val codec = encoders.createForAudioEncoding(requested, logSessionId)
     if (codec.configurationFormat.sampleMimeType != MimeTypes.AUDIO_AAC) return codec
     val priming = AacPriming.samples(codec.name, format.sampleRate, format.channelCount) ?: return codec
     return PrimedCodec(codec, priming)
@@ -200,6 +205,10 @@ internal class PrimingCorrectedEncoderFactory(
   override fun isVideoFormatSupported(format: Format) = encoders.isVideoFormatSupported(format)
 
   override fun audioNeedsEncoding() = encoders.audioNeedsEncoding()
+
+  private companion object {
+    const val JOIN_AUDIO_INPUT_BYTES = 256 * 1024
+  }
 
   // A one-clip composition ignores setTransmuxVideo and asks this instead, and the default factory
   // says yes whenever encoder settings are given: a one-clip "join" was re-encoded (S24: 5.2 Mbps
