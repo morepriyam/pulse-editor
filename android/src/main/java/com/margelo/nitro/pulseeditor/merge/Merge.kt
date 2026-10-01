@@ -2,6 +2,7 @@ package com.margelo.nitro.pulseeditor.merge
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.transformer.ExportResult
@@ -12,6 +13,7 @@ import com.margelo.nitro.pulseeditor.Probe
 import com.margelo.nitro.pulseeditor.ProbeResult
 import com.margelo.nitro.pulseeditor.transcode.Transcode
 import com.margelo.nitro.pulseeditor.transcode.isFaststart
+import com.margelo.nitro.pulseeditor.transcode.addAacRollGroup
 import com.margelo.nitro.pulseeditor.transcode.moveMoovToFront
 import java.io.File
 import java.util.UUID
@@ -71,6 +73,7 @@ object Merge {
       val outcome = MergeExport.run(context, clips, media, options, join, expectedMs, output) { progress(it * 0.98) }
       return withContext(Dispatchers.IO) {
         moveMoovToFront(output)
+        if (!addAacRollGroup(output)) Log.w("PulseEditor", "Couldn't add the AAC roll group: Apple players may play the audio 44 ms early")
         verify(context, output, outcome, expectedMs, options)
       }.also { progress(1.0) }
     } catch (e: Throwable) {

@@ -41,7 +41,6 @@ struct MergePlan {
   static func joinBlockers(media: [Probe.Media], options: MergeOptions) -> [String] {
     var reasons: [String] = []
     guard let first = media.first?.result.video else { return ["clip 1 has no video"] }
-    let firstAudio = media.compactMap { $0.result.audio }.first
 
     for (i, m) in media.enumerated() {
       let n = i + 1
@@ -66,12 +65,10 @@ struct MergePlan {
       if v.bitrate > options.bitrate * bitrateTolerance {
         reasons.append("clip \(n) is \(Int(v.bitrate / 1000)) kbps, above the chosen \(Int(options.bitrate / 1000))")
       }
-      if let a = m.result.audio {
-        if a.codec != "aac" { reasons.append("clip \(n) audio is \(a.codec), not aac") }
-        if let f = firstAudio, a.sampleRate != f.sampleRate || a.channels != f.channels {
-          reasons.append("clip \(n) audio layout differs")
-        }
-      }
+      // Audio from more than one clip is re-encoded by the join anyway (into the draft's layout),
+      // so differing sample rates or channel counts don't need the video re-encoded. A single
+      // clip's audio is copied, so it has to be AAC already.
+      if let a = m.result.audio, a.codec != "aac" { reasons.append("clip \(n) audio is \(a.codec), not aac") }
     }
     return reasons
   }
