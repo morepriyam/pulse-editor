@@ -423,6 +423,25 @@ Every row where RNVT comes out ahead or the outputs differ. "Measured" means a n
 | **probe on the iPhone** | 12 ms vs RNVT 13–108 ms | RNVT's first read was ~110 ms in most runs and 13 ms in one, so its number is a range. | — |
 | **Android exports, absolute speed** | faster than RNVT everywhere, but joins ~10× realtime (2 min in 12.2 s) | Media3 runs the audio pipeline (decode, cut, mix, encode) one buffer at a time on one thread; during a join one core is busy and the rest of the phone is idle (measured with `top` on the S24). Feeding the encoder larger buffers made joins 21–34% faster; pre-decoding the audio didn't help (decoding isn't the bottleneck). | Accepted. Going further means replacing Media3's audio pipeline. |
 
+### Switching a trade-off later
+
+Each choice above is one small, local change. Where it lives, and what changes if you flip it:
+
+| Choice | Where | To switch | What you'd trade |
+|---|---|---|---|
+| iOS joins re-encode multi-clip audio | `ios/Merge/Join.swift`, `if let audioOut, audioPieces > 1 \|\| audioGap` | Re-encode only on a gap (`audioGap`) to copy audio again | ~2× faster iOS joins; browsers drift ~10 ms per clip again |
+| iOS join trims snap to frames | `ios/Merge/Join.swift`, `trimRange(…, frame: frame)` | Pass no `frame` | Exact-ms cuts; FFmpeg-based players start the picture up to a frame late |
+| AAC encoder quality (iOS) | `ios/Merge/SampleTransfer.swift`, `EncodeSettings.aac` | Add `AVEncoderAudioQualityKey: AVAudioQuality.low` | ~2× faster audio encode (joins); ~6 dB lower signal-to-distortion |
+| Format mismatches → full encode (iOS) | `ios/Merge/MergePlan.swift`, `init`: any join blocker → `.encode` | Render only the mismatched clips, like `.selective` does for edited ones | Mixed-format drafts ~2× faster; worth it only if mixed formats still reach merge after `conform` |
+| Join bitrate allowance | `MergePlan.swift` `bitrateTolerance`, `MergePlan.kt` `BITRATE_TOLERANCE` (1.6×) | Lower it | Fewer joins (more re-encodes); smaller files from high-bitrate recordings |
+| Export bitrate | Pulse `src/features/export/editor-merge.ts`, `EXPORT_BITRATE` (5 Mbps) | Lower it | Smaller encoded files (Android's are 1.7–5.7× RNVT's); softer picture; recordings above 1.6× of it stop joining |
+| Android join audio encoder buffer | `transcode/AacPriming.kt`, `JOIN_AUDIO_INPUT_BYTES` (256 KB, joins only) | Change the size, or apply it to encodes | Joins 21–34% faster with it; encodes got 5–15% slower when it applied to them |
+| Android one-clip joins copy video | `transcode/AacPriming.kt`, `videoNeedsEncoding() = !copyVideo && …` | Return the default factory's answer | One-clip drafts re-encoded again |
+| Android Apple-player sync (AAC roll group) | `merge/Merge.kt` → `transcode/Mp4.kt` `addAacRollGroup` | Remove the call | Android exports 44 ms early on Apple players |
+| Android extractAudio batching | `ExtractAudio.kt`, the `FEATURE_MultipleFrames` check (Android 15+) | Force the one-frame path | 5–9× slower captions audio on the S24 |
+| Android HDR without GPU support | `merge/MergeExport.kt`, `hdrMode` | Always use OpenGL tone mapping | HDR clips fail on GPUs without `GL_EXT_YUV_target` instead of coming out flat |
+| Android frame rate on speed changes | `merge/MergeExport.kt`, `videoItem` `setFrameRate` (a cap) | Add a frame-repeat effect to fill gaps | Constant 30 fps like iOS; more encoding work |
+
 **Reading the tables:**
 
 - RNVT's iOS joins are faster because they copy the audio, and that is what drifts in browsers (the +27–32 ms above). pulse-editor re-encodes it to stay in sync everywhere.
