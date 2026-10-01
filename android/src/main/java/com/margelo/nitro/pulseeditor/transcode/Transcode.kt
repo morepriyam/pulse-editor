@@ -3,6 +3,7 @@ package com.margelo.nitro.pulseeditor.transcode
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.Clock
@@ -86,6 +87,7 @@ internal object Transcode {
             composition: Composition, original: TransformationRequest, fallback: TransformationRequest,
           ) {
             fallbacks += describe(original, fallback)
+            Log.i("PulseEditor", fallbacks.last())
           }
         })
         transformer = t

@@ -4,6 +4,7 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaFormat
 import android.media.metrics.LogSessionId
+import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
@@ -41,8 +42,14 @@ internal object AacPriming {
     val priming = measured.getOrPut(key) {
       // Any AAC encoder primes at least one 1024-sample frame; a smaller result means the decoder
       // dropped the priming itself, so it can't be trusted.
-      runCatching { measure(encoderName, sampleRate, channels, System.nanoTime() + DEADLINE_NS) }.getOrNull()
-        ?.takeIf { it in 1024..8192 } ?: FAILED
+      val result = runCatching { measure(encoderName, sampleRate, channels, System.nanoTime() + DEADLINE_NS) }
+      val samples = result.getOrNull()?.takeIf { it in 1024..8192 }
+      Log.i(
+        "PulseEditor",
+        if (samples != null) "AAC priming $key: $samples samples"
+        else "AAC priming $key: not measured (${result.exceptionOrNull()?.message ?: "got ${result.getOrNull()}"}), Media3's value is used",
+      )
+      samples ?: FAILED
     }
     return priming.takeIf { it != FAILED }
   }
