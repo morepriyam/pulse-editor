@@ -12,6 +12,10 @@
 namespace NitroModules { class ArrayBufferHolder; }
 // Forward declaration of `AudioPCM` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct AudioPCM; }
+// Forward declaration of `ConformResult` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ConformResult; }
+// Forward declaration of `HybridConformJobSpec` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { class HybridConformJobSpec; }
 // Forward declaration of `HybridMergeJobSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
 // Forward declaration of `HybridPulseEditorSpec` to properly resolve imports.
@@ -32,6 +36,8 @@ namespace margelo::nitro::pulseeditor { struct ProbeVideo; }
 namespace margelo::nitro::pulseeditor { enum class Transfer; }
 
 // Forward declarations of Swift defined types
+// Forward declaration of `HybridConformJobSpec_cxx` to properly resolve imports.
+namespace PulseEditor { class HybridConformJobSpec_cxx; }
 // Forward declaration of `HybridMergeJobSpec_cxx` to properly resolve imports.
 namespace PulseEditor { class HybridMergeJobSpec_cxx; }
 // Forward declaration of `HybridPulseEditorSpec_cxx` to properly resolve imports.
@@ -39,6 +45,8 @@ namespace PulseEditor { class HybridPulseEditorSpec_cxx; }
 
 // Include C++ defined types
 #include "AudioPCM.hpp"
+#include "ConformResult.hpp"
+#include "HybridConformJobSpec.hpp"
 #include "HybridMergeJobSpec.hpp"
 #include "HybridPulseEditorSpec.hpp"
 #include "MergeClip.hpp"
@@ -172,6 +180,61 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
   }
   inline Result_void_ create_Result_void_(const std::exception_ptr& error) noexcept {
     return Result<void>::withError(error);
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<ConformResult>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<ConformResult>>`.
+   */
+  using std__shared_ptr_Promise_ConformResult__ = std::shared_ptr<Promise<ConformResult>>;
+  inline std::shared_ptr<Promise<ConformResult>> create_std__shared_ptr_Promise_ConformResult__() noexcept {
+    return Promise<ConformResult>::create();
+  }
+  inline PromiseHolder<ConformResult> wrap_std__shared_ptr_Promise_ConformResult__(std::shared_ptr<Promise<ConformResult>> promise) noexcept {
+    return PromiseHolder<ConformResult>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const ConformResult& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const ConformResult&)>`.
+   */
+  using Func_void_ConformResult = std::function<void(const ConformResult& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const ConformResult& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_ConformResult_Wrapper final {
+  public:
+    explicit Func_void_ConformResult_Wrapper(std::function<void(const ConformResult& /* result */)>&& func): _function(std::make_unique<std::function<void(const ConformResult& /* result */)>>(std::move(func))) {}
+    inline void call(ConformResult result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const ConformResult& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_ConformResult create_Func_void_ConformResult(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_ConformResult_Wrapper wrap_Func_void_ConformResult(Func_void_ConformResult value) noexcept {
+    return Func_void_ConformResult_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridConformJobSpec>
+  /**
+   * Specialized version of `std::shared_ptr<HybridConformJobSpec>`.
+   */
+  using std__shared_ptr_HybridConformJobSpec_ = std::shared_ptr<HybridConformJobSpec>;
+  std::shared_ptr<HybridConformJobSpec> create_std__shared_ptr_HybridConformJobSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
+  void* NON_NULL get_std__shared_ptr_HybridConformJobSpec_(std__shared_ptr_HybridConformJobSpec_ cppType);
+  
+  // pragma MARK: std::weak_ptr<HybridConformJobSpec>
+  using std__weak_ptr_HybridConformJobSpec_ = std::weak_ptr<HybridConformJobSpec>;
+  inline std__weak_ptr_HybridConformJobSpec_ weakify_std__shared_ptr_HybridConformJobSpec_(const std::shared_ptr<HybridConformJobSpec>& strong) noexcept { return strong; }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<ConformResult>>>
+  using Result_std__shared_ptr_Promise_ConformResult___ = Result<std::shared_ptr<Promise<ConformResult>>>;
+  inline Result_std__shared_ptr_Promise_ConformResult___ create_Result_std__shared_ptr_Promise_ConformResult___(const std::shared_ptr<Promise<ConformResult>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<ConformResult>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_ConformResult___ create_Result_std__shared_ptr_Promise_ConformResult___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<ConformResult>>>::withError(error);
   }
   
   // pragma MARK: std::optional<ProbeVideo>
@@ -335,6 +398,15 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
   }
   inline Result_std__shared_ptr_HybridMergeJobSpec__ create_Result_std__shared_ptr_HybridMergeJobSpec__(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<HybridMergeJobSpec>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<HybridConformJobSpec>>
+  using Result_std__shared_ptr_HybridConformJobSpec__ = Result<std::shared_ptr<HybridConformJobSpec>>;
+  inline Result_std__shared_ptr_HybridConformJobSpec__ create_Result_std__shared_ptr_HybridConformJobSpec__(const std::shared_ptr<HybridConformJobSpec>& value) noexcept {
+    return Result<std::shared_ptr<HybridConformJobSpec>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_HybridConformJobSpec__ create_Result_std__shared_ptr_HybridConformJobSpec__(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<HybridConformJobSpec>>::withError(error);
   }
 
 } // namespace margelo::nitro::pulseeditor::bridge::swift

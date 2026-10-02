@@ -24,7 +24,7 @@ Pulse is moving every native video method it uses from its react-native-video-tr
 |  | `merge`: RNVT fallback removed | the FFmpeg merge | ✅ in code: the app merges with pulse-editor only, and an error shows the retry state (tsc, lint, tests; not run on a device since) | ✅ same | 
 | 5 | `extractAudio` → Whisper captions | `extractAudio` | ✅ iPhone: captions (extract 80–180 ms, VAD 128 ms, Whisper 123 ms); macOS: PCM vs FFmpeg reference within 0.1 ms; local whisper.cpp 1.9.3 gives the same transcripts | ✅ S24: captions (extract 0.4–0.8 s, Whisper 1.5 s on CPU); emulator: length and speech onset exact vs FFmpeg; local whisper.cpp gives the same transcripts | 
 | | Cleanups from the whisper.rn audit (VAD comment, real CPU fallback) | | ✅ from whisper.rn 0.7.4's source, not run: the Whisper fallback now asks for the CPU (it only runs if the GPU context fails to load) | ✅ comments only (whisper.rn has no Android GPU backend) | 
-| 6 | `conform`: import normalization, HDR | `compress`, `cancelCompress` | 📋 | 📋 (RNVT's fails on the S24 today) | 
+| 6 | `conform`: import normalization, HDR | `compress`, `cancelCompress` | ⏳ macOS: 51 of 51 sample files to contract, in sync; the app imports with it (tsc, tests) · iPhone next | ⏳ emulator: every 8-bit input, both layouts, in sync, cancel (see [conform](#conform)) · S24 next | 
 | 7 | `thumbnail` | `getFrameAt` | 📋 | 📋 | 
 | 8 | `<PulsePreview>`: composition player | (needed by the editor) | 📋 | 📋 | 
 | 9 | Timeline editor UI (React Native), replacing the clip preview and the per-clip editor (see [The timeline editor](#the-timeline-editor-plan)) | `showEditor` | 📋 | 📋 | 
@@ -289,6 +289,60 @@ What whisper.cpp takes, decoded in memory: no FFmpeg, no intermediate file, and 
 - **In Pulse, on an iPhone 17 Pro Max and a Galaxy S24 Ultra**, transcribing merged exports with whisper.rn 0.7.4:
   - the PCM's length matches the video's (14,799 vs 14,800 ms; 12,648 vs 12,660 ms); 80–180 ms on the iPhone and 0.4–0.8 s on the S24 for 6–15 s of audio;
   - the transcripts match a local run of the same whisper.cpp (1.9.3) with whisper.rn's exact settings on the same exports, and the iOS extractor's PCM matches an FFmpeg reference decode to 0.1 ms.
+
+## `conform`
+
+```ts
+import { conform } from '@mieweb/pulse-editor';
+
+const result = await conform(uri, {
+  width: 1080, height: 1920,         // display canvas: the picture is fitted, letterboxed, centered
+  rotation: 90,                      // clockwise tag; at 90/270 frames are coded 1920×1080, like the camera's
+  fps: 30, bitrate: 5_000_000,
+  audio: { sampleRate: 48000, channels: 1 },  // the recorder's layout
+  copyVideo: false,                  // true: keep the video samples, re-encode only the audio
+}, { onProgress, signal });          // abort = cancel: stops, deletes partial output, rejects "Conform cancelled"
+// → { uri, durationMs, encoded, bitrate }: a faststart MP4 in the caches folder
+```
+
+One imported file into the recorder's format, so it can join the camera's own recordings without re-encoding. What to do with a file (pass it through, convert only its audio, or convert it all) stays in Pulse (`decideImport`); `conform` only carries it out.
+
+- **Output:** H.264 High 8-bit SDR BT.709, the canvas at the given rotation tag, a constant frame rate on iOS, AAC in the given layout, faststart.
+- **HDR** (HLG, PQ, Dolby Vision) is tone-mapped to SDR, not just re-tagged.
+- **Mirrored** sources are flipped back into the pixels.
+- **Sound:** the track the platform plays, never Apple's spatial-audio (APAC) track. A file whose sound the device can't decode is **rejected**; it is never conformed silently.
+- **Checked before it's returned:** the output is probed (codec, layout, rotation, sound) and must be as long as the source's picture; a decoder that gives up early fails the conform instead of hiding behind a held frame. Leftover conform files in the caches folder are deleted after a day.
+
+### How a conform runs
+
+| | iOS | Android |
+|---|---|---|
+| Video and audio | merge's single-clip render (`Render`): hardware decode, a video composition rendering into BT.709 (the tone map), letterbox, coded in the tag's orientation, gaps filled to a constant 30 fps, `AVAssetWriter` H.264 + AAC | one `Transformer` export (merge's `transcode/`): `FrameDropEffect` down to the rate (no fill: a 24 fps source stays 24), a flip for mirrored sources (Media3 reads the flag but doesn't apply it), `Presentation` letterbox, then a turn into the coded orientation; GPU tone map where the GPU can (as merge); the audio mixed and resampled into the layout |
+| Audio only (`copyVideo`) | merge's join with one clip and its audio re-encoded (passthrough export) | the same export with the video transmuxed |
+| Rotation tag | the iPhone camera's matrix (quarter turn plus the translation back to the origin) | written on the muxer's video format (`RotationTagMuxerFactory`), the way the S24 camera writes it; Transformer otherwise picks 90 or 270 itself |
+| Sync | merge's audio path | merge's priming fix and AAC roll group |
+
+What RNVT's `compress` did differently: an AVFoundation engine on iOS with FFmpeg as a fallback, FFmpeg only on Android, and a file whose sound couldn't be decoded was imported silent.
+
+### Tested
+- **iOS code on macOS**, against the conform sample set (the longest file of each of 53 format groups among 173 files: iPhone Dolby Vision HLG 1080p/4K at 24–120 fps with spatial audio, screen recordings, full-range HEVC, old Pulse exports with 5.1, messaging-app clips, Pulse's import fixtures), with an iPhone recorder target (1920×1080 tagged 90°, 48 kHz mono):
+  - all 51 that needed it converted (2 already matched): H.264 8-bit BT.709, 1080×1920 displayed, tagged 90°, 30 fps constant, mono 48 kHz AAC, picture length within 1% of the source, faststart, no FFmpeg decode errors; 0.2–34 s each (4 minutes of 4K HEVC in 34 s);
+  - audio-only on six clips (including both phones' own recordings): video samples kept, audio converted, in 30–120 ms;
+  - lip sync through a full conversion and an audio-only one: 0.0–0.1 ms in FFmpeg and in AVFoundation (flash/click sync clips);
+  - frames from 7 conversions checked by eye against their sources: upright, letterboxed, HDR toned down to SDR;
+  - a mirrored source (display matrix with a flip) comes out as players show it, with no mirror left in the tag;
+  - an audio-only conform of a sync clip tagged like a recording: 0.0 ms in both;
+  - full-range sources keep their colours (mean centre colour within 2–3 levels of the source).
+- **Android on the emulator (Android 17, software codecs)**, in Pulse's debug build through the app's own import gate (`conformToContract`), upright target (1080×1920) and the S24's (1920×1080 tagged 90°):
+  - every 8-bit input converted: 120 fps slow motion, 60 fps, variable frame rate, 4K, Opus, no audio, WhatsApp, square, a mirrored clip, and real screen recordings, 5.1 exports and messaging clips; H.264 BT.709 limited range at the requested layout and tag, AAC, length within 1%, faststart, no FFmpeg decode errors;
+  - lip sync 0.0 ms in FFmpeg and AVFoundation, full conversion (48 and 44.1 kHz sources, both targets) and audio-only (the video copied untouched);
+  - cancel: rejects "Conform cancelled" 14–86 ms after the abort, no file left;
+  - the emulator can't decode 10-bit HEVC, so its HDR inputs fail with "This phone couldn't decode the video." (needs the S24).
+- **Found and changed on the emulator:**
+  - Media3 encodes an SDR source in the source's own colour description, so full-range sources (screen recordings, some messaging apps) came out full range. Every Android encode (merge and conform) now asks for BT.709 limited range, what the cameras and iOS write.
+  - Still open: on the emulator a full-range source's picture comes out 9–10 levels darker (full range read as limited), with or without that change; limited-range sources keep their levels exactly (180.9 → 180.4). To check on the S24.
+- **Known differences between the platforms:** iOS fills frames to a constant 30 fps; Android drops frames down to 30 but doesn't add any, so a 24 fps or variable source stays variable (a 58 fps screen recording averaged 29.95 fps) and 29.97 fps stays 29.97. Both pass the import contract and the recorder match.
+- Not yet run on a phone.
 
 ## Benchmarks (on device)
 

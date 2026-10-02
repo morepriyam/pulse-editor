@@ -8,6 +8,7 @@
 #include "PulseEditor-Swift-Cxx-Bridge.hpp"
 
 // Include C++ implementation defined types
+#include "HybridConformJobSpecSwift.hpp"
 #include "HybridMergeJobSpecSwift.hpp"
 #include "HybridPulseEditorSpecSwift.hpp"
 #include "PulseEditor-Swift-Cxx-Umbrella.hpp"
@@ -52,6 +53,30 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
     }
     #endif
     PulseEditor::HybridMergeJobSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
+    return swiftPart.toUnsafe();
+  }
+  
+  // pragma MARK: std::function<void(const ConformResult& /* result */)>
+  Func_void_ConformResult create_Func_void_ConformResult(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PulseEditor::Func_void_ConformResult::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const ConformResult& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridConformJobSpec>
+  std::shared_ptr<HybridConformJobSpec> create_std__shared_ptr_HybridConformJobSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
+    PulseEditor::HybridConformJobSpec_cxx swiftPart = PulseEditor::HybridConformJobSpec_cxx::fromUnsafe(swiftUnsafePointer);
+    return std::make_shared<margelo::nitro::pulseeditor::HybridConformJobSpecSwift>(swiftPart);
+  }
+  void* NON_NULL get_std__shared_ptr_HybridConformJobSpec_(std__shared_ptr_HybridConformJobSpec_ cppType) {
+    std::shared_ptr<margelo::nitro::pulseeditor::HybridConformJobSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::pulseeditor::HybridConformJobSpecSwift>(cppType);
+    #ifdef NITRO_DEBUG
+    if (swiftWrapper == nullptr) [[unlikely]] {
+      throw std::runtime_error("Class \"HybridConformJobSpec\" is not implemented in Swift!");
+    }
+    #endif
+    PulseEditor::HybridConformJobSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
     return swiftPart.toUnsafe();
   }
   

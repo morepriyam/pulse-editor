@@ -150,17 +150,18 @@ enum Merge {
   }
 
   /// A fresh output file in the caches directory.
-  static func outputURL() throws -> URL {
+  static func outputURL(_ prefix: String = "merge") throws -> URL {
     try FileManager.default.createDirectory(at: outputDirectory, withIntermediateDirectories: true)
-    return outputDirectory.appendingPathComponent("merge-\(UUID().uuidString).mp4")
+    return outputDirectory.appendingPathComponent("\(prefix)-\(UUID().uuidString).mp4")
   }
 
-  /// Deletes merge files a killed app left behind (a finished merge is moved out by its caller).
-  private static func removeStaleOutputs() {
+  /// Deletes merge and conform files a killed app left behind (a finished one is moved out by its
+  /// caller).
+  static func removeStaleOutputs() {
     let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
     let files = (try? FileManager.default.contentsOfDirectory(
       at: outputDirectory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
-    for file in files where file.lastPathComponent.hasPrefix("merge-") {
+    for file in files where file.lastPathComponent.hasPrefix("merge-") || file.lastPathComponent.hasPrefix("conform-") {
       let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
       if let modified, modified < cutoff { try? FileManager.default.removeItem(at: file) }
     }

@@ -16,9 +16,10 @@ enum Join {
     var muted = false
   }
 
+  /// `encodeAudio` re-encodes the audio into `options.audio` even when it's one piece (conform).
   static func run(
-    _ segments: [Segment], options: MergeOptions, encoded: Bool,
-    progress: @escaping @Sendable (Double) -> Void
+    _ segments: [Segment], options: MergeOptions, encoded: Bool, encodeAudio: Bool = false,
+    output: URL? = nil, progress: @escaping @Sendable (Double) -> Void
   ) async throws -> MergeResult {
     let composition = AVMutableComposition()
     guard let videoOut = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
@@ -60,7 +61,7 @@ enum Join {
     }
     try Task.checkCancellation()
 
-    let output = try Merge.outputURL()
+    let output = try output ?? Merge.outputURL()
     var encodedAudio: URL?
     defer { if let encodedAudio { try? FileManager.default.removeItem(at: encodedAudio) } }
     do {
@@ -68,7 +69,7 @@ enum Join {
       // The composition reads the encoded audio through this asset; a track doesn't keep its
       // asset alive, so hold it until the export is done.
       var encodedAsset: AVAsset?
-      if let audioOut, audioPieces > 1 || audioGap {
+      if let audioOut, encodeAudio || audioPieces > 1 || audioGap {
         let url = output.deletingPathExtension().appendingPathExtension("audio.mp4")
         encodedAudio = url
         try await AudioEncode.run(composition, audio: options.audio, to: url) { progress($0 * 0.3) }

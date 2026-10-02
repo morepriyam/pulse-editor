@@ -95,6 +95,36 @@ export interface MergeResult {
   bitrate: number;
 }
 
+/** What `conform` writes: one clip in the recorder's format. */
+export interface ConformOptions {
+  /** Display canvas the picture is fitted onto, letterboxed and centered, e.g. 1080×1920. */
+  width: number;
+  height: number;
+  /** Clockwise rotation the output is tagged with: 0, 90, 180 or 270. At 90 or 270 the frames
+   * are coded sideways (1920×1080 for a 1080×1920 canvas), the way phone cameras write portrait
+   * video, so the result can join the camera's recordings without re-encoding. */
+  rotation: number;
+  /** Frame rate of the output; faster sources drop frames to it. */
+  fps: number;
+  /** Video bitrate in bits per second. */
+  bitrate: number;
+  /** Audio layout of the output (the recorder's). */
+  audio: MergeAudio;
+  /** Keep the video samples exactly as they are and only re-encode the audio into `audio`. The
+   * canvas, rotation, fps and bitrate are then not used. */
+  copyVideo: boolean;
+}
+
+export interface ConformResult {
+  /** `file://` URI of the conformed MP4 (faststart), in the caches directory. */
+  uri: string;
+  durationMs: number;
+  /** `false` when the video was copied (`copyVideo`). */
+  encoded: boolean;
+  /** Average video bitrate of the output, bits per second. */
+  bitrate: number;
+}
+
 /** A file's audio as 16-bit signed little-endian mono PCM. */
 export interface AudioPCM {
   /** The samples; empty when the file has no audio track. */
@@ -111,6 +141,17 @@ export interface MergeJob extends HybridObject<{
   /** Run the merge. `onProgress` gets 0–1. Rejects with "Merge cancelled" after `cancel()`. */
   start(onProgress: (progress: number) => void): Promise<MergeResult>;
   /** Stop the merge and delete its partial output. Safe to call at any time. */
+  cancel(): void;
+}
+
+/** One conform run: start it once, cancel it any time. */
+export interface ConformJob extends HybridObject<{
+  ios: 'swift';
+  android: 'kotlin';
+}> {
+  /** Run the conform. `onProgress` gets 0–1. Rejects with "Conform cancelled" after `cancel()`. */
+  start(onProgress: (progress: number) => void): Promise<ConformResult>;
+  /** Stop the conform and delete its partial output. Safe to call at any time. */
   cancel(): void;
 }
 
@@ -132,4 +173,7 @@ export interface PulseEditor extends HybridObject<{
 
   /** Prepare a merge of `clips`, in order, applying each clip's edit. Call `start` to run it. */
   createMerge(clips: MergeClip[], options: MergeOptions): MergeJob;
+
+  /** Prepare a conform of one file into `options`' format. Call `start` to run it. */
+  createConform(uri: string, options: ConformOptions): ConformJob;
 }

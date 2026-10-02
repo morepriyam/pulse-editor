@@ -1,6 +1,8 @@
 import { editor } from './editor';
 import type {
   AudioPCM,
+  ConformOptions,
+  ConformResult,
   MergeClip,
   MergeOptions,
   MergeResult,
@@ -9,6 +11,8 @@ import type {
 
 export type {
   AudioPCM,
+  ConformOptions,
+  ConformResult,
   MergeAudio,
   MergeClip,
   MergeCrop,
@@ -64,7 +68,7 @@ export function extractAudio(
   });
 }
 
-export interface MergeControls {
+export interface JobControls {
   /** Called with 0–1 as the merge advances; never goes backwards. */
   onProgress?: (progress: number) => void;
   /** Aborting cancels the merge: it stops, deletes its partial output and rejects. */
@@ -79,7 +83,7 @@ export interface MergeControls {
 export async function merge(
   clips: MergeClip[],
   options: MergeOptions,
-  { onProgress, signal }: MergeControls = {}
+  { onProgress, signal }: JobControls = {}
 ): Promise<MergeResult> {
   if (clips.length === 0) {
     throw new Error('No clips to merge.');
@@ -88,6 +92,36 @@ export async function merge(
     throw new Error('Merge cancelled');
   }
   const job = editor.createMerge(clips, options);
+  const cancel = () => job.cancel();
+  signal?.addEventListener('abort', cancel);
+  try {
+    return await job.start(onProgress ?? (() => {}));
+  } catch (e) {
+    throw nativeError(e);
+  } finally {
+    signal?.removeEventListener('abort', cancel);
+  }
+}
+
+/**
+ * Conform one local video file into the recorder's format (`options`): H.264 8-bit SDR at the
+ * canvas, rotation tag, frame rate and bitrate asked for, AAC in the given layout, faststart.
+ * HDR is tone-mapped to SDR; with `copyVideo` the video samples are kept and only the audio is
+ * re-encoded. Rejects when the file can't be read, when its sound can't be decoded on this device,
+ * and with "Conform cancelled" when `signal` aborts.
+ */
+export async function conform(
+  uri: string,
+  options: ConformOptions,
+  { onProgress, signal }: JobControls = {}
+): Promise<ConformResult> {
+  if (!uri?.trim().length) {
+    throw new Error('File path cannot be empty.');
+  }
+  if (signal?.aborted) {
+    throw new Error('Conform cancelled');
+  }
+  const job = editor.createConform(uri, options);
   const cancel = () => job.cancel();
   signal?.addEventListener('abort', cancel);
   try {

@@ -19,6 +19,8 @@ namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
 namespace margelo::nitro::pulseeditor { struct AudioPCM; }
 // Forward declaration of `HybridMergeJobSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
+// Forward declaration of `HybridConformJobSpec` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { class HybridConformJobSpec; }
 // Forward declaration of `MergeClip` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeClip; }
 // Forward declaration of `MergeCrop` to properly resolve imports.
@@ -27,6 +29,8 @@ namespace margelo::nitro::pulseeditor { struct MergeCrop; }
 namespace margelo::nitro::pulseeditor { struct MergeOptions; }
 // Forward declaration of `MergeAudio` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeAudio; }
+// Forward declaration of `ConformOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ConformOptions; }
 
 #include "ProbeResult.hpp"
 #include <NitroModules/Promise.hpp>
@@ -47,6 +51,8 @@ namespace margelo::nitro::pulseeditor { struct MergeAudio; }
 #include <memory>
 #include "HybridMergeJobSpec.hpp"
 #include "JHybridMergeJobSpec.hpp"
+#include "HybridConformJobSpec.hpp"
+#include "JHybridConformJobSpec.hpp"
 #include "MergeClip.hpp"
 #include <vector>
 #include "JMergeClip.hpp"
@@ -56,6 +62,8 @@ namespace margelo::nitro::pulseeditor { struct MergeAudio; }
 #include "JMergeOptions.hpp"
 #include "MergeAudio.hpp"
 #include "JMergeAudio.hpp"
+#include "ConformOptions.hpp"
+#include "JConformOptions.hpp"
 
 namespace margelo::nitro::pulseeditor {
 
@@ -135,6 +143,11 @@ namespace margelo::nitro::pulseeditor {
       return __array;
     }(clips), JMergeOptions::fromCpp(options));
     return __result->getJHybridMergeJobSpec();
+  }
+  std::shared_ptr<HybridConformJobSpec> JHybridPulseEditorSpec::createConform(const std::string& uri, const ConformOptions& options) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JHybridConformJobSpec::JavaPart>(jni::alias_ref<jni::JString> /* uri */, jni::alias_ref<JConformOptions> /* options */)>("createConform");
+    auto __result = method(_javaPart, jni::make_jstring(uri), JConformOptions::fromCpp(options));
+    return __result->getJHybridConformJobSpec();
   }
 
 } // namespace margelo::nitro::pulseeditor

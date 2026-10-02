@@ -19,12 +19,20 @@ struct RenderTarget {
 /// AVVideoComposition (one instruction per clip carrying its geometry) → AVAssetReader →
 /// AVAssetWriter (H.264 at the chosen bitrate, AAC with natural pitch).
 enum Render {
-  /// Returns the rendered duration.
+  struct Rendered {
+    let duration: CMTime
+    /// When the last decoded video frame starts (before any padding to `duration`).
+    let lastVideoFrame: CMTime
+    /// When the last decoded audio starts; `.invalid` when the timeline has sound that decoded to
+    /// nothing, nil when it has no sound.
+    let lastAudio: CMTime?
+  }
+
   @discardableResult
   static func timeline(
     _ items: [(clip: MergeClip, media: Probe.Media)], target: RenderTarget, to output: URL,
     faststart: Bool, progress: @escaping @Sendable (Double) -> Void
-  ) async throws -> CMTime {
+  ) async throws -> Rendered {
     try? FileManager.default.removeItem(at: output)
     let composition = AVMutableComposition()
     guard let video = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
@@ -112,9 +120,9 @@ enum Render {
       pairs.append((audioOutput, audioInput))
     }
 
-    try await SampleTransfer.run(
+    let last = try await SampleTransfer.run(
       reader: reader, writer: writer, pairs: pairs, duration: duration,
       frameDuration: videoComposition.frameDuration, progress: progress)
-    return duration
+    return Rendered(duration: duration, lastVideoFrame: last[0], lastAudio: last.count > 1 ? last[1] : nil)
   }
 }

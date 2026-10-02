@@ -10,6 +10,12 @@
 // Forward declarations of C++ defined types
 // Forward declaration of `AudioPCM` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct AudioPCM; }
+// Forward declaration of `ConformOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ConformOptions; }
+// Forward declaration of `ConformResult` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ConformResult; }
+// Forward declaration of `HybridConformJobSpec` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { class HybridConformJobSpec; }
 // Forward declaration of `HybridMergeJobSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
 // Forward declaration of `HybridPulseEditorSpec` to properly resolve imports.
@@ -35,6 +41,9 @@ namespace margelo::nitro::pulseeditor { enum class Transfer; }
 
 // Include C++ defined types
 #include "AudioPCM.hpp"
+#include "ConformOptions.hpp"
+#include "ConformResult.hpp"
+#include "HybridConformJobSpec.hpp"
 #include "HybridMergeJobSpec.hpp"
 #include "HybridPulseEditorSpec.hpp"
 #include "MergeAudio.hpp"
@@ -66,6 +75,8 @@ namespace margelo::nitro::pulseeditor { enum class Transfer; }
 #include <NitroModules/DateToChronoDate.hpp>
 
 // Forward declarations of Swift defined types
+// Forward declaration of `HybridConformJobSpec_cxx` to properly resolve imports.
+namespace PulseEditor { class HybridConformJobSpec_cxx; }
 // Forward declaration of `HybridMergeJobSpec_cxx` to properly resolve imports.
 namespace PulseEditor { class HybridMergeJobSpec_cxx; }
 // Forward declaration of `HybridPulseEditorSpec_cxx` to properly resolve imports.

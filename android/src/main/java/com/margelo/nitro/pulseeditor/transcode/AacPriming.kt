@@ -6,6 +6,7 @@ import android.media.MediaFormat
 import android.media.metrics.LogSessionId
 import android.util.Log
 import androidx.annotation.OptIn
+import androidx.media3.common.ColorInfo
 import androidx.media3.common.Format
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.ExperimentalApi
@@ -199,8 +200,14 @@ internal class PrimingCorrectedEncoderFactory(
     return PrimedCodec(codec, priming)
   }
 
-  override fun createForVideoEncoding(format: Format, logSessionId: LogSessionId?): Codec =
-    encoders.createForVideoEncoding(format, logSessionId)
+  // Media3 encodes an SDR source in its own colour description, so a full-range one (screen
+  // recordings, some messaging apps) came out full range, and a BT.601 one BT.601. Pulse's
+  // recordings and iOS exports are BT.709 limited range, which every output is now encoded as.
+  override fun createForVideoEncoding(format: Format, logSessionId: LogSessionId?): Codec {
+    val sdr = format.colorInfo?.let { !ColorInfo.isTransferHdr(it) } ?: true
+    val requested = if (sdr) format.buildUpon().setColorInfo(ColorInfo.SDR_BT709_LIMITED).build() else format
+    return encoders.createForVideoEncoding(requested, logSessionId)
+  }
 
   override fun isVideoFormatSupported(format: Format) = encoders.isVideoFormatSupported(format)
 

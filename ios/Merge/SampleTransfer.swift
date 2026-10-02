@@ -13,12 +13,15 @@ import AVFoundation
 ///
 /// Every track runs to `duration`: the reader stops at the last real sample, so a stream that ends
 /// early is padded (the last frame held, or silence), e.g. a muted clip at the end of a timeline.
+/// Returns, per pair, when its last real (not padding) sample starts: `.invalid` when the output
+/// gave none, so a caller can tell a source that decoded short from one that didn't.
 enum SampleTransfer {
+  @discardableResult
   static func run(
     reader: AVAssetReader, writer: AVAssetWriter,
     pairs: [(output: AVAssetReaderOutput, input: AVAssetWriterInput)],
     duration: CMTime, frameDuration: CMTime? = nil, progress: @escaping @Sendable (Double) -> Void
-  ) async throws {
+  ) async throws -> [CMTime] {
     let session = Session(reader: reader, writer: writer, pairs: pairs)
     guard reader.startReading() else { throw reader.error ?? MergeError.failed("Couldn't start reading.") }
     guard writer.startWriting() else {
@@ -105,6 +108,7 @@ enum SampleTransfer {
       throw writer.error ?? MergeError.failed("Writing failed.")
     }
     progress(1)
+    return session.states.map { $0.last.map(CMSampleBufferGetPresentationTimeStamp) ?? .invalid }
   }
 
   /// Copies of `previous` retimed to fill the gap before `next`, one every `step`.

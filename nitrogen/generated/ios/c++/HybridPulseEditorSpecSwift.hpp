@@ -34,6 +34,10 @@ namespace margelo::nitro::pulseeditor { struct MergeCrop; }
 namespace margelo::nitro::pulseeditor { struct MergeOptions; }
 // Forward declaration of `MergeAudio` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeAudio; }
+// Forward declaration of `HybridConformJobSpec` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { class HybridConformJobSpec; }
+// Forward declaration of `ConformOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ConformOptions; }
 
 #include "ProbeResult.hpp"
 #include <NitroModules/Promise.hpp>
@@ -52,6 +56,8 @@ namespace margelo::nitro::pulseeditor { struct MergeAudio; }
 #include "MergeCrop.hpp"
 #include "MergeOptions.hpp"
 #include "MergeAudio.hpp"
+#include "HybridConformJobSpec.hpp"
+#include "ConformOptions.hpp"
 
 #include "PulseEditor-Swift-Cxx-Umbrella.hpp"
 
@@ -121,6 +127,14 @@ namespace margelo::nitro::pulseeditor {
     }
     inline std::shared_ptr<HybridMergeJobSpec> createMerge(const std::vector<MergeClip>& clips, const MergeOptions& options) override {
       auto __result = _swiftPart.createMerge(clips, std::forward<decltype(options)>(options));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<HybridConformJobSpec> createConform(const std::string& uri, const ConformOptions& options) override {
+      auto __result = _swiftPart.createConform(uri, std::forward<decltype(options)>(options));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

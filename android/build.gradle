@@ -132,6 +132,7 @@ dependencies {
   def media3Version = getExtOrDefault("media3Version")
   implementation "androidx.media3:media3-transformer:$media3Version"
   implementation "androidx.media3:media3-effect:$media3Version"
+  implementation "androidx.media3:media3-muxer:$media3Version"
   implementation "androidx.media3:media3-common:$media3Version"
   implementation "androidx.media3:media3-inspector:$media3Version"
   // ListenableFuture.await() for Media3's async retrieval inside Nitro's Promise.async.

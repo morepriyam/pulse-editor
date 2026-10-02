@@ -22,6 +22,10 @@ class PulseEditor: HybridPulseEditorSpec {
   public func createMerge(clips: [MergeClip], options: MergeOptions) throws -> (any HybridMergeJobSpec) {
     return MergeJob(clips: clips, options: options)
   }
+
+  public func createConform(uri: String, options: ConformOptions) throws -> (any HybridConformJobSpec) {
+    return ConformJob(uri: uri, options: options)
+  }
 }
 
 /// Runs `work`, turning any error into the message JS sees: Nitro describes other errors with

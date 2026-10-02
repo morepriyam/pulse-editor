@@ -50,7 +50,7 @@ internal object MergeExport {
    * "Video frame processing error". There the HDR picture is read as SDR instead: it finishes, with
    * flatter colours. Checked once per process.
    */
-  private val hdrMode: Int by lazy {
+  internal val hdrMode: Int by lazy {
     if (GlUtil.isYuvTargetExtensionSupported()) {
       Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL
     } else {
