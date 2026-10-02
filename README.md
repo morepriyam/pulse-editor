@@ -28,10 +28,10 @@ Pulse is moving every native video method it uses from its react-native-video-tr
 | 7 | `thumbnail` | `getFrameAt` | ⏳ macOS: every edit matches merge's frame, HDR, exact frames; Pulse covers use it (tsc, tests) · iPhone next | ⏳ emulator: every edit matches RNVT and FFmpeg, mirrored, exact frames · S24 next | 
 | 8 | `<PulsePreview>`: composition player | (needed by the editor) | 📋 | 📋 | 
 | 9 | Timeline editor UI (React Native), replacing the clip preview and the per-clip editor (see [The timeline editor](#the-timeline-editor-plan)) | `showEditor` | 📋 | 📋 | 
-| 10 | File helpers to `expo-file-system` | `deleteFile`, `cleanFiles`, `saveToDocuments` | 📋 | 📋 | 
+| 10 | File helpers to `expo-file-system` | `deleteFile`, `cleanFiles`, `saveToDocuments` | ✅ in code: `deleteFile` → `File.delete`; `cleanFiles` → a sweep of RNVT's `trimmedVideo*` files (Simulator: removed them, left other files); "Save to Files" dropped, Share's sheet already offers it | ✅ same code; the sweep not yet run on Android | 
 | 11 | **Last commit:** remove the fork and FFmpeg (package, Podfile, Gradle, submodule), then merge | the fork | 📋 | 📋 | 
 
-RNVT's file helpers (`deleteFile`, `cleanFiles`, `saveToDocuments`) don't move here; Pulse uses `expo-file-system` for those.
+RNVT's file helpers (`deleteFile`, `cleanFiles`, `saveToDocuments`) don't move here: Pulse uses `expo-file-system` for the first two, and dropped its "Save to Files" button (the Share sheet has "Save to Files" on iOS).
 
 Every step keeps Pulse's output unchanged: the same saved clip edits (`editState`), the same 1080×1920 H.264 export, and the same recorder format. Existing drafts keep working.
 
