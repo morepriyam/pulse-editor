@@ -3,14 +3,14 @@
 The native video engine behind [Pulse](https://github.com/mieweb/pulse): fast, simple, and built only on each platform's own media stack.
 
 - **iOS:** AVFoundation (Core Media, Core Video, VideoToolbox)
-- **Android:** Media3 (Transformer, Effect, Inspector)
+- **Android:** Media3 (Transformer, Effect, Inspector, Inspector frame)
 - **No FFmpeg** on either platform
 - A [Nitro module](https://nitro.margelo.com/): Swift and Kotlin, typed specs, no Objective-C++ shim
 - Works with Expo and bare React Native through autolinking
 
 ## Status: migrating from react-native-video-trim
 
-Pulse is moving every native video method it uses from its react-native-video-trim fork into pulse-editor, **one method at a time**. Each method is added here, switched over in the app, and tested on a device before the next one starts. The trim editor UI moves last.
+Pulse is moving every native video method it uses from its react-native-video-trim fork into pulse-editor, **one method at a time**. Each method is added here, switched over in the app, and tested on both phones. `conform` and `thumbnail` are switched over and tested on macOS, the Android emulator and the iOS Simulator; their phone runs are next. RNVT's editor (`showEditor`) is now the only part of the fork Pulse still uses; it moves last.
 
 ✅ done · ⏳ left to do · 📋 not started. Devices: **iPhone 17 Pro Max** (iOS) and **Galaxy S24 Ultra, Android 16** (Android); "macOS" = the same iOS code run on a Mac against references; "emulator" = Android 17 emulator.
 
@@ -18,9 +18,9 @@ Pulse is moving every native video method it uses from its react-native-video-tr
 |---|---|---|---|---|
 | 1 | `probe` | `probeVideo`, `isValidFile` | ✅ iPhone: recordings, upright + letterboxed imports, HDR import, preview sizing, recording rescue · iOS: all 24 fixtures read correctly | ✅ S24: recordings (codec, rotation, fps, bitrate, audio); emulator: fixtures | 
 | 2 | `merge`: join, trims, mute | `merge` (copy path) | ✅ iPhone: joins, trims, muted clip, real recordings; in sync in browsers and Photos (current numbers: [Benchmarks](#benchmarks-on-device)) | ✅ S24: joins, trims, muted clip, real recordings; in sync in both (see [Benchmarks](#benchmarks-on-device)) | 
-|  | `merge`: cancel | (not possible in RNVT) | ✅ iPhone: cancel mid-merge; macOS: no files left behind | ✅ emulator · ⏳ S24: next device run | 
+|  | `merge`: cancel | (not possible in RNVT) | ✅ iPhone: cancel mid-merge; macOS: no files left behind | ✅ S24: settles 6–36 ms after the abort, no files left; emulator | 
 | 3 | `merge`: edited clips (rotate, flip, crop, 2×, 0.5×) | `merge` with clip edits | ✅ iPhone: rotate + flip + crop + 0.5× + mute, trim + 2× (only edited clips rendered, lengths within a frame); macOS: every rotation/flip/crop frame by frame, exact durations, natural pitch | ✅ S24: rotate + flip, crop, 2×, 0.5×, mute (one hardware encode, lengths within a frame, 5.6–6.2 Mbps); emulator: frames identical to iOS | 
-| 4 | `merge`: full encode | the re-encode path | ✅ iPhone: mixed (20 clips) and wild-imports (12 clips: HDR, VFR, Opus, no audio) seed drafts → H.264 1080×1920 30 fps, SDR, audio in sync; macOS: 2 Mbps target → 1.98 Mbps | ✅ emulator: mixed HEVC / 60 fps / 4K / landscape / 5.1 draft · ⏳ S24 | 
+| 4 | `merge`: full encode | the re-encode path | ✅ iPhone: mixed (20 clips) and wild-imports (12 clips: HDR, VFR, Opus, no audio) seed drafts → H.264 1080×1920 30 fps, SDR, audio in sync; macOS: 2 Mbps target → 1.98 Mbps | ✅ S24: mixed draft (20 clips: HEVC, 60 fps, 4K, landscape) in 17.2–17.9 s and wild-imports draft (12 clips, HLG and PQ HDR included) in 13.8–14.1 s, exact lengths; emulator: mixed HEVC / 60 fps / 4K / landscape / 5.1 draft | 
 |  | `merge`: RNVT fallback removed | the FFmpeg merge | ✅ in code: the app merges with pulse-editor only, and an error shows the retry state (tsc, lint, tests; not run on a device since) | ✅ same | 
 | 5 | `extractAudio` → Whisper captions | `extractAudio` | ✅ iPhone: captions (extract 80–180 ms, VAD 128 ms, Whisper 123 ms); macOS: PCM vs FFmpeg reference within 0.1 ms; local whisper.cpp 1.9.3 gives the same transcripts | ✅ S24: captions (extract 0.4–0.8 s, Whisper 1.5 s on CPU); emulator: length and speech onset exact vs FFmpeg; local whisper.cpp gives the same transcripts | 
 | | Cleanups from the whisper.rn audit (VAD comment, real CPU fallback) | | ✅ from whisper.rn 0.7.4's source, not run: the Whisper fallback now asks for the CPU (it only runs if the GPU context fails to load) | ✅ comments only (whisper.rn has no Android GPU backend) | 
@@ -33,7 +33,7 @@ Pulse is moving every native video method it uses from its react-native-video-tr
 
 RNVT's file helpers (`deleteFile`, `cleanFiles`, `saveToDocuments`) don't move here: Pulse uses `expo-file-system` for the first two, and dropped its "Save to Files" button (the Share sheet has "Save to Files" on iOS).
 
-Every step keeps Pulse's output unchanged: the same saved clip edits (`editState`), the same 1080×1920 H.264 export, and the same recorder format. Existing drafts keep working.
+Every step keeps Pulse's output unchanged: the same saved clip edits (`editState`), the same 1080×1920 H.264 export, and the same recorder format. Existing drafts keep working. Two deliberate behaviour changes so far: an import whose sound the phone can't decode is now rejected instead of imported silent (`conform`), and the export screen's "Save to Files" button is gone (Share covers it on iOS).
 
 ## The timeline editor (plan)
 
@@ -60,7 +60,7 @@ Editing a draft means going through screens 2 and 3 once per clip, and screen 3 
 | Piece | From |
 |---|---|
 | Playback across clips with edits, preview == export | `<PulsePreview>` (step 8) |
-| Thumbnails along each clip | `thumbnail` (step 7) |
+| Thumbnails along each clip | `thumbnail` (done) |
 | Waveform and captions on the timeline | `extractAudio` (done) + per-clip audio ([after the migration](#after-the-migration-planned-features)) |
 | Rendering the edits at export | `merge` (done) |
 
@@ -341,6 +341,8 @@ What RNVT's `compress` did differently: an AVFoundation engine on iOS with FFmpe
 - **Found and changed on the emulator:**
   - Media3 encodes an SDR source in the source's own colour description, so full-range sources (screen recordings, some messaging apps) came out full range. Every Android encode (merge and conform) now asks for BT.709 limited range, what the cameras and iOS write.
   - Still open: on the emulator a full-range source's picture comes out 9–10 levels darker (full range read as limited), with or without that change; limited-range sources keep their levels exactly (180.9 → 180.4). To check on the S24.
+- **iPhone videos' second sound track:** every iPhone video carries a spatial-audio (APAC) track next to its stereo AAC, which Android can't decode. Test clips with a normal picture and a real iPhone video's two tracks (APAC second, as iPhones write it, and APAC first and default) keep the AAC sound on macOS, the iOS Simulator and the Android emulator, full and audio-only (output vs the source's AAC: correlation 0.999 at 0 ms).
+- **Next to RNVT's `compress`, in Pulse:** on the iOS Simulator both convert to contract, and pulse-editor's cancel settles in 233–353 ms with nothing left behind. On the Android emulator RNVT's full conversion fails by its own bug (its FFmpeg command picks the `mpeg4` encoder and combines options FFmpeg rejects as contradictory); its audio-only one works.
 - **Known differences between the platforms:** iOS fills frames to a constant 30 fps; Android drops frames down to 30 but doesn't add any, so a 24 fps or variable source stays variable (a 58 fps screen recording averaged 29.95 fps) and 29.97 fps stays 29.97. Both pass the import contract and the recorder match.
 - Not yet run on a phone.
 
