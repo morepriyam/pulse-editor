@@ -19,6 +19,10 @@
 #include "JFunc_void_double.hpp"
 #include "JHybridConformJobSpec.hpp"
 #include "JHybridPulseEditorSpec.hpp"
+#include "JHybridPulsePreviewSpec.hpp"
+#include "JFunc_void_double_bool.hpp"
+#include "JFunc_void_PreviewStatus.hpp"
+#include "views/JHybridPulsePreviewStateUpdater.hpp"
 #include <NitroModules/DefaultConstructableObject.hpp>
 
 namespace margelo::nitro::pulseeditor {
@@ -37,6 +41,14 @@ struct JHybridPulseEditorSpecImpl: public jni::JavaClass<JHybridPulseEditorSpecI
     return javaPart->getJHybridPulseEditorSpec();
   }
 };
+struct JHybridPulsePreviewSpecImpl: public jni::JavaClass<JHybridPulsePreviewSpecImpl, JHybridPulsePreviewSpec::JavaPart> {
+  static constexpr auto kJavaDescriptor = "Lcom/margelo/nitro/pulseeditor/HybridPulsePreview;";
+  static std::shared_ptr<JHybridPulsePreviewSpec> create() {
+    static const auto constructorFn = javaClassStatic()->getConstructor<JHybridPulsePreviewSpecImpl::javaobject()>();
+    jni::local_ref<JHybridPulsePreviewSpec::JavaPart> javaPart = javaClassStatic()->newObject(constructorFn);
+    return javaPart->getJHybridPulsePreviewSpec();
+  }
+};
 
 void registerAllNatives() {
   using namespace margelo::nitro;
@@ -47,12 +59,22 @@ void registerAllNatives() {
   margelo::nitro::pulseeditor::JFunc_void_double_cxx::registerNatives();
   margelo::nitro::pulseeditor::JHybridConformJobSpec::CxxPart::registerNatives();
   margelo::nitro::pulseeditor::JHybridPulseEditorSpec::CxxPart::registerNatives();
+  margelo::nitro::pulseeditor::JHybridPulsePreviewSpec::CxxPart::registerNatives();
+  margelo::nitro::pulseeditor::JFunc_void_double_bool_cxx::registerNatives();
+  margelo::nitro::pulseeditor::JFunc_void_PreviewStatus_cxx::registerNatives();
+  margelo::nitro::pulseeditor::views::JHybridPulsePreviewStateUpdater::registerNatives();
 
   // Register Nitro Hybrid Objects
   HybridObjectRegistry::registerHybridObjectConstructor(
     "PulseEditor",
     []() -> std::shared_ptr<HybridObject> {
       return JHybridPulseEditorSpecImpl::create();
+    }
+  );
+  HybridObjectRegistry::registerHybridObjectConstructor(
+    "PulsePreview",
+    []() -> std::shared_ptr<HybridObject> {
+      return JHybridPulsePreviewSpecImpl::create();
     }
   );
 }

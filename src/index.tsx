@@ -27,6 +27,12 @@ export type {
   ThumbnailOptions,
   Transfer,
 } from './PulseEditor.nitro';
+export type { PreviewStats, PreviewStatus } from './PulsePreview.nitro';
+export {
+  PulsePreview,
+  type PulsePreviewRef,
+  type PulsePreviewViewProps,
+} from './preview';
 
 /**
  * A native failure as a plain Error with just its message. Android errors reach JS as the Kotlin

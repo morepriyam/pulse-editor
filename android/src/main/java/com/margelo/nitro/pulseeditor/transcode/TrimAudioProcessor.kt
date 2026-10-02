@@ -67,10 +67,16 @@ internal class TrimAudioProcessor(private val skipUs: Long, private val duration
 
   override fun isEnded(): Boolean = super.isEnded() && keepFrames == 0L
 
+  /**
+   * The stream restarts at `positionOffsetUs` into the clip's audio: 0 for an export, anywhere
+   * after a seek in a preview (CompositionPlayer flushes with the seek position). The part of the
+   * skip and of the window before it is already behind.
+   */
   override fun onFlush(streamMetadata: AudioProcessor.StreamMetadata) {
     val rate = inputAudioFormat.sampleRate
-    skipFrames = (skipUs * rate / 1_000_000.0).roundToLong()
-    keepFrames = (durationUs * rate / 1_000_000.0).roundToLong()
+    val positionUs = maxOf(0L, streamMetadata.positionOffsetUs)
+    skipFrames = (maxOf(0L, skipUs - positionUs) * rate / 1_000_000.0).roundToLong()
+    keepFrames = (maxOf(0L, durationUs - maxOf(0L, positionUs - skipUs)) * rate / 1_000_000.0).roundToLong()
     inputDone = false
   }
 

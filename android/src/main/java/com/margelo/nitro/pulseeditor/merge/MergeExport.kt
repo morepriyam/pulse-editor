@@ -108,8 +108,9 @@ internal object MergeExport {
     return builder.build()
   }
 
-  /** A clip's picture: trimmed, retimed, with its geometry, capped at the frame rate. */
-  private fun videoItem(clip: MergeClip, media: ProbeResult, options: MergeOptions): EditedMediaItem {
+  /** A clip's picture: trimmed, retimed, with its geometry, capped at the frame rate. Shared
+   * with the preview, which draws the same picture (at a smaller size). */
+  internal fun videoItem(clip: MergeClip, media: ProbeResult, options: MergeOptions): EditedMediaItem {
     val mediaItem = MediaItem.Builder().setUri(mediaUri(clip.uri))
     if (clip.endMs > clip.startMs) {
       mediaItem.setClippingConfiguration(
@@ -142,7 +143,7 @@ internal object MergeExport {
   }
 
   /** Natural-pitch speed change, or null at 1×. */
-  private fun speed(clip: MergeClip): SpeedParameters? =
+  internal fun speed(clip: MergeClip): SpeedParameters? =
     if (abs(clip.speed - 1) > 0.0001) SpeedParameters(ConstantSpeed(clip.speed.toFloat()), /* shouldMaintainPitch= */ true) else null
 
   /** The clip's edit, then a letterboxed fit onto the canvas. */

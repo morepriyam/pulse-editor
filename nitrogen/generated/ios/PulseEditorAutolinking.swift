@@ -23,4 +23,16 @@ public final class PulseEditorAutolinking {
   public static func isPulseEditorRecyclable() -> Bool {
     return PulseEditor.self is any RecyclableView.Type
   }
+  
+  public static func createPulsePreview() -> bridge.std__shared_ptr_HybridPulsePreviewSpec_ {
+    let hybridObject = HybridPulsePreview()
+    return { () -> bridge.std__shared_ptr_HybridPulsePreviewSpec_ in
+      let __cxxWrapped = hybridObject.getCxxWrapper()
+      return __cxxWrapped.getCxxPart()
+    }()
+  }
+  
+  public static func isPulsePreviewRecyclable() -> Bool {
+    return HybridPulsePreview.self is any RecyclableView.Type
+  }
 }

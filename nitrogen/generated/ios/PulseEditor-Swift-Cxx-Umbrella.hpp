@@ -20,6 +20,8 @@ namespace margelo::nitro::pulseeditor { class HybridConformJobSpec; }
 namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
 // Forward declaration of `HybridPulseEditorSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridPulseEditorSpec; }
+// Forward declaration of `HybridPulsePreviewSpec` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { class HybridPulsePreviewSpec; }
 // Forward declaration of `MergeAudio` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeAudio; }
 // Forward declaration of `MergeClip` to properly resolve imports.
@@ -30,6 +32,10 @@ namespace margelo::nitro::pulseeditor { struct MergeCrop; }
 namespace margelo::nitro::pulseeditor { struct MergeOptions; }
 // Forward declaration of `MergeResult` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeResult; }
+// Forward declaration of `PreviewStats` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct PreviewStats; }
+// Forward declaration of `PreviewStatus` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct PreviewStatus; }
 // Forward declaration of `ProbeAudio` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
 // Forward declaration of `ProbeResult` to properly resolve imports.
@@ -50,11 +56,14 @@ namespace margelo::nitro::pulseeditor { enum class Transfer; }
 #include "HybridConformJobSpec.hpp"
 #include "HybridMergeJobSpec.hpp"
 #include "HybridPulseEditorSpec.hpp"
+#include "HybridPulsePreviewSpec.hpp"
 #include "MergeAudio.hpp"
 #include "MergeClip.hpp"
 #include "MergeCrop.hpp"
 #include "MergeOptions.hpp"
 #include "MergeResult.hpp"
+#include "PreviewStats.hpp"
+#include "PreviewStatus.hpp"
 #include "ProbeAudio.hpp"
 #include "ProbeResult.hpp"
 #include "ProbeVideo.hpp"
@@ -87,6 +96,8 @@ namespace PulseEditor { class HybridConformJobSpec_cxx; }
 namespace PulseEditor { class HybridMergeJobSpec_cxx; }
 // Forward declaration of `HybridPulseEditorSpec_cxx` to properly resolve imports.
 namespace PulseEditor { class HybridPulseEditorSpec_cxx; }
+// Forward declaration of `HybridPulsePreviewSpec_cxx` to properly resolve imports.
+namespace PulseEditor { class HybridPulsePreviewSpec_cxx; }
 
 // Include Swift defined types
 #if __has_include("PulseEditor-Swift.h")

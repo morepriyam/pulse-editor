@@ -36,10 +36,14 @@ target_sources(
   ../nitrogen/generated/shared/c++/HybridMergeJobSpec.cpp
   ../nitrogen/generated/shared/c++/HybridConformJobSpec.cpp
   ../nitrogen/generated/shared/c++/HybridPulseEditorSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridPulsePreviewSpec.cpp
+  ../nitrogen/generated/shared/c++/views/HybridPulsePreviewComponent.cpp
   # Android-specific Nitrogen C++ sources
   ../nitrogen/generated/android/c++/JHybridMergeJobSpec.cpp
   ../nitrogen/generated/android/c++/JHybridConformJobSpec.cpp
   ../nitrogen/generated/android/c++/JHybridPulseEditorSpec.cpp
+  ../nitrogen/generated/android/c++/JHybridPulsePreviewSpec.cpp
+  ../nitrogen/generated/android/c++/views/JHybridPulsePreviewStateUpdater.cpp
 )
 
 # From node_modules/react-native/ReactAndroid/cmake-utils/folly-flags.cmake

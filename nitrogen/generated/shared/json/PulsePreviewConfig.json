@@ -1,0 +1,13 @@
+{
+  "uiViewClassName": "PulsePreview",
+  "supportsRawText": false,
+  "bubblingEventTypes": {},
+  "directEventTypes": {},
+  "validAttributes": {
+    "clips": true,
+    "options": true,
+    "onTime": true,
+    "onStatus": true,
+    "hybridRef": true
+  }
+}

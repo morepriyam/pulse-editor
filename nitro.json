@@ -1,10 +1,14 @@
 {
-  "cxxNamespace": ["pulseeditor"],
+  "cxxNamespace": [
+    "pulseeditor"
+  ],
   "ios": {
     "iosModuleName": "PulseEditor"
   },
   "android": {
-    "androidNamespace": ["pulseeditor"],
+    "androidNamespace": [
+      "pulseeditor"
+    ],
     "androidCxxLibName": "pulseeditor"
   },
   "autolinking": {
@@ -17,7 +21,19 @@
         "language": "kotlin",
         "implementationClassName": "PulseEditor"
       }
+    },
+    "PulsePreview": {
+      "ios": {
+        "language": "swift",
+        "implementationClassName": "HybridPulsePreview"
+      },
+      "android": {
+        "language": "kotlin",
+        "implementationClassName": "HybridPulsePreview"
+      }
     }
   },
-  "ignorePaths": ["node_modules"]
+  "ignorePaths": [
+    "node_modules"
+  ]
 }

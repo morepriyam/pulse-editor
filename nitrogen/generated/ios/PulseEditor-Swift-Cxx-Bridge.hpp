@@ -20,12 +20,18 @@ namespace margelo::nitro::pulseeditor { class HybridConformJobSpec; }
 namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
 // Forward declaration of `HybridPulseEditorSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridPulseEditorSpec; }
+// Forward declaration of `HybridPulsePreviewSpec` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { class HybridPulsePreviewSpec; }
 // Forward declaration of `MergeClip` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeClip; }
 // Forward declaration of `MergeCrop` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeCrop; }
 // Forward declaration of `MergeResult` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeResult; }
+// Forward declaration of `PreviewStats` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct PreviewStats; }
+// Forward declaration of `PreviewStatus` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct PreviewStatus; }
 // Forward declaration of `ProbeAudio` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
 // Forward declaration of `ProbeResult` to properly resolve imports.
@@ -44,6 +50,8 @@ namespace PulseEditor { class HybridConformJobSpec_cxx; }
 namespace PulseEditor { class HybridMergeJobSpec_cxx; }
 // Forward declaration of `HybridPulseEditorSpec_cxx` to properly resolve imports.
 namespace PulseEditor { class HybridPulseEditorSpec_cxx; }
+// Forward declaration of `HybridPulsePreviewSpec_cxx` to properly resolve imports.
+namespace PulseEditor { class HybridPulsePreviewSpec_cxx; }
 
 // Include C++ defined types
 #include "AudioPCM.hpp"
@@ -51,9 +59,12 @@ namespace PulseEditor { class HybridPulseEditorSpec_cxx; }
 #include "HybridConformJobSpec.hpp"
 #include "HybridMergeJobSpec.hpp"
 #include "HybridPulseEditorSpec.hpp"
+#include "HybridPulsePreviewSpec.hpp"
 #include "MergeClip.hpp"
 #include "MergeCrop.hpp"
 #include "MergeResult.hpp"
+#include "PreviewStats.hpp"
+#include "PreviewStatus.hpp"
 #include "ProbeAudio.hpp"
 #include "ProbeResult.hpp"
 #include "ProbeVideo.hpp"
@@ -453,6 +464,150 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
   }
   inline Result_std__shared_ptr_HybridConformJobSpec__ create_Result_std__shared_ptr_HybridConformJobSpec__(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<HybridConformJobSpec>>::withError(error);
+  }
+  
+  // pragma MARK: std::function<void(double /* timeMs */, bool /* playing */)>
+  /**
+   * Specialized version of `std::function<void(double, bool)>`.
+   */
+  using Func_void_double_bool = std::function<void(double /* timeMs */, bool /* playing */)>;
+  /**
+   * Wrapper class for a `std::function<void(double / * timeMs * /, bool / * playing * /)>`, this can be used from Swift.
+   */
+  class Func_void_double_bool_Wrapper final {
+  public:
+    explicit Func_void_double_bool_Wrapper(std::function<void(double /* timeMs */, bool /* playing */)>&& func): _function(std::make_unique<std::function<void(double /* timeMs */, bool /* playing */)>>(std::move(func))) {}
+    inline void call(double timeMs, bool playing) const noexcept {
+      _function->operator()(timeMs, playing);
+    }
+  private:
+    std::unique_ptr<std::function<void(double /* timeMs */, bool /* playing */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_double_bool create_Func_void_double_bool(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_double_bool_Wrapper wrap_Func_void_double_bool(Func_void_double_bool value) noexcept {
+    return Func_void_double_bool_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::optional<std::string>
+  /**
+   * Specialized version of `std::optional<std::string>`.
+   */
+  using std__optional_std__string_ = std::optional<std::string>;
+  inline std::optional<std::string> create_std__optional_std__string_(const std::string& value) noexcept {
+    return std::optional<std::string>(value);
+  }
+  inline bool has_value_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline std::string get_std__optional_std__string_(const std::optional<std::string>& optional) noexcept {
+    return optional.value();
+  }
+  
+  // pragma MARK: std::function<void(const PreviewStatus& /* status */)>
+  /**
+   * Specialized version of `std::function<void(const PreviewStatus&)>`.
+   */
+  using Func_void_PreviewStatus = std::function<void(const PreviewStatus& /* status */)>;
+  /**
+   * Wrapper class for a `std::function<void(const PreviewStatus& / * status * /)>`, this can be used from Swift.
+   */
+  class Func_void_PreviewStatus_Wrapper final {
+  public:
+    explicit Func_void_PreviewStatus_Wrapper(std::function<void(const PreviewStatus& /* status */)>&& func): _function(std::make_unique<std::function<void(const PreviewStatus& /* status */)>>(std::move(func))) {}
+    inline void call(PreviewStatus status) const noexcept {
+      _function->operator()(status);
+    }
+  private:
+    std::unique_ptr<std::function<void(const PreviewStatus& /* status */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_PreviewStatus create_Func_void_PreviewStatus(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_PreviewStatus_Wrapper wrap_Func_void_PreviewStatus(Func_void_PreviewStatus value) noexcept {
+    return Func_void_PreviewStatus_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<double>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<double>>`.
+   */
+  using std__shared_ptr_Promise_double__ = std::shared_ptr<Promise<double>>;
+  inline std::shared_ptr<Promise<double>> create_std__shared_ptr_Promise_double__() noexcept {
+    return Promise<double>::create();
+  }
+  inline PromiseHolder<double> wrap_std__shared_ptr_Promise_double__(std::shared_ptr<Promise<double>> promise) noexcept {
+    return PromiseHolder<double>(std::move(promise));
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<std::string>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<std::string>>`.
+   */
+  using std__shared_ptr_Promise_std__string__ = std::shared_ptr<Promise<std::string>>;
+  inline std::shared_ptr<Promise<std::string>> create_std__shared_ptr_Promise_std__string__() noexcept {
+    return Promise<std::string>::create();
+  }
+  inline PromiseHolder<std::string> wrap_std__shared_ptr_Promise_std__string__(std::shared_ptr<Promise<std::string>> promise) noexcept {
+    return PromiseHolder<std::string>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const std::string& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const std::string&)>`.
+   */
+  using Func_void_std__string = std::function<void(const std::string& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::string& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__string_Wrapper final {
+  public:
+    explicit Func_void_std__string_Wrapper(std::function<void(const std::string& /* result */)>&& func): _function(std::make_unique<std::function<void(const std::string& /* result */)>>(std::move(func))) {}
+    inline void call(std::string result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::string& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__string_Wrapper wrap_Func_void_std__string(Func_void_std__string value) noexcept {
+    return Func_void_std__string_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridPulsePreviewSpec>
+  /**
+   * Specialized version of `std::shared_ptr<HybridPulsePreviewSpec>`.
+   */
+  using std__shared_ptr_HybridPulsePreviewSpec_ = std::shared_ptr<HybridPulsePreviewSpec>;
+  std::shared_ptr<HybridPulsePreviewSpec> create_std__shared_ptr_HybridPulsePreviewSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
+  void* NON_NULL get_std__shared_ptr_HybridPulsePreviewSpec_(std__shared_ptr_HybridPulsePreviewSpec_ cppType);
+  
+  // pragma MARK: std::weak_ptr<HybridPulsePreviewSpec>
+  using std__weak_ptr_HybridPulsePreviewSpec_ = std::weak_ptr<HybridPulsePreviewSpec>;
+  inline std__weak_ptr_HybridPulsePreviewSpec_ weakify_std__shared_ptr_HybridPulsePreviewSpec_(const std::shared_ptr<HybridPulsePreviewSpec>& strong) noexcept { return strong; }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<double>>>
+  using Result_std__shared_ptr_Promise_double___ = Result<std::shared_ptr<Promise<double>>>;
+  inline Result_std__shared_ptr_Promise_double___ create_Result_std__shared_ptr_Promise_double___(const std::shared_ptr<Promise<double>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<double>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_double___ create_Result_std__shared_ptr_Promise_double___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<double>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<std::string>>>
+  using Result_std__shared_ptr_Promise_std__string___ = Result<std::shared_ptr<Promise<std::string>>>;
+  inline Result_std__shared_ptr_Promise_std__string___ create_Result_std__shared_ptr_Promise_std__string___(const std::shared_ptr<Promise<std::string>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<std::string>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_std__string___ create_Result_std__shared_ptr_Promise_std__string___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<std::string>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<PreviewStats>
+  using Result_PreviewStats_ = Result<PreviewStats>;
+  inline Result_PreviewStats_ create_Result_PreviewStats_(const PreviewStats& value) noexcept {
+    return Result<PreviewStats>::withValue(value);
+  }
+  inline Result_PreviewStats_ create_Result_PreviewStats_(const std::exception_ptr& error) noexcept {
+    return Result<PreviewStats>::withError(error);
   }
 
 } // namespace margelo::nitro::pulseeditor::bridge::swift

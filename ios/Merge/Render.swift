@@ -34,62 +34,9 @@ enum Render {
     faststart: Bool, progress: @escaping @Sendable (Double) -> Void
   ) async throws -> Rendered {
     try? FileManager.default.removeItem(at: output)
-    let composition = AVMutableComposition()
-    guard let video = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
-      throw MergeError.failed("Couldn't create the video track.")
-    }
-    let hasAudio = items.contains { !$0.clip.muted && $0.media.audioTrack != nil }
-    let audio = hasAudio
-      ? composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
-      : nil
-
-    var instructions: [AVVideoCompositionInstruction] = []
-    var cursor = CMTime.zero
-    for (clip, media) in items {
-      guard let sourceVideo = media.videoTrack else { throw MergeError.failed("A clip has no video.") }
-      let (sourceSize, sourceTransform, sourceRange) = try await sourceVideo.load(.naturalSize, .preferredTransform, .timeRange)
-      let range = try Join.trimRange(startMs: clip.startMs, endMs: clip.endMs, in: sourceRange)
-
-      // The clip's slot: trimmed in at the cursor, then retimed in place.
-      try video.insertTimeRange(range, of: sourceVideo, at: cursor)
-      if let audio, !clip.muted, let sourceAudio = media.audioTrack {
-        let overlap = range.intersection(try await sourceAudio.load(.timeRange))
-        if overlap.duration > .zero {
-          try audio.insertTimeRange(overlap, of: sourceAudio, at: cursor + (overlap.start - range.start))
-        }
-      }
-      var slot = range.duration
-      if abs(clip.speed - 1) > 0.0001 {
-        let scaled = CMTimeMultiplyByFloat64(slot, multiplier: 1 / clip.speed)
-        composition.scaleTimeRange(CMTimeRange(start: cursor, duration: slot), toDuration: scaled)
-        slot = scaled
-      }
-
-      // The clip's picture: its own geometry for its slot.
-      let geometry = MergeGeometry(
-        clip: clip, sourceSize: sourceSize, sourceTransform: sourceTransform,
-        targetSize: target.size, targetTransform: target.transform, canvas: target.canvas)
-      let layer = AVMutableVideoCompositionLayerInstruction(assetTrack: video)
-      layer.setTransform(geometry.transform, at: cursor)
-      if let crop = geometry.sourceCrop { layer.setCropRectangle(crop, at: cursor) }
-      let instruction = AVMutableVideoCompositionInstruction()
-      instruction.timeRange = CMTimeRange(start: cursor, duration: slot)
-      instruction.layerInstructions = [layer]
-      instructions.append(instruction)
-
-      cursor = cursor + slot
-    }
-    let duration = cursor
-
-    let videoComposition = AVMutableVideoComposition()
-    videoComposition.instructions = instructions
-    videoComposition.renderSize = target.size
-    // At most the target rate, whatever the source timing (a 2× clip doesn't become 60 fps).
-    videoComposition.frameDuration = CMTime(value: 1, timescale: CMTimeScale(target.fps.rounded()))
-    videoComposition.sourceTrackIDForFrameTiming = kCMPersistentTrackID_Invalid
-    videoComposition.colorPrimaries = AVVideoColorPrimaries_ITU_R_709_2
-    videoComposition.colorTransferFunction = AVVideoTransferFunction_ITU_R_709_2
-    videoComposition.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_709_2
+    let composed = try await Timeline.compose(items, target: target)
+    let (composition, video, audio, videoComposition, duration) = (
+      composed.composition, composed.videoTrack, composed.audioTrack, composed.videoComposition, composed.duration)
 
     let reader = try AVAssetReader(asset: composition)
     reader.timeRange = CMTimeRange(start: .zero, duration: duration)

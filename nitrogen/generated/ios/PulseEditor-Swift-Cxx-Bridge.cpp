@@ -11,6 +11,7 @@
 #include "HybridConformJobSpecSwift.hpp"
 #include "HybridMergeJobSpecSwift.hpp"
 #include "HybridPulseEditorSpecSwift.hpp"
+#include "HybridPulsePreviewSpecSwift.hpp"
 #include "PulseEditor-Swift-Cxx-Umbrella.hpp"
 #include <NitroModules/NitroDefines.hpp>
 
@@ -117,6 +118,46 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
     }
     #endif
     PulseEditor::HybridPulseEditorSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
+    return swiftPart.toUnsafe();
+  }
+  
+  // pragma MARK: std::function<void(double /* timeMs */, bool /* playing */)>
+  Func_void_double_bool create_Func_void_double_bool(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PulseEditor::Func_void_double_bool::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](double timeMs, bool playing) mutable -> void {
+      swiftClosure.call(timeMs, playing);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const PreviewStatus& /* status */)>
+  Func_void_PreviewStatus create_Func_void_PreviewStatus(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PulseEditor::Func_void_PreviewStatus::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const PreviewStatus& status) mutable -> void {
+      swiftClosure.call(status);
+    };
+  }
+  
+  // pragma MARK: std::function<void(const std::string& /* result */)>
+  Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PulseEditor::Func_void_std__string::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::string& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridPulsePreviewSpec>
+  std::shared_ptr<HybridPulsePreviewSpec> create_std__shared_ptr_HybridPulsePreviewSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
+    PulseEditor::HybridPulsePreviewSpec_cxx swiftPart = PulseEditor::HybridPulsePreviewSpec_cxx::fromUnsafe(swiftUnsafePointer);
+    return std::make_shared<margelo::nitro::pulseeditor::HybridPulsePreviewSpecSwift>(swiftPart);
+  }
+  void* NON_NULL get_std__shared_ptr_HybridPulsePreviewSpec_(std__shared_ptr_HybridPulsePreviewSpec_ cppType) {
+    std::shared_ptr<margelo::nitro::pulseeditor::HybridPulsePreviewSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::pulseeditor::HybridPulsePreviewSpecSwift>(cppType);
+    #ifdef NITRO_DEBUG
+    if (swiftWrapper == nullptr) [[unlikely]] {
+      throw std::runtime_error("Class \"HybridPulsePreviewSpec\" is not implemented in Swift!");
+    }
+    #endif
+    PulseEditor::HybridPulsePreviewSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
     return swiftPart.toUnsafe();
   }
 

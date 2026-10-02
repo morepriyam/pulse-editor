@@ -10,7 +10,7 @@ The native video engine behind [Pulse](https://github.com/mieweb/pulse): fast, s
 
 ## Status: migrating from react-native-video-trim
 
-Pulse is moving every native video method it uses from its react-native-video-trim fork into pulse-editor, **one method at a time**. Each method is added here, switched over in the app, and tested on both phones. `conform` and `thumbnail` are switched over and tested on macOS, the Android emulator and the iOS Simulator; their phone runs are next. RNVT's editor (`showEditor`) is now the only part of the fork Pulse still uses; it moves last.
+Pulse is moving every native video method it uses from its react-native-video-trim fork into pulse-editor, **one method at a time**. Each method is added here, switched over in the app, and tested on both phones. `conform` and `thumbnail` are switched over and tested on macOS, the Android emulator and the iOS Simulator; their phone runs are next. `<PulsePreview>`, the player the timeline editor will be built on, is built and tested on the iOS Simulator and the Android emulator; its phone runs go with them. RNVT's editor (`showEditor`) is now the only part of the fork Pulse still uses; it moves last.
 
 ✅ done · ⏳ left to do · 📋 not started. Devices: **iPhone 17 Pro Max** (iOS) and **Galaxy S24 Ultra, Android 16** (Android); "macOS" = the same iOS code run on a Mac against references; "emulator" = Android 17 emulator.
 
@@ -26,7 +26,7 @@ Pulse is moving every native video method it uses from its react-native-video-tr
 | | Cleanups from the whisper.rn audit (VAD comment, real CPU fallback) | | ✅ from whisper.rn 0.7.4's source, not run: the Whisper fallback now asks for the CPU (it only runs if the GPU context fails to load) | ✅ comments only (whisper.rn has no Android GPU backend) | 
 | 6 | `conform`: import normalization, HDR | `compress`, `cancelCompress` | ⏳ macOS: 51 of 51 sample files to contract, in sync; the app imports with it (tsc, tests) · iPhone next | ⏳ emulator: every 8-bit input, both layouts, in sync, cancel (see [conform](#conform)) · S24 next | 
 | 7 | `thumbnail` | `getFrameAt` | ⏳ macOS: every edit matches merge's frame, HDR, exact frames; Pulse covers use it (tsc, tests) · iPhone next | ⏳ emulator: every edit matches RNVT and FFmpeg, mirrored, exact frames · S24 next | 
-| 8 | `<PulsePreview>`: composition player | (needed by the editor) | 📋 | 📋 | 
+| 8 | `<PulsePreview>`: composition player | (needed by the editor) | ⏳ Simulator: seeks show the export's frame 58 of 60 (the 2: the export lags a frame at the end of a sped-up clip), edits on screen in 43–113 ms with the edit showing, 28 fps playback (see [`<PulsePreview>`](#pulsepreview)) · iPhone next | ⏳ emulator: seeks show the export's frame 60 of 60, edits show 6 of 6, 21–25 fps playback (see [`<PulsePreview>`](#pulsepreview)) · S24 next | 
 | 9 | Timeline editor UI (React Native), replacing the clip preview and the per-clip editor (see [The timeline editor](#the-timeline-editor-plan)) | `showEditor` | 📋 | 📋 | 
 | 10 | File helpers to `expo-file-system` | `deleteFile`, `cleanFiles`, `saveToDocuments` | ✅ in code: `deleteFile` → `File.delete`; `cleanFiles` → a sweep of RNVT's `trimmedVideo*` files (Simulator: removed them, left other files); "Save to Files" dropped, Share's sheet already offers it | ✅ same code; the sweep not yet run on Android | 
 | 11 | **Last commit:** remove the fork and FFmpeg (package, Podfile, Gradle, submodule), then merge | the fork | 📋 | 📋 | 
@@ -371,6 +371,51 @@ A clip's cover. The edit is drawn by merge's own geometry, so an edited clip's c
 - **iOS code on macOS:** every rotation, flip, crop and combination on a clip tagged like a recording matches merge's export of the same edit at the same frame (31–35 dB, two lossy encodes apart); the exact frame asked for (1500 ms → 1500 ms); a time past the end gives the last frame; iPhone HDR (1080p, 4K60, 4K120) tone-mapped, a screen recording, a mirrored clip; 20–30 ms per cover on an M-series Mac (120 ms for the first HDR one).
 - **Android on the emulator**, through a Pulse debug build next to RNVT's `getFrameAt` with the same edits: all 8 edits show the same picture as RNVT's (by eye) and match an FFmpeg reference of the edit at 32–36 dB (the crop reference scores 25 dB on both platforms, an artifact of FFmpeg's crop rounding: the iOS and Android crop covers match each other at 36 dB); exact frames; real recordings, screen recordings, a mirrored clip (RNVT: sideways), slow motion; 150–600 ms per cover against RNVT's 50–300 ms (`FrameExtractor` starts a player per call; to be timed on the S24). The emulator can't decode 10-bit HEVC, so HDR waits for the S24.
 - **iOS Simulator, in Pulse next to RNVT:** every edit matches the FFmpeg reference at 37–40 dB; 20–160 ms per cover; a PQ HDR clip and a time past the end work where RNVT's `getFrameAt` fails ("Cannot Decode", "Cannot Open").
+- Not yet run on a phone.
+
+## `<PulsePreview>`
+
+```tsx
+import { PulsePreview, type PulsePreviewRef } from '@mieweb/pulse-editor';
+
+<PulsePreview
+  style={{ flex: 1 }}
+  clips={clips}           // MergeClip[] as merge takes them; keep the array stable (useMemo): a new one rebuilds
+  options={options}       // the MergeOptions the draft will be merged with (canvas, fps, ...)
+  onStatus={({ durationMs, ready, error }) => {}}  // ready once the first frame is on screen
+  onTime={(timeMs, playing) => {}}                  // ~12×/s while playing, and after every seek, play, pause
+  onReady={(ref: PulsePreviewRef) => {}}            // the handle for the methods below
+/>
+
+ref.play(); ref.pause();
+await ref.seek(timeMs);   // resolves with that frame's time once it's on screen; a newer seek replaces it
+ref.setScrubbing(true);   // faster, approximate seeks while a finger drags; false on release lands exactly
+```
+
+A native view that plays a draft's clips, every edit applied, as `merge` would export them: the same timeline, the same trims, speeds and geometry, drawn at the view's size. Changing a clip (an edit) swaps the new timeline in at the same moment, holding the last frame until the new one is up. `snapshot()` and `stats()` exist for the bench (frame files and timings) and may go before release.
+
+- **Preview = export:** the preview is built from merge's own code, not a copy of it. On iOS both play `Timeline.compose` (the composition merge renders from); on Android both use merge's per-clip media items and effects. `options` tells the preview which clips merge will copy and which it will render, because the two trim differently (below).
+- **"On screen" means on screen:** first frame, seeks and edits resolve when the new frame is displayed, not when it's decoded. iOS waits for the layer to show the new item; Android draws into a `TextureView` and counts the frames that reach it (below).
+
+### How it runs
+
+| | iOS | Android |
+|---|---|---|
+| Player | `AVPlayer` + `AVPlayerLayer`, the item built from `Timeline.compose` at the view's pixel size | one long-lived Media3 `CompositionPlayer` (experimental API) drawing into a `TextureView`, 100 ms start buffer |
+| Seeks | Apple's chase pattern (QA1820): one exact seek at a time, always to the latest time asked for; a tolerance of one frame while scrubbing | exact seek to the start of the frame showing at that time (ExoPlayer shows the first frame at or after the position); Media3's scrubbing mode while dragging |
+| Edits | a new item swapped in at the same time; done when the layer shows a frame of it | `setComposition` at the current position (rebuilds the players); done when a frame released after the swap reaches the view |
+| Trims | clips merge copies start on the nearest frame (as the join copies them), rendered clips exactly | a trim inside a frame starts on the next whole frame (as Media3's clipping does) |
+| "On screen" signal | `isReadyForDisplay` + `displayedPixelBuffer`; while playing, a display-link video output | `TextureView.onSurfaceTextureUpdated`, matched to the frame's time through Media3's frame callback |
+
+Why a `TextureView` on Android: `CompositionPlayer`'s frame callback fires when a frame enters its effects pipeline, before rotate, crop and the letterbox are drawn, so with a `SurfaceView` an edit was reported done while the old picture was still showing (4 of 6 edit snapshots wrong on the emulator). The `TextureView` reports every frame that reaches the view; drafts are SDR after `conform`, which a `TextureView` shows like a `SurfaceView`. Its frames carry no timestamp, so they're matched to Media3's callbacks in order.
+
+### Tested
+Through Pulse's debug build (bench mode `preview`) with four recorder-shaped test clips that carry each frame's number in the picture (readable through rotate, flip, crop and letterbox), on three drafts: four whole clips (join), trims inside frames (trims), and rotate/flip/crop/speed edits (edits). Each draft: the first frame, 20 seeks (every clip's first, middle and last frame, plus random times) with screenshots at +0, +50 and +150 ms, a 2 s scrub, two edits (rotate 180°, then 1.5×) with screenshots, and 8 s of playback with 4 screenshots. Every screenshot is compared with the **export** of the same draft on the same device.
+- **iOS Simulator (iPhone 17 Pro Max):** seeks show exactly the export's frame 58 of 60 (the other 2: the export shows one frame earlier at the end of the sped-up clip, a quirk of the rendered clip, not the preview), seek p90 77–102 ms; first frame 36–216 ms; edits on screen in 43–113 ms, all 6 showing the edit; playback 27.6–28.6 fps with nothing dropped, the frame on screen 0–33 ms from the reported time.
+- **Android emulator (Android 17, host GPU, software decoders):** seeks show exactly the export's frame 60 of 60, none late; edits all 6 showing the edit; playback 21–25 fps, nothing dropped; first frame 308–351 ms (1.7 s cold); seeks 0.6–1.8 s p90 and scrubbing 0–6 frames/s, both bounded by the emulator's software decoders.
+- **Found and changed on the way:** iOS trimmed copied clips at the exact millisecond while merge's join starts them on the nearest frame (the preview showed one frame earlier: 7 of 20 trims seeks matched, now 20 of 20); the Android `SurfaceView` timing above; on Android the preview's audio trim now starts from the seek position (`TrimAudioProcessor`); exports are unaffected (the emulator's trimmed export has its clicks exactly at the trims, the same as iOS's to within the frame rounding).
+- **Known differences between the platforms:** a trim inside a frame starts on the nearest frame on iOS (join) and on the next whole frame on Android, so the same draft can export one frame apart; each preview matches its own platform's export.
+- **Open, for the phones:** speed on real hardware against the targets (first frame ≤300 ms iPhone / ≤500 ms S24, seek p95 ≤100 ms, edits ≤250 / ≤400 ms, playback ≥29 fps); the picture rate while scrubbing; on the emulator the Android picture ran 67–100 ms ahead of the time `onTime` reports (iOS 0–33 ms); lip sync during preview playback (not measured yet).
 - Not yet run on a phone.
 
 ## Benchmarks (on device)

@@ -11,6 +11,7 @@
 #import <type_traits>
 
 #include "HybridPulseEditorSpecSwift.hpp"
+#include "HybridPulsePreviewSpecSwift.hpp"
 
 @interface PulseEditorAutolinking : NSObject
 @end
@@ -25,6 +26,13 @@
     "PulseEditor",
     []() -> std::shared_ptr<HybridObject> {
       std::shared_ptr<HybridPulseEditorSpec> hybridObject = PulseEditor::PulseEditorAutolinking::createPulseEditor();
+      return hybridObject;
+    }
+  );
+  HybridObjectRegistry::registerHybridObjectConstructor(
+    "PulsePreview",
+    []() -> std::shared_ptr<HybridObject> {
+      std::shared_ptr<HybridPulsePreviewSpec> hybridObject = PulseEditor::PulseEditorAutolinking::createPulsePreview();
       return hybridObject;
     }
   );

@@ -64,6 +64,20 @@ enum Merge {
     return try await renderAndJoin(clips, media, render: render, target: target, options: options, progress: progress)
   }
 
+  /// The clips a merge with these options copies rather than renders (the join trims those on
+  /// their frames). Ignores the selective path's fallback to a full encode after a failure.
+  static func copied(_ clips: [MergeClip], _ media: [Probe.Media], options: MergeOptions) async throws -> Set<Int> {
+    switch MergePlan(clips: clips, media: media, options: options).path {
+    case .join:
+      return Set(clips.indices)
+    case .selective(let render):
+      if try await reordersFrames(media, except: render) { return [] }
+      return Set(clips.indices).subtracting(render)
+    case .encode:
+      return []
+    }
+  }
+
   /// Whether any clip that would be copied (not in `render`) has out-of-order frames.
   private static func reordersFrames(_ media: [Probe.Media], except render: [Int]) async throws -> Bool {
     for (i, m) in media.enumerated() where !render.contains(i) {
