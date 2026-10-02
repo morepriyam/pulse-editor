@@ -25,7 +25,7 @@ Pulse is moving every native video method it uses from its react-native-video-tr
 | 5 | `extractAudio` → Whisper captions | `extractAudio` | ✅ iPhone: captions (extract 80–180 ms, VAD 128 ms, Whisper 123 ms); macOS: PCM vs FFmpeg reference within 0.1 ms; local whisper.cpp 1.9.3 gives the same transcripts | ✅ S24: captions (extract 0.4–0.8 s, Whisper 1.5 s on CPU); emulator: length and speech onset exact vs FFmpeg; local whisper.cpp gives the same transcripts | 
 | | Cleanups from the whisper.rn audit (VAD comment, real CPU fallback) | | ✅ from whisper.rn 0.7.4's source, not run: the Whisper fallback now asks for the CPU (it only runs if the GPU context fails to load) | ✅ comments only (whisper.rn has no Android GPU backend) | 
 | 6 | `conform`: import normalization, HDR | `compress`, `cancelCompress` | ⏳ macOS: 51 of 51 sample files to contract, in sync; the app imports with it (tsc, tests) · iPhone next | ⏳ emulator: every 8-bit input, both layouts, in sync, cancel (see [conform](#conform)) · S24 next | 
-| 7 | `thumbnail` | `getFrameAt` | 📋 | 📋 | 
+| 7 | `thumbnail` | `getFrameAt` | ⏳ macOS: every edit matches merge's frame, HDR, exact frames; Pulse covers use it (tsc, tests) · iPhone next | ⏳ emulator: every edit matches RNVT and FFmpeg, mirrored, exact frames · S24 next | 
 | 8 | `<PulsePreview>`: composition player | (needed by the editor) | 📋 | 📋 | 
 | 9 | Timeline editor UI (React Native), replacing the clip preview and the per-clip editor (see [The timeline editor](#the-timeline-editor-plan)) | `showEditor` | 📋 | 📋 | 
 | 10 | File helpers to `expo-file-system` | `deleteFile`, `cleanFiles`, `saveToDocuments` | 📋 | 📋 | 
@@ -342,6 +342,33 @@ What RNVT's `compress` did differently: an AVFoundation engine on iOS with FFmpe
   - Media3 encodes an SDR source in the source's own colour description, so full-range sources (screen recordings, some messaging apps) came out full range. Every Android encode (merge and conform) now asks for BT.709 limited range, what the cameras and iOS write.
   - Still open: on the emulator a full-range source's picture comes out 9–10 levels darker (full range read as limited), with or without that change; limited-range sources keep their levels exactly (180.9 → 180.4). To check on the S24.
 - **Known differences between the platforms:** iOS fills frames to a constant 30 fps; Android drops frames down to 30 but doesn't add any, so a 24 fps or variable source stays variable (a 58 fps screen recording averaged 29.95 fps) and 29.97 fps stays 29.97. Both pass the import contract and the recorder match.
+- Not yet run on a phone.
+
+## `thumbnail`
+
+```ts
+import { thumbnail } from '@mieweb/pulse-editor';
+
+const { uri, width, height, timeMs } = await thumbnail(fileUri, {
+  timeMs: 1500,                    // the frame shown at that moment (clamped to the video)
+  maxWidth: 192, maxHeight: 256,   // fitted inside, never enlarged; 0 = no limit
+  quality: 0.8,                    // JPEG
+  rotation: 90, flipped: false,    // the clip's edit, as in MergeClip (optional)
+  crop: { x: 0.1, y: 0.2, w: 0.6, h: 0.5 },
+});
+// uri: a JPEG in the caches folder; timeMs: when that frame starts in the source
+```
+
+A clip's cover. The edit is drawn by merge's own geometry, so an edited clip's cover matches its export; HDR is tone-mapped to SDR; the frame is the exact one at `timeMs`, not the nearest keyframe.
+
+- **iOS:** `AVAssetImageGenerator` with zero time tolerance, reading through a video composition built with `MergeGeometry` (BT.709, the tone map), written with ImageIO.
+- **Android:** Media3's `FrameExtractor` (`media3-inspector-frame`, exact seek, platform decoder, HDR tone-mapped) with merge's edit effects (`MergeExport.editEffects`) and a `Presentation` to the fitted size; Media3 turns the frame upright itself, and a mirrored source gets its flip from us (as in conform).
+- What RNVT's `getFrameAt` did differently: iOS cut the edit out of a decoded frame with its own code and allowed ±100 ms; on Android `MediaMetadataRetriever` with an FFmpeg fallback, which sized un-edited covers before turning them upright (61×108 instead of 144×256 for a portrait recording), ignored mirrored sources, and named files by the second (two covers in one second overwrote each other).
+
+### Tested
+- **iOS code on macOS:** every rotation, flip, crop and combination on a clip tagged like a recording matches merge's export of the same edit at the same frame (31–35 dB, two lossy encodes apart); the exact frame asked for (1500 ms → 1500 ms); a time past the end gives the last frame; iPhone HDR (1080p, 4K60, 4K120) tone-mapped, a screen recording, a mirrored clip; 20–30 ms per cover on an M-series Mac (120 ms for the first HDR one).
+- **Android on the emulator**, through a Pulse debug build next to RNVT's `getFrameAt` with the same edits: all 8 edits show the same picture as RNVT's (by eye) and match an FFmpeg reference of the edit at 32–36 dB (the crop reference scores 25 dB on both platforms, an artifact of FFmpeg's crop rounding: the iOS and Android crop covers match each other at 36 dB); exact frames; real recordings, screen recordings, a mirrored clip (RNVT: sideways), slow motion; 150–600 ms per cover against RNVT's 50–300 ms (`FrameExtractor` starts a player per call; to be timed on the S24). The emulator can't decode 10-bit HEVC, so HDR waits for the S24.
+- **iOS Simulator, in Pulse next to RNVT:** every edit matches the FFmpeg reference at 37–40 dB; 20–160 ms per cover; a PQ HDR clip and a time past the end work where RNVT's `getFrameAt` fails ("Cannot Decode", "Cannot Open").
 - Not yet run on a phone.
 
 ## Benchmarks (on device)

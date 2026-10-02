@@ -20,6 +20,7 @@ import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
 import androidx.media3.transformer.Effects
 import com.margelo.nitro.pulseeditor.MergeClip
+import com.margelo.nitro.pulseeditor.MergeCrop
 import com.margelo.nitro.pulseeditor.MergeOptions
 import com.margelo.nitro.pulseeditor.ProbeResult
 import com.margelo.nitro.pulseeditor.Transfer
@@ -144,17 +145,23 @@ internal object MergeExport {
   private fun speed(clip: MergeClip): SpeedParameters? =
     if (abs(clip.speed - 1) > 0.0001) SpeedParameters(ConstantSpeed(clip.speed.toFloat()), /* shouldMaintainPitch= */ true) else null
 
-  /** rotate (clockwise; Media3 turns counter-clockwise) → flip → crop → letterboxed fit. */
-  private fun videoEffects(clip: MergeClip, options: MergeOptions): List<Effect> {
+  /** The clip's edit, then a letterboxed fit onto the canvas. */
+  private fun videoEffects(clip: MergeClip, options: MergeOptions): List<Effect> =
+    editEffects(clip.rotation, clip.flipped, clip.crop) + Presentation.createForWidthAndHeight(
+      options.width.roundToInt(), options.height.roundToInt(), Presentation.LAYOUT_SCALE_TO_FIT)
+
+  /** A clip's edit on its upright frame: rotate (clockwise; Media3 turns counter-clockwise) →
+   * flip → crop. Shared with thumbnails, so a cover is drawn as the export renders the clip. */
+  internal fun editEffects(rotation: Double, flipped: Boolean, crop: MergeCrop?): List<Effect> {
     val effects = mutableListOf<Effect>()
-    val degrees = ((clip.rotation.roundToInt() % 360) + 360) % 360
+    val degrees = ((rotation.roundToInt() % 360) + 360) % 360
     if (degrees != 0) {
       effects += ScaleAndRotateTransformation.Builder().setRotationDegrees(-degrees.toFloat()).build()
     }
-    if (clip.flipped) {
+    if (flipped) {
       effects += ScaleAndRotateTransformation.Builder().setScale(-1f, 1f).build()
     }
-    clip.crop?.let { c ->
+    crop?.let { c ->
       // Normalized, y down → Media3's normalized device coordinates, y up.
       val left = (-1 + 2 * c.x).toFloat()
       val right = (-1 + 2 * (c.x + c.w)).toFloat()
@@ -162,8 +169,6 @@ internal object MergeExport {
       val bottom = (1 - 2 * (c.y + c.h)).toFloat()
       effects += Crop(left, right, bottom, top)
     }
-    effects += Presentation.createForWidthAndHeight(
-      options.width.roundToInt(), options.height.roundToInt(), Presentation.LAYOUT_SCALE_TO_FIT)
     return effects
   }
 

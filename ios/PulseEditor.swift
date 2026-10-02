@@ -19,6 +19,15 @@ class PulseEditor: HybridPulseEditorSpec {
     }
   }
 
+  public func thumbnail(uri: String, options: ThumbnailOptions) throws -> Promise<Thumbnail> {
+    return Promise.async(.userInitiated) {
+      try await withJSError {
+        Merge.removeStaleOutputs()
+        return try await FrameGrab.run(uri, options)
+      }
+    }
+  }
+
   public func createMerge(clips: [MergeClip], options: MergeOptions) throws -> (any HybridMergeJobSpec) {
     return MergeJob(clips: clips, options: options)
   }

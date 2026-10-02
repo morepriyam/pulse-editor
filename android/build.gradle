@@ -135,6 +135,7 @@ dependencies {
   implementation "androidx.media3:media3-muxer:$media3Version"
   implementation "androidx.media3:media3-common:$media3Version"
   implementation "androidx.media3:media3-inspector:$media3Version"
+  implementation "androidx.media3:media3-inspector-frame:$media3Version"
   // ListenableFuture.await() for Media3's async retrieval inside Nitro's Promise.async.
   implementation "org.jetbrains.kotlinx:kotlinx-coroutines-guava:1.9.0"
 }

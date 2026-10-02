@@ -8,6 +8,8 @@ struct MergeGeometry {
   let transform: CGAffineTransform
   /// The crop in source coded pixels (for `setCropRectangle`); nil when the clip isn't cropped.
   let sourceCrop: CGRect?
+  /// The edited picture's size (after rotation, flip and crop), before it's fitted to the canvas.
+  let contentSize: CGSize
 
   /// - Parameters:
   ///   - sourceSize: the source track's natural (coded) size
@@ -45,6 +47,8 @@ struct MergeGeometry {
     } else {
       sourceCrop = nil
     }
+
+    contentSize = content.size
 
     // 5. Fit the content onto the canvas, centered (letterbox / pillarbox).
     let scale = min(canvas.width / content.width, canvas.height / content.height)

@@ -114,14 +114,15 @@ object Merge {
   private fun outputDirectory(context: Context) = File(context.cacheDir, "pulse-editor")
 
   /** A fresh output file in the caches directory. */
-  internal fun outputFile(context: Context, prefix: String = "merge"): File =
-    File(outputDirectory(context), "$prefix-${UUID.randomUUID()}.mp4")
+  internal fun outputFile(context: Context, prefix: String = "merge", extension: String = "mp4"): File =
+    File(outputDirectory(context), "$prefix-${UUID.randomUUID()}.$extension")
 
-  /** Deletes merge and conform files a killed app left behind (a finished one is moved out by its caller). */
+  /** Deletes merge, conform and frame files a killed app left behind (a finished one is moved out by its caller). */
   internal fun removeStaleOutputs(context: Context) {
     val cutoff = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+    val prefixes = listOf("merge-", "conform-", "frame-")
     outputDirectory(context)
-      .listFiles { file -> (file.name.startsWith("merge-") || file.name.startsWith("conform-")) && file.lastModified() < cutoff }
+      .listFiles { file -> prefixes.any { file.name.startsWith(it) } && file.lastModified() < cutoff }
       ?.forEach { it.delete() }
   }
 

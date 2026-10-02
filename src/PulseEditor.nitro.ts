@@ -125,6 +125,32 @@ export interface ConformResult {
   bitrate: number;
 }
 
+/** Which frame `thumbnail` takes, how big, and the clip's edit. */
+export interface ThumbnailOptions {
+  /** Source time in ms: the frame shown at that moment (clamped to the video). */
+  timeMs: number;
+  /** The picture is scaled down to fit inside maxWidth × maxHeight, never up. 0 = no limit. */
+  maxWidth: number;
+  maxHeight: number;
+  /** JPEG quality, 0–1. */
+  quality: number;
+  /** The clip's edit, as in `MergeClip`: clockwise rotation, then a horizontal flip, then the
+   * crop (normalized, in the rotated + flipped frame). */
+  rotation: number;
+  flipped: boolean;
+  crop?: MergeCrop;
+}
+
+/** One frame as a JPEG file. */
+export interface Thumbnail {
+  /** `file://` URI of the JPEG, in the caches directory. */
+  uri: string;
+  width: number;
+  height: number;
+  /** When the frame starts in the source, ms. */
+  timeMs: number;
+}
+
 /** A file's audio as 16-bit signed little-endian mono PCM. */
 export interface AudioPCM {
   /** The samples; empty when the file has no audio track. */
@@ -170,6 +196,13 @@ export interface PulseEditor extends HybridObject<{
    * band-limited resampled, in memory. Turned down as a whole only if the downmix would clip.
    */
   extractAudio(uri: string, sampleRate: number): Promise<AudioPCM>;
+
+  /**
+   * The frame at `options.timeMs` as a JPEG, with the clip's edit drawn as merge renders it,
+   * scaled to fit the maximum size; HDR is tone-mapped to SDR. Rejects when the file has no
+   * video or can't be decoded.
+   */
+  thumbnail(uri: string, options: ThumbnailOptions): Promise<Thumbnail>;
 
   /** Prepare a merge of `clips`, in order, applying each clip's edit. Call `start` to run it. */
   createMerge(clips: MergeClip[], options: MergeOptions): MergeJob;

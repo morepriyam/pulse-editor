@@ -24,12 +24,16 @@ namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
 namespace margelo::nitro::pulseeditor { struct AudioPCM; }
 // Forward declaration of `ArrayBufferHolder` to properly resolve imports.
 namespace NitroModules { class ArrayBufferHolder; }
+// Forward declaration of `Thumbnail` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct Thumbnail; }
+// Forward declaration of `ThumbnailOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ThumbnailOptions; }
+// Forward declaration of `MergeCrop` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct MergeCrop; }
 // Forward declaration of `HybridMergeJobSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
 // Forward declaration of `MergeClip` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeClip; }
-// Forward declaration of `MergeCrop` to properly resolve imports.
-namespace margelo::nitro::pulseeditor { struct MergeCrop; }
 // Forward declaration of `MergeOptions` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeOptions; }
 // Forward declaration of `MergeAudio` to properly resolve imports.
@@ -49,11 +53,13 @@ namespace margelo::nitro::pulseeditor { struct ConformOptions; }
 #include "AudioPCM.hpp"
 #include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/ArrayBufferHolder.hpp>
+#include "Thumbnail.hpp"
+#include "ThumbnailOptions.hpp"
+#include "MergeCrop.hpp"
 #include <memory>
 #include "HybridMergeJobSpec.hpp"
 #include "MergeClip.hpp"
 #include <vector>
-#include "MergeCrop.hpp"
 #include "MergeOptions.hpp"
 #include "MergeAudio.hpp"
 #include "HybridConformJobSpec.hpp"
@@ -119,6 +125,14 @@ namespace margelo::nitro::pulseeditor {
     }
     inline std::shared_ptr<Promise<AudioPCM>> extractAudio(const std::string& uri, double sampleRate) override {
       auto __result = _swiftPart.extractAudio(uri, std::forward<decltype(sampleRate)>(sampleRate));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<Thumbnail>> thumbnail(const std::string& uri, const ThumbnailOptions& options) override {
+      auto __result = _swiftPart.thumbnail(uri, std::forward<decltype(options)>(options));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

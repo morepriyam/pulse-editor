@@ -32,6 +32,8 @@ namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
 namespace margelo::nitro::pulseeditor { struct ProbeResult; }
 // Forward declaration of `ProbeVideo` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ProbeVideo; }
+// Forward declaration of `Thumbnail` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct Thumbnail; }
 // Forward declaration of `Transfer` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { enum class Transfer; }
 
@@ -55,6 +57,7 @@ namespace PulseEditor { class HybridPulseEditorSpec_cxx; }
 #include "ProbeAudio.hpp"
 #include "ProbeResult.hpp"
 #include "ProbeVideo.hpp"
+#include "Thumbnail.hpp"
 #include "Transfer.hpp"
 #include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/ArrayBufferHolder.hpp>
@@ -335,6 +338,40 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
     return Func_void_AudioPCM_Wrapper(std::move(value));
   }
   
+  // pragma MARK: std::shared_ptr<Promise<Thumbnail>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<Thumbnail>>`.
+   */
+  using std__shared_ptr_Promise_Thumbnail__ = std::shared_ptr<Promise<Thumbnail>>;
+  inline std::shared_ptr<Promise<Thumbnail>> create_std__shared_ptr_Promise_Thumbnail__() noexcept {
+    return Promise<Thumbnail>::create();
+  }
+  inline PromiseHolder<Thumbnail> wrap_std__shared_ptr_Promise_Thumbnail__(std::shared_ptr<Promise<Thumbnail>> promise) noexcept {
+    return PromiseHolder<Thumbnail>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const Thumbnail& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const Thumbnail&)>`.
+   */
+  using Func_void_Thumbnail = std::function<void(const Thumbnail& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const Thumbnail& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_Thumbnail_Wrapper final {
+  public:
+    explicit Func_void_Thumbnail_Wrapper(std::function<void(const Thumbnail& /* result */)>&& func): _function(std::make_unique<std::function<void(const Thumbnail& /* result */)>>(std::move(func))) {}
+    inline void call(Thumbnail result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const Thumbnail& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_Thumbnail create_Func_void_Thumbnail(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_Thumbnail_Wrapper wrap_Func_void_Thumbnail(Func_void_Thumbnail value) noexcept {
+    return Func_void_Thumbnail_Wrapper(std::move(value));
+  }
+  
   // pragma MARK: std::optional<MergeCrop>
   /**
    * Specialized version of `std::optional<MergeCrop>`.
@@ -389,6 +426,15 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
   }
   inline Result_std__shared_ptr_Promise_AudioPCM___ create_Result_std__shared_ptr_Promise_AudioPCM___(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<Promise<AudioPCM>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<Thumbnail>>>
+  using Result_std__shared_ptr_Promise_Thumbnail___ = Result<std::shared_ptr<Promise<Thumbnail>>>;
+  inline Result_std__shared_ptr_Promise_Thumbnail___ create_Result_std__shared_ptr_Promise_Thumbnail___(const std::shared_ptr<Promise<Thumbnail>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<Thumbnail>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_Thumbnail___ create_Result_std__shared_ptr_Promise_Thumbnail___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<Thumbnail>>>::withError(error);
   }
   
   // pragma MARK: Result<std::shared_ptr<HybridMergeJobSpec>>

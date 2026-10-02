@@ -17,6 +17,10 @@
 namespace margelo::nitro::pulseeditor { struct ProbeResult; }
 // Forward declaration of `AudioPCM` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct AudioPCM; }
+// Forward declaration of `Thumbnail` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct Thumbnail; }
+// Forward declaration of `ThumbnailOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ThumbnailOptions; }
 // Forward declaration of `HybridMergeJobSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
 // Forward declaration of `MergeClip` to properly resolve imports.
@@ -32,6 +36,8 @@ namespace margelo::nitro::pulseeditor { struct ConformOptions; }
 #include <NitroModules/Promise.hpp>
 #include <string>
 #include "AudioPCM.hpp"
+#include "Thumbnail.hpp"
+#include "ThumbnailOptions.hpp"
 #include <memory>
 #include "HybridMergeJobSpec.hpp"
 #include "MergeClip.hpp"
@@ -73,6 +79,7 @@ namespace margelo::nitro::pulseeditor {
       // Methods
       virtual std::shared_ptr<Promise<ProbeResult>> probe(const std::string& uri) = 0;
       virtual std::shared_ptr<Promise<AudioPCM>> extractAudio(const std::string& uri, double sampleRate) = 0;
+      virtual std::shared_ptr<Promise<Thumbnail>> thumbnail(const std::string& uri, const ThumbnailOptions& options) = 0;
       virtual std::shared_ptr<HybridMergeJobSpec> createMerge(const std::vector<MergeClip>& clips, const MergeOptions& options) = 0;
       virtual std::shared_ptr<HybridConformJobSpec> createConform(const std::string& uri, const ConformOptions& options) = 0;
 

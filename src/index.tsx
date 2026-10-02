@@ -7,6 +7,8 @@ import type {
   MergeOptions,
   MergeResult,
   ProbeResult,
+  Thumbnail,
+  ThumbnailOptions,
 } from './PulseEditor.nitro';
 
 export type {
@@ -21,6 +23,8 @@ export type {
   ProbeAudio,
   ProbeResult,
   ProbeVideo,
+  Thumbnail,
+  ThumbnailOptions,
   Transfer,
 } from './PulseEditor.nitro';
 
@@ -64,6 +68,32 @@ export function extractAudio(
     return Promise.reject(new Error('File path cannot be empty.'));
   }
   return editor.extractAudio(uri, sampleRate).catch((e) => {
+    throw nativeError(e);
+  });
+}
+
+/**
+ * The frame at `timeMs` as a JPEG file (in the caches directory), with the clip's edit drawn as
+ * merge renders it, scaled to fit `maxWidth` × `maxHeight` (never up). HDR is tone-mapped to SDR.
+ * Defaults: the first frame, no size limit, quality 0.8, no edit.
+ */
+export function thumbnail(
+  uri: string,
+  options: Partial<ThumbnailOptions> = {}
+): Promise<Thumbnail> {
+  if (!uri?.trim().length) {
+    return Promise.reject(new Error('File path cannot be empty.'));
+  }
+  const full: ThumbnailOptions = {
+    timeMs: 0,
+    maxWidth: 0,
+    maxHeight: 0,
+    quality: 0.8,
+    rotation: 0,
+    flipped: false,
+    ...options,
+  };
+  return editor.thumbnail(uri, full).catch((e) => {
     throw nativeError(e);
   });
 }

@@ -21,6 +21,10 @@ class PulseEditor : HybridPulseEditorSpec() {
     }
   }
 
+  override fun thumbnail(uri: String, options: ThumbnailOptions): Promise<Thumbnail> {
+    return Promise.async { FrameGrab.run(context(), uri, options) }
+  }
+
   override fun createMerge(clips: Array<MergeClip>, options: MergeOptions): HybridMergeJobSpec =
     com.margelo.nitro.pulseeditor.merge.MergeJob(clips, options)
 

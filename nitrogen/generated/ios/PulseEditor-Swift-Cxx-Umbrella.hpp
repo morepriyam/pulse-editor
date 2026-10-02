@@ -36,6 +36,10 @@ namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
 namespace margelo::nitro::pulseeditor { struct ProbeResult; }
 // Forward declaration of `ProbeVideo` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ProbeVideo; }
+// Forward declaration of `ThumbnailOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ThumbnailOptions; }
+// Forward declaration of `Thumbnail` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct Thumbnail; }
 // Forward declaration of `Transfer` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { enum class Transfer; }
 
@@ -54,6 +58,8 @@ namespace margelo::nitro::pulseeditor { enum class Transfer; }
 #include "ProbeAudio.hpp"
 #include "ProbeResult.hpp"
 #include "ProbeVideo.hpp"
+#include "Thumbnail.hpp"
+#include "ThumbnailOptions.hpp"
 #include "Transfer.hpp"
 #include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/Promise.hpp>

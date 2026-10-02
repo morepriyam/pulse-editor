@@ -40,6 +40,10 @@ abstract class HybridPulseEditorSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun thumbnail(uri: String, options: ThumbnailOptions): Promise<Thumbnail>
+  
+  @DoNotStrip
+  @Keep
   abstract fun createMerge(clips: Array<MergeClip>, options: MergeOptions): HybridMergeJobSpec
   
   @DoNotStrip

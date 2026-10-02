@@ -15,6 +15,7 @@ public protocol HybridPulseEditorSpec_protocol: HybridObject {
   // Methods
   func probe(uri: String) throws -> Promise<ProbeResult>
   func extractAudio(uri: String, sampleRate: Double) throws -> Promise<AudioPCM>
+  func thumbnail(uri: String, options: ThumbnailOptions) throws -> Promise<Thumbnail>
   func createMerge(clips: [MergeClip], options: MergeOptions) throws -> (any HybridMergeJobSpec)
   func createConform(uri: String, options: ConformOptions) throws -> (any HybridConformJobSpec)
 }
