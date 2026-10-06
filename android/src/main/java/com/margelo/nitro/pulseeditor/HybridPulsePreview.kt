@@ -10,11 +10,13 @@ import android.view.TextureView
 import android.view.View
 import androidx.annotation.OptIn
 import androidx.media3.common.C
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.Size
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.video.VideoFrameMetadataListener
 import androidx.media3.transformer.CompositionPlayer
 import com.facebook.proguard.annotations.DoNotStrip
@@ -97,7 +99,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     override fun run() {
       val p = player ?: return
       if (p.isPlaying) {
-        onTime(p.currentPosition.toDouble(), true)
+        onTime(shownTimeMs(p), true)
         main.postDelayed(this, TICK_MS)
       }
     }
@@ -106,7 +108,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
   private val listener = object : Player.Listener {
     override fun onIsPlayingChanged(isPlaying: Boolean) {
       val p = player ?: return
-      onTime(p.currentPosition.toDouble(), isPlaying)
+      onTime(shownTimeMs(p), isPlaying)
       main.removeCallbacks(ticker)
       if (isPlaying) main.postDelayed(ticker, TICK_MS)
     }
@@ -175,7 +177,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     build = scope.launch {
       try {
         val media = withContext(Dispatchers.IO) {
-          list.map { clip -> probes.getOrPut(clip.uri) { Probe.read(context, clip.uri) } }
+          list.map { clip -> probes.getOrPut(clip.uri) { Probe.read(context, clip.uri) } }.also(::logDecoders)
         }
         val composition = PreviewComposition.build(list, media, size.first, size.second, options.fps)
         var at = 0.0
@@ -187,6 +189,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
         durationMs = at
         val p = ensurePlayer()
         val first = p.playbackState == Player.STATE_IDLE
+        inFlight.clear()
         compositionSetNs = System.nanoTime()
         if (first) {
           awaitingFirstFrame = true
@@ -205,6 +208,27 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
         Log.w("PulseEditor", "Preview couldn't load the clips", e)
         onStatus(PreviewStatus(0.0, false, e.message ?: e.javaClass.simpleName))
       }
+    }
+  }
+
+  /**
+   * Bench: the decoder ExoPlayer's default selector puts first for each clip codec, once per
+   * rebuild. CompositionPlayer exposes no AnalyticsListener, so this is the first candidate its
+   * video renderer tries (MediaCodecSelector.DEFAULT), not a report of the one that initialised.
+   */
+  private fun logDecoders(media: List<ProbeResult>) {
+    for (codec in media.mapNotNull { it.video?.codec }.distinct()) {
+      val mime = when (codec) {
+        "h264" -> MimeTypes.VIDEO_H264
+        "hevc" -> MimeTypes.VIDEO_H265
+        else -> "video/$codec"
+      }
+      val names = try {
+        MediaCodecSelector.DEFAULT.getDecoderInfos(mime, false, false).map { it.name }
+      } catch (e: Exception) {
+        emptyList()
+      }
+      Log.i("PulseEditor", "preview decoder $mime: ${names.firstOrNull() ?: "none"} (ExoPlayer default selector, ${names.size} candidates)")
     }
   }
 
@@ -240,6 +264,12 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     // Every frame that reaches the view counts, known or not (scrubbing may skip the metadata).
     framesShown++
     val match = inFlight.indexOfFirst { it.second == timestampNs }
+    if (match < 0) {
+      // Matched by order (no texture timestamp): frames a scrub released but never drew would be
+      // taken for this one. A frame reaches the view within a refresh or two of its release time.
+      val stale = System.nanoTime() - STALE_FRAME_MS * 1_000_000
+      while (inFlight.size > 1 && inFlight.first().second < stale) inFlight.removeFirst()
+    }
     val (presentationTimeUs, releaseTimeNs) = when {
       match >= 0 -> inFlight[match].also { repeat(match + 1) { inFlight.removeFirst() } }
       inFlight.isNotEmpty() -> inFlight.removeFirst()
@@ -270,8 +300,12 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     if (seekTargetUs != C.TIME_UNSET && presentationTimeUs >= seekTargetUs - 1_000 && presentationTimeUs < seekTargetUs + frameUs()) {
       lastSeekMs = (shownNs - seekStartNs) / 1e6
       val target = seekTargetUs
-      seekTargetUs = C.TIME_UNSET
-      main.postDelayed({ if (seekTargetUs == C.TIME_UNSET || seekTargetUs == target) finishSeeks(presentationTimeUs / 1000.0) }, afterShown)
+      // Bench: the split of this seek (released = Media3's release time of the matched frame, in
+      // the System.nanoTime domain; shown = when it reached the view).
+      val releasedMs = if (releaseTimeNs == C.TIME_UNSET) "?" else "${((releaseTimeNs - seekStartNs) / 1e6).roundToInt()}"
+      Log.i("PulseEditor", "preview seek target=${target / 1000} released=+$releasedMs shown=+${lastSeekMs.roundToInt()}")
+      // Told once it's up, unless a newer seek replaced the target meanwhile.
+      main.postDelayed({ if (seekTargetUs == target) finishSeeks(presentationTimeUs / 1000.0) }, afterShown)
     }
   }
 
@@ -307,6 +341,25 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     onTime(timeMs, player?.isPlaying == true)
   }
 
+  /** The time of the frame on screen, else the player's position (before the first frame). */
+  private fun shownTimeMs(p: CompositionPlayer): Double =
+    if (lastFrameUs != C.TIME_UNSET) lastFrameUs / 1000.0 else p.currentPosition.toDouble()
+
+  private fun startSeek(p: CompositionPlayer, target: Long) {
+    // Already showing that frame, with no seek on its way: nothing new will be drawn.
+    val shown = lastFrameUs
+    if (!p.isPlaying && seekTargetUs == C.TIME_UNSET && shown != C.TIME_UNSET && target * 1000 >= shown && target * 1000 < shown + frameUs()) {
+      lastSeekMs = 0.0
+      finishSeeks(shown / 1000.0)
+      return
+    }
+    seekTargetUs = target * 1000
+    seekStartNs = System.nanoTime()
+    main.removeCallbacks(seekTimeout)
+    main.postDelayed(seekTimeout, SEEK_TIMEOUT_MS)
+    p.seekTo(target)
+  }
+
   override fun play() {
     main.post { player?.play() }
   }
@@ -325,21 +378,10 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
       }
       // Whole milliseconds, rounded down: the first frame at or after it is the one starting there.
       val target = kotlin.math.floor(frameStartMs(timeMs.coerceIn(0.0, maxOf(0.0, durationMs - 1)))).toLong()
+      // Every seek goes to the player at once (in scrubbing mode it keeps only the latest);
+      // callers all resolve when the latest target is on screen.
       pendingSeeks += promise
-      // Already showing that frame: nothing new will be drawn.
-      val shown = lastFrameUs
-      if (!p.isPlaying && seekTargetUs == C.TIME_UNSET && shown != C.TIME_UNSET &&
-        target * 1000 >= shown && target * 1000 < shown + frameUs()
-      ) {
-        lastSeekMs = 0.0
-        finishSeeks(shown / 1000.0)
-        return@post
-      }
-      seekTargetUs = target * 1000
-      seekStartNs = System.nanoTime()
-      main.removeCallbacks(seekTimeout)
-      main.postDelayed(seekTimeout, SEEK_TIMEOUT_MS)
-      p.seekTo(target)
+      startSeek(p, target)
     }
     return promise
   }
@@ -384,5 +426,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     const val SEEK_TIMEOUT_MS = 3_000L
     /** A screen refresh and a bit: from a frame reaching the view to it being on screen. */
     const val REFRESH_MARGIN_MS = 20L
+    /** Older than this since its release time, a frame matched by order is one that never drew. */
+    const val STALE_FRAME_MS = 300L
   }
 }

@@ -52,6 +52,8 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
   private var rateObservation: NSKeyValueObservation?
   private var timeObserver: Any?
   private var frameCounter: CADisplayLink?
+  /// Watches the layer for a seek's frame (whenShown).
+  private var displayWatch: CADisplayLink?
   private var frameOutput: AVPlayerItemVideoOutput?
   /// The frame the counter last took for display (snapshot() while playing).
   private var lastFrame: CVPixelBuffer?
@@ -134,6 +136,11 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
         self.onStatus(PreviewStatus(durationMs: self.durationMs, ready: self.ready, error: item.error?.localizedDescription ?? "The preview couldn't play."))
       }
     }
+    // The counter's output goes on with the item: adding one to a playing or about-to-play item
+    // holds its clock back for a few hundred ms.
+    let output = AVPlayerItemVideoOutput(pixelBufferAttributes: nil)
+    item.add(output)
+    frameOutput = output
     player.replaceCurrentItem(with: item)
     pendingSwap = first ? nil : (started, false)
     // The layer's first frame of the new item: the first frame of all (ready), or the end of a swap.
@@ -190,7 +197,13 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
   // MARK: Playback
 
   func play() throws {
-    DispatchQueue.main.async { self.player.play() }
+    DispatchQueue.main.async {
+      // Start the clock now. play() schedules the start "at a host time in the near future" to
+      // allow for media loading (AVPlayer.h, setRate:time:atHostTime:), which held the picture
+      // still for 170-300 ms after a paused seek on a local, prepared item; nothing is loading.
+      // Allowed because automaticallyWaitsToMinimizeStalling is off.
+      self.player.setRate(1, time: .invalid, atHostTime: CMClockGetTime(CMClockGetHostTimeClock()))
+    }
   }
 
   func pause() throws {
@@ -219,18 +232,58 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
     seeking = true
     let target = chaseTime
     let tolerance = scrubbing ? CMTime(value: 1, timescale: CMTimeScale(max(1, options.fps.rounded()))) : .zero
+    // The frame on screen before this seek: the seek is done once the layer shows another one.
+    // Holding it keeps its surface from being reused for the next frame.
+    let before = displayedFrame()
+    let fromMs = Self.ms(player.currentTime())
     player.seek(to: target, toleranceBefore: tolerance, toleranceAfter: tolerance) { [weak self] _ in
       DispatchQueue.main.async {
         guard let self else { return }
-        if CMTimeCompare(target, self.chaseTime) == 0 {
-          self.seeking = false
-          self.lastSeekMs = (CACurrentMediaTime() - self.seekStart) * 1000
-          self.finishSeeks(Self.ms(self.player.currentTime()))
-        } else {
-          self.seekToChaseTime()
+        let landedMs = Self.ms(self.player.currentTime())
+        self.whenShown(after: before, from: fromMs, to: landedMs) {
+          if CMTimeCompare(target, self.chaseTime) == 0 {
+            self.seeking = false
+            self.lastSeekMs = (CACurrentMediaTime() - self.seekStart) * 1000
+            self.finishSeeks(Self.ms(self.player.currentTime()))
+          } else {
+            // A drag moved on: report the frame now on screen, then chase the newer time.
+            self.onTime(landedMs, false)
+            self.seekToChaseTime()
+          }
         }
       }
     }
+  }
+
+  /// The frame the layer shows while paused (iOS returns none while playing).
+  private func displayedFrame() -> CVPixelBuffer? {
+    guard #available(iOS 16, *), player.timeControlStatus != .playing else { return nil }
+    return playerView.playerLayer.displayedPixelBuffer()
+  }
+
+  /// Call `done` once the layer shows a frame other than `before`: at once while playing, when
+  /// the seek stayed on the same frame (the layer then keeps it), or after a timeout.
+  private func whenShown(after before: CVPixelBuffer?, from fromMs: Double, to landedMs: Double, _ done: @escaping () -> Void) {
+    guard #available(iOS 16, *), player.timeControlStatus != .playing else { done(); return }
+    let frameMs = 1000 / max(1, options.fps)
+    let sameFrame = (fromMs / frameMs + 1e-6).rounded(.down) == (landedMs / frameMs + 1e-6).rounded(.down)
+    let started = CACurrentMediaTime()
+    let baseline = Self.surfaceID(before)
+    displayWatch?.invalidate()
+    let link = CADisplayLink(target: DisplayLinkProxy { [weak self] link in
+      guard let self else { link.invalidate(); return }
+      let shown = Self.surfaceID(self.displayedFrame())
+      let waited = (CACurrentMediaTime() - started) * 1000
+      let changed = shown != 0 && shown != baseline
+      let timedOut = waited > (sameFrame ? 40 : 300) || self.player.timeControlStatus == .playing
+      guard changed || timedOut else { return }
+      link.invalidate()
+      if self.displayWatch === link { self.displayWatch = nil }
+      _ = before  // held until the new frame is up
+      done()
+    }, selector: #selector(DisplayLinkProxy.tick(_:)))
+    link.add(to: .main, forMode: .common)
+    displayWatch = link
   }
 
   private func finishSeeks(_ timeMs: Double) {
@@ -278,12 +331,9 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
     PreviewStats(firstFrameMs: firstFrameMs, lastSeekMs: lastSeekMs, lastSwapMs: lastSwapMs, framesShown: framesShown, framesDropped: framesDropped)
   }
 
-  /// Counts new frames while playing or scrubbing (a fresh video output each time either starts).
+  /// Counts new frames while playing or scrubbing, from the item's video output.
   private func startCounting() {
-    guard frameCounter == nil, let item = player.currentItem else { return }
-    let output = AVPlayerItemVideoOutput(pixelBufferAttributes: nil)
-    item.add(output)
-    frameOutput = output
+    guard frameCounter == nil else { return }
     let link = CADisplayLink(target: DisplayLinkProxy { [weak self] link in self?.countFrame(link) }, selector: #selector(DisplayLinkProxy.tick(_:)))
     link.add(to: .main, forMode: .common)
     frameCounter = link
@@ -301,23 +351,29 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
   private func stopCounting() {
     frameCounter?.invalidate()
     frameCounter = nil
-    if let output = frameOutput { player.currentItem?.remove(output) }
-    frameOutput = nil
     lastFrame = nil
   }
 
   func onDropView() {
     DispatchQueue.main.async {
       self.build?.cancel()
+      self.displayWatch?.invalidate()
+      self.displayWatch = nil
       self.stopCounting()
       if let observer = self.timeObserver { self.player.removeTimeObserver(observer) }
       self.timeObserver = nil
       self.player.pause()
       self.player.replaceCurrentItem(with: nil)
+      self.frameOutput = nil
     }
   }
 
   private static func ms(_ t: CMTime) -> Double { t.isNumeric ? t.seconds * 1000 : 0 }
+
+  private static func surfaceID(_ b: CVPixelBuffer?) -> UInt32 {
+    guard let b, let s = CVPixelBufferGetIOSurface(b) else { return 0 }
+    return IOSurfaceGetID(s.takeUnretainedValue())
+  }
 
   private static func writeJPEG(_ buffer: CVPixelBuffer) throws -> String {
     let image = CIImage(cvPixelBuffer: buffer)
