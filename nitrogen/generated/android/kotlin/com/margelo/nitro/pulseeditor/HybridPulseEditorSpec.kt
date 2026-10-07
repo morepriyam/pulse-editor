@@ -49,6 +49,10 @@ abstract class HybridPulseEditorSpec: HybridObject() {
   @DoNotStrip
   @Keep
   abstract fun createConform(uri: String, options: ConformOptions): HybridConformJobSpec
+  
+  @DoNotStrip
+  @Keep
+  abstract fun createSeekBench(): HybridSeekBenchSpec
 
   // Default implementation of `HybridObject.toString()`
   override fun toString(): String {

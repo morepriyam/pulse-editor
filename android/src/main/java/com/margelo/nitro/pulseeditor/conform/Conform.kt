@@ -1,6 +1,7 @@
 package com.margelo.nitro.pulseeditor.conform
 
 import android.content.Context
+import android.media.MediaFormat
 import android.net.Uri
 import android.util.Log
 import androidx.annotation.OptIn
@@ -11,6 +12,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.FrameDropEffect
 import androidx.media3.effect.Presentation
 import androidx.media3.effect.ScaleAndRotateTransformation
+import androidx.media3.inspector.MediaExtractorCompat
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.EditedMediaItemSequence
@@ -19,6 +21,7 @@ import com.margelo.nitro.pulseeditor.ConformOptions
 import com.margelo.nitro.pulseeditor.ConformResult
 import com.margelo.nitro.pulseeditor.Probe
 import com.margelo.nitro.pulseeditor.ProbeResult
+import com.margelo.nitro.pulseeditor.ProbeVideo
 import com.margelo.nitro.pulseeditor.Transfer
 import com.margelo.nitro.pulseeditor.mediaUri
 import com.margelo.nitro.pulseeditor.merge.Merge
@@ -67,7 +70,10 @@ object Conform {
       val outcome = Transcode.run(context, composition(uri, source, options, degrees), output, settings) { progress(it * 0.98) }
       return withContext(Dispatchers.IO) {
         moveMoovToFront(output)
-        if (!addAacRollGroup(output)) Log.w("PulseEditor", "Couldn't add the AAC roll group: Apple players may play the audio 44 ms early")
+        if (source.audio != null && !addAacRollGroup(output)) {
+          Log.w("PulseEditor", "Couldn't add the AAC roll group: Apple players may play the audio 44 ms early")
+        }
+        if (!options.copyVideo) checkFrameCount(context, uri, video, options, outcome.result.videoFrameCount, outcome.fallbacks)
         val out = verify(context, output, source, options, degrees, durationMs, outcome.fallbacks)
         ConformResult(
           uri = Uri.fromFile(output).toString(),
@@ -108,6 +114,53 @@ object Conform {
       if (video.transfer != Transfer.SDR) setHdrMode(MergeExport.hdrMode)
     }.build()
   }
+
+  /**
+   * A damaged source must not come out with holes: the platform decoder drops the frames it can't
+   * decode and Transformer carries on, so the output keeps the source's length with the picture
+   * frozen over the gaps (a corrupt 114 s clip came out with 746 of its 3424 frames on a Galaxy
+   * S24; AVFoundation conceals the same errors). The output's frame count is compared with the
+   * source's sample count, scaled by the frame drop when the source runs above the target rate.
+   */
+  private fun checkFrameCount(
+    context: Context, uri: String, video: ProbeVideo, options: ConformOptions, outputFrames: Int, fallbacks: List<String>,
+  ) {
+    if (outputFrames <= 0) return  // not reported (Media3 counts only encoded video)
+    val samples = videoSampleCount(context, uri) ?: return
+    val keep = if (video.fps > 0 && video.fps > options.fps) options.fps / video.fps else 1.0
+    val expected = samples * keep
+    Log.i("PulseEditor", "conform frames: $outputFrames written, $samples in the source, ${expected.roundToInt()} expected")
+    if (outputFrames < expected * MIN_FRAME_FRACTION) {
+      throw MergeException(
+        (listOf("This phone couldn't decode all of the video ($outputFrames of ${expected.roundToInt()} frames).") + fallbacks).joinToString("; "))
+    }
+  }
+
+  /** The number of samples in the first video track, from the container's index (no decoding). */
+  private fun videoSampleCount(context: Context, uri: String): Int? {
+    val extractor = MediaExtractorCompat(context)
+    try {
+      extractor.setDataSource(mediaUri(uri), 0)
+      val track = (0 until extractor.trackCount).firstOrNull {
+        extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true
+      } ?: return null
+      extractor.selectTrack(track)
+      var count = 0
+      while (extractor.sampleTrackIndex >= 0) {
+        count++
+        if (!extractor.advance()) break
+      }
+      return count
+    } catch (e: Exception) {
+      Log.w("PulseEditor", "Couldn't count the video samples of $uri", e)
+      return null
+    } finally {
+      extractor.release()
+    }
+  }
+
+  /** The output may lose this share of the frames the source has (frame-rate rounding, a trailing partial frame). */
+  private const val MIN_FRAME_FRACTION = 0.8
 
   /**
    * The output must be what was asked for: H.264 8-bit SDR in the requested layout, sound kept,

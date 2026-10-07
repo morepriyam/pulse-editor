@@ -12,6 +12,7 @@
 #include "HybridMergeJobSpecSwift.hpp"
 #include "HybridPulseEditorSpecSwift.hpp"
 #include "HybridPulsePreviewSpecSwift.hpp"
+#include "HybridSeekBenchSpecSwift.hpp"
 #include "PulseEditor-Swift-Cxx-Umbrella.hpp"
 #include <NitroModules/NitroDefines.hpp>
 
@@ -78,6 +79,30 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
     }
     #endif
     PulseEditor::HybridConformJobSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
+    return swiftPart.toUnsafe();
+  }
+  
+  // pragma MARK: std::function<void(const SeekBenchResult& /* result */)>
+  Func_void_SeekBenchResult create_Func_void_SeekBenchResult(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PulseEditor::Func_void_SeekBenchResult::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const SeekBenchResult& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridSeekBenchSpec>
+  std::shared_ptr<HybridSeekBenchSpec> create_std__shared_ptr_HybridSeekBenchSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
+    PulseEditor::HybridSeekBenchSpec_cxx swiftPart = PulseEditor::HybridSeekBenchSpec_cxx::fromUnsafe(swiftUnsafePointer);
+    return std::make_shared<margelo::nitro::pulseeditor::HybridSeekBenchSpecSwift>(swiftPart);
+  }
+  void* NON_NULL get_std__shared_ptr_HybridSeekBenchSpec_(std__shared_ptr_HybridSeekBenchSpec_ cppType) {
+    std::shared_ptr<margelo::nitro::pulseeditor::HybridSeekBenchSpecSwift> swiftWrapper = std::dynamic_pointer_cast<margelo::nitro::pulseeditor::HybridSeekBenchSpecSwift>(cppType);
+    #ifdef NITRO_DEBUG
+    if (swiftWrapper == nullptr) [[unlikely]] {
+      throw std::runtime_error("Class \"HybridSeekBenchSpec\" is not implemented in Swift!");
+    }
+    #endif
+    PulseEditor::HybridSeekBenchSpec_cxx& swiftPart = swiftWrapper->getSwiftPart();
     return swiftPart.toUnsafe();
   }
   

@@ -35,12 +35,14 @@ target_sources(
   # Shared Nitrogen C++ sources
   ../nitrogen/generated/shared/c++/HybridMergeJobSpec.cpp
   ../nitrogen/generated/shared/c++/HybridConformJobSpec.cpp
+  ../nitrogen/generated/shared/c++/HybridSeekBenchSpec.cpp
   ../nitrogen/generated/shared/c++/HybridPulseEditorSpec.cpp
   ../nitrogen/generated/shared/c++/HybridPulsePreviewSpec.cpp
   ../nitrogen/generated/shared/c++/views/HybridPulsePreviewComponent.cpp
   # Android-specific Nitrogen C++ sources
   ../nitrogen/generated/android/c++/JHybridMergeJobSpec.cpp
   ../nitrogen/generated/android/c++/JHybridConformJobSpec.cpp
+  ../nitrogen/generated/android/c++/JHybridSeekBenchSpec.cpp
   ../nitrogen/generated/android/c++/JHybridPulseEditorSpec.cpp
   ../nitrogen/generated/android/c++/JHybridPulsePreviewSpec.cpp
   ../nitrogen/generated/android/c++/views/JHybridPulsePreviewStateUpdater.cpp

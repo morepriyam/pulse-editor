@@ -210,4 +210,19 @@ open class HybridPulseEditorSpec_cxx {
       return bridge.create_Result_std__shared_ptr_HybridConformJobSpec__(__exceptionPtr)
     }
   }
+  
+  @inline(__always)
+  public final func createSeekBench() -> bridge.Result_std__shared_ptr_HybridSeekBenchSpec__ {
+    do {
+      let __result = try self.__implementation.createSeekBench()
+      let __resultCpp = { () -> bridge.std__shared_ptr_HybridSeekBenchSpec_ in
+        let __cxxWrapped = __result.getCxxWrapper()
+        return __cxxWrapped.getCxxPart()
+      }()
+      return bridge.create_Result_std__shared_ptr_HybridSeekBenchSpec__(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_HybridSeekBenchSpec__(__exceptionPtr)
+    }
+  }
 }

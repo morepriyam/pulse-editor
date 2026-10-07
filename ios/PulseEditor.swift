@@ -35,6 +35,11 @@ class PulseEditor: HybridPulseEditorSpec {
   public func createConform(uri: String, options: ConformOptions) throws -> (any HybridConformJobSpec) {
     return ConformJob(uri: uri, options: options)
   }
+
+  /// Bench only: the plain-player seek bench is Android's (see `SeekBench`).
+  public func createSeekBench() throws -> (any HybridSeekBenchSpec) {
+    return SeekBench()
+  }
 }
 
 /// Runs `work`, turning any error into the message JS sees: Nitro describes other errors with

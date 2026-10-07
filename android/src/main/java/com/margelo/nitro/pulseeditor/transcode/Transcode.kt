@@ -1,6 +1,7 @@
 package com.margelo.nitro.pulseeditor.transcode
 
 import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -34,7 +35,8 @@ import kotlinx.coroutines.suspendCancellableCoroutine
  * - portrait encoding only when asked: Media3 encodes portrait as landscape plus a rotation tag
  *   by default, because more encoders support landscape;
  * - the AAC encoder's measured priming as its encoder delay ([AacPriming]), so the audio starts in
- *   sync.
+ *   sync;
+ * - on Android 15+, audio decoded in large batches ([BatchedAudioDecoderFactory]).
  * Progress is polled every 100 ms. Cancelling the coroutine cancels the export and deletes the
  * partial output. Any fallback Media3's encoder factory applied is returned with the result.
  */
@@ -138,7 +140,8 @@ internal object Transcode {
   }
 
   private fun transformer(context: Context, settings: Settings, listener: Transformer.Listener): Transformer {
-    val decoders = DefaultDecoderFactory.Builder(context).setEnableDecoderFallback(true).build()
+    val defaultDecoders = DefaultDecoderFactory.Builder(context).setEnableDecoderFallback(true).build()
+    val decoders = if (Build.VERSION.SDK_INT >= 35) BatchedAudioDecoderFactory(context, defaultDecoders) else defaultDecoders
     val encoders = PrimingCorrectedEncoderFactory(
       DefaultEncoderFactory.Builder(context)
         .setRequestedVideoEncoderSettings(

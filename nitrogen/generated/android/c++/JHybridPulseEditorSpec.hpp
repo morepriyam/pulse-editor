@@ -59,6 +59,7 @@ namespace margelo::nitro::pulseeditor {
     std::shared_ptr<Promise<Thumbnail>> thumbnail(const std::string& uri, const ThumbnailOptions& options) override;
     std::shared_ptr<HybridMergeJobSpec> createMerge(const std::vector<MergeClip>& clips, const MergeOptions& options) override;
     std::shared_ptr<HybridConformJobSpec> createConform(const std::string& uri, const ConformOptions& options) override;
+    std::shared_ptr<HybridSeekBenchSpec> createSeekBench() override;
 
   private:
     jni::global_ref<JHybridPulseEditorSpec::JavaPart> _javaPart;

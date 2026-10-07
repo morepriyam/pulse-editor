@@ -181,6 +181,134 @@ export interface ConformJob extends HybridObject<{
   cancel(): void;
 }
 
+/** Bench only: how a `SeekBench` drag treats its seek targets. `exact`: Media3's
+ * `ScrubbingModeParameters.DEFAULT` (exact seeks); `fractional`: the default parameters plus a
+ * fractional seek tolerance (`toleranceBeforeMs` / `toleranceAfterMs` of the clip's duration);
+ * `closestSync`: the default parameters with the player's `SeekParameters.CLOSEST_SYNC` for the
+ * drag only (scrubbing mode uses the player's seek parameters when it has no tolerance of its own). */
+export type SeekBenchDragMode = 'exact' | 'fractional' | 'closestSync';
+
+/** Bench only: one simulated finger drag of a `SeekBench` run, in scrubbing mode. */
+export interface SeekBenchDrag {
+  /** Name for the rows and the log lines, e.g. `fwd-exact`. */
+  name: string;
+  /** Source time the drag starts at and ends at, ms (backward when `toMs < fromMs`). */
+  fromMs: number;
+  toMs: number;
+  /** How long the drag lasts and how often it seeks (e.g. 2000 ms at 60 Hz = 120 seeks). */
+  durationMs: number;
+  hz: number;
+  mode: SeekBenchDragMode;
+  /** For `fractional` only: the tolerance before and after each target, ms of source. */
+  toleranceBeforeMs: number;
+  toleranceAfterMs: number;
+}
+
+/** Bench only: what one `SeekBench` pass measures (one fresh player per pass). */
+export interface SeekBenchOptions {
+  /** Name of the pass in the rows and the log lines. */
+  label: string;
+  /** Paused exact seeks, in order, source ms: each goes to the start of the frame showing at that time. */
+  seekTargetsMs: number[];
+  /** Paused seeks run with Media3's scrubbing mode on (exact, default parameters). */
+  pausedScrubbing: boolean;
+  /** Idle time after each landed seek and each drag, ms. */
+  restMs: number;
+  drags: SeekBenchDrag[];
+  /** Ask the decoder for low-latency output (`KEY_LOW_LATENCY` = 1 through the player's video
+   * codec parameters, set before the codec is configured). */
+  lowLatency: boolean;
+  /** Size of the bench's TextureView, dp. */
+  viewWidth: number;
+  viewHeight: number;
+}
+
+/** Bench only: one landed seek (paused, or the exact settle seek after a drag). */
+export interface SeekBenchSeek {
+  /** `paused`, or `settle-<drag name>`. */
+  kind: string;
+  /** Where the seek was asked to go (a frame start) and what the player was given (1 ms earlier
+   * when the player already sat at that position, so the seek isn't skipped). */
+  targetMs: number;
+  seekedMs: number;
+  /** Presentation time of the frame that answered it, ms; -1 when none came (timed out). */
+  ptsMs: number;
+  /** Seek → the release time Media3 gave that frame (VideoFrameMetadataListener), ms. */
+  releasedMs: number;
+  /** Seek → that release callback arriving on the playback thread, ms. */
+  callbackMs: number;
+  /** Seek → the frame reaching the TextureView (onSurfaceTextureUpdated), ms; -1 = timed out. */
+  shownMs: number;
+}
+
+/** Bench only: one picture that reached the view during a drag. */
+export interface SeekBenchPicture {
+  /** Presentation time of the frame, ms; -1 when it couldn't be matched to a release. */
+  ptsMs: number;
+  /** When it reached the view, ms since the drag's first seek. */
+  atMs: number;
+  /** From the drag first asking for that frame to it reaching the view, ms; -1 when no seek asked
+   * for exactly that frame (a tolerant seek landed on a keyframe instead). */
+  latencyMs: number;
+}
+
+/** Bench only: one drag's outcome. */
+export interface SeekBenchDragResult {
+  name: string;
+  mode: SeekBenchDragMode;
+  /** Seeks given to the player, and how many distinct frame targets they were. */
+  seeksIssued: number;
+  distinctTargets: number;
+  /** The measured window: from the first seek to one period after the last, ms. */
+  windowMs: number;
+  /** Pictures that reached the view in the window, how many distinct frames they were, and the
+   * pictures per second of window. */
+  pictures: number;
+  distinctFrames: number;
+  picturesPerSecond: number;
+  /** The final exact seek after the drag (scrubbing off): -1 when it timed out. */
+  settleMs: number;
+  frames: SeekBenchPicture[];
+}
+
+/** Bench only: one `SeekBench` pass. Times are ms. */
+export interface SeekBenchResult {
+  label: string;
+  /** The decoder the player initialised (AnalyticsListener), its init time, and what it supports. */
+  decoder: string;
+  decoderInitMs: number;
+  lowLatency: boolean;
+  lowLatencySupported: boolean;
+  maxDecoderInstances: number;
+  /** TextureView added → its surface available (not part of the player's cost). */
+  viewMs: number;
+  /** Player build start → `build()` returned, → STATE_READY, → first frame on the view
+   * (`firstFrameMs` is the prewarm cost: create + prepare + first frame). */
+  buildMs: number;
+  readyMs: number;
+  firstFrameMs: number;
+  /** `release()` of the player. */
+  releaseMs: number;
+  durationMs: number;
+  fps: number;
+  seeks: SeekBenchSeek[];
+  drags: SeekBenchDragResult[];
+  /** Frames that reached the view without a release whose time matched the texture's
+   * timestamp (matched by order instead). */
+  matchedByOrder: number;
+}
+
+/** Bench only (Android): a plain Media3 ExoPlayer on one file, no effects, drawing into a
+ * TextureView added over the app for the run: paused exact seeks, drags, prewarm cost. The gate
+ * measurement for a plain-player drag layer in `<PulsePreview>`. Rejects on iOS. */
+export interface SeekBench extends HybridObject<{
+  ios: 'swift';
+  android: 'kotlin';
+}> {
+  /** One pass on `uri` with a fresh player, released at the end. */
+  run(uri: string, options: SeekBenchOptions): Promise<SeekBenchResult>;
+}
+
 export interface PulseEditor extends HybridObject<{
   ios: 'swift';
   android: 'kotlin';
@@ -209,4 +337,7 @@ export interface PulseEditor extends HybridObject<{
 
   /** Prepare a conform of one file into `options`' format. Call `start` to run it. */
   createConform(uri: string, options: ConformOptions): ConformJob;
+
+  /** Bench only: a plain-ExoPlayer seek bench (Android; rejects on iOS). */
+  createSeekBench(): SeekBench;
 }
