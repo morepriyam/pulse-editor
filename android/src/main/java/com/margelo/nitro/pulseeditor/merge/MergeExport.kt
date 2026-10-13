@@ -112,12 +112,9 @@ internal object MergeExport {
    * with the preview, which draws the same picture (at a smaller size). */
   internal fun videoItem(clip: MergeClip, media: ProbeResult, options: MergeOptions): EditedMediaItem {
     val mediaItem = MediaItem.Builder().setUri(mediaUri(clip.uri))
-    if (clip.endMs > clip.startMs) {
+    MergePlan.windowUs(clip, media)?.let { (startUs, endUs) ->
       mediaItem.setClippingConfiguration(
-        MediaItem.ClippingConfiguration.Builder()
-          .setStartPositionMs(clip.startMs.toLong())
-          .setEndPositionMs(minOf(clip.endMs, media.durationMs).toLong())
-          .build(),
+        MediaItem.ClippingConfiguration.Builder().setStartPositionUs(startUs).setEndPositionUs(endUs).build(),
       )
     }
     val item = EditedMediaItem.Builder(mediaItem.build()).setRemoveAudio(true)
@@ -134,9 +131,9 @@ internal object MergeExport {
 
   /** The clip's window cut exactly (in timeline time, after the speed change), then the recorder's layout. */
   private fun audioChain(clip: MergeClip, media: ProbeResult, options: MergeOptions): List<AudioProcessor> {
-    val startMs = if (clip.endMs > clip.startMs) clip.startMs else 0.0
+    val startUs = MergePlan.windowUs(clip, media)?.first ?: 0L
     val trim = TrimAudioProcessor(
-      skipUs = (startMs / clip.speed * 1000).roundToLong(),
+      skipUs = (startUs / clip.speed).roundToLong(),
       durationUs = (MergePlan.timelineMs(clip, media) * 1000).roundToLong(),
     )
     return listOf(trim) + audioProcessors(options.audio.sampleRate.roundToInt(), options.audio.channels.roundToInt())

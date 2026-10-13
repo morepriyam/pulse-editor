@@ -14,11 +14,9 @@ enum Timeline {
     let duration: CMTime
   }
 
-  /// `snapped`: indexes of clips whose trims snap to the nearest frame, as the join path copies
-  /// them (the preview passes the clips the export will copy); the others are trimmed exactly.
-  static func compose(
-    _ items: [(clip: MergeClip, media: Probe.Media)], target: RenderTarget, snapped: Set<Int> = []
-  ) async throws -> Composed {
+  /// A clip is whole source frames: both trim ends snap to the nearest frame, as the join's do,
+  /// so a rendered clip, its copied neighbours and the preview all cut on the same frames.
+  static func compose(_ items: [(clip: MergeClip, media: Probe.Media)], target: RenderTarget) async throws -> Composed {
     let composition = AVMutableComposition()
     guard let video = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
       throw MergeError.failed("Couldn't create the video track.")
@@ -30,12 +28,11 @@ enum Timeline {
 
     var instructions: [AVVideoCompositionInstruction] = []
     var cursor = CMTime.zero
-    for (index, (clip, media)) in items.enumerated() {
+    for (clip, media) in items {
       guard let sourceVideo = media.videoTrack else { throw MergeError.failed("A clip has no video.") }
       let (sourceSize, sourceTransform, sourceRange, frame) = try await sourceVideo.load(
         .naturalSize, .preferredTransform, .timeRange, .minFrameDuration)
-      let range = try Join.trimRange(
-        startMs: clip.startMs, endMs: clip.endMs, in: sourceRange, frame: snapped.contains(index) ? frame : nil)
+      let range = try Join.trimRange(startMs: clip.startMs, endMs: clip.endMs, in: sourceRange, frame: frame)
 
       // The clip's slot: trimmed in at the cursor, then retimed in place.
       try video.insertTimeRange(range, of: sourceVideo, at: cursor)

@@ -10,6 +10,7 @@ import com.margelo.nitro.pulseeditor.ProbeResult
 import com.margelo.nitro.pulseeditor.Transfer
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 /**
  * Whether a merge can be a transmux join (samples copied) or needs one full encode. Media3 can't
@@ -32,9 +33,22 @@ object MergePlan {
   fun needsRender(clip: MergeClip): Boolean =
     (clip.rotation.roundToInt() % 360) != 0 || clip.flipped || clip.crop != null || abs(clip.speed - 1) > 0.0001
 
+  /**
+   * A trimmed clip's window in its source, µs (null when untrimmed): whole source frames, both
+   * ends at the nearest frame on the clip's average rate, as on iOS. Merge and the preview both
+   * clip with it, so a clip's first frame starts at its slot's start (a cut inside a frame left
+   * a gap that showed the previous clip's last frame).
+   */
+  fun windowUs(clip: MergeClip, media: ProbeResult): Pair<Long, Long>? {
+    if (clip.endMs <= clip.startMs) return null
+    val fps = media.video?.fps ?: 0.0
+    fun at(ms: Double): Long = if (fps > 0) ((ms * fps / 1000).roundToLong() * 1_000_000 / fps).toLong() else (ms * 1000).toLong()
+    return at(clip.startMs) to minOf(at(clip.endMs), (media.durationMs * 1000).toLong())
+  }
+
   /** What a clip contributes to the timeline, ms: its window at its speed. */
   fun timelineMs(clip: MergeClip, media: ProbeResult): Double {
-    val window = if (clip.endMs > clip.startMs) minOf(clip.endMs, media.durationMs) - clip.startMs else media.durationMs
+    val window = windowUs(clip, media)?.let { (startUs, endUs) -> (endUs - startUs) / 1000.0 } ?: media.durationMs
     return window / clip.speed
   }
 

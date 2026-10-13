@@ -118,8 +118,7 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
         try Task.checkCancellation()
         let target = RenderTarget(
           size: size, transform: .identity, canvas: size, fps: options.fps, bitrate: 0, audio: options.audio)
-        let snapped = try await Merge.copied(list, items.map { $0.media }, options: options)
-        let composed = try await Timeline.compose(items, target: target, snapped: snapped)
+        let composed = try await Timeline.compose(items, target: target)
         try Task.checkCancellation()
         let item = AVPlayerItem(asset: composed.composition.copy() as! AVComposition)
         item.videoComposition = composed.videoComposition.copy() as? AVVideoComposition
