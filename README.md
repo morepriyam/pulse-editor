@@ -230,6 +230,7 @@ Media3 can't mix copied and re-encoded clips in one export, and its copy mode is
 - **HDR clips** are tone-mapped to SDR with OpenGL, which needs the GPU's `GL_EXT_YUV_target`. Without it (the emulator), every HDR clip failed with "Video frame processing error"; such a device now reads HDR as SDR (Media3's `HDR_MODE_EXPERIMENTAL_FORCE_INTERPRET_HDR_AS_SDR`: it finishes, with flatter colours) and logs that it did. Not yet run on a device that lacks the extension: the emulator can't decode 10-bit HEVC at all, so HDR there still fails, now with "This phone couldn't decode one of the clips."
 - **Apple players got the audio 44 ms early:** Media3's muxer doesn't write the AAC "roll" sample group (`sgpd`/`sbgp`, roll distance −1) that FFmpeg's does, and without it AVFoundation trims Apple's default 2112 priming samples on top of the edit list. Every Android export read 0.0 ms in FFmpeg but −44 ms in AVFoundation (Safari, Photos, iOS viewers), with Pulse's flash/click sync clips on the emulator. The roll group is now added after the export, inside the front `moov`, out of the free space after it (`mdat` doesn't move): 0.0 ms in both. If there's no room it's skipped and logged.
 - **Joins feed the audio encoder in larger buffers:** Media3 fills each encoder input buffer before queueing it, and each queued buffer is a round trip to the codec's process (the default holds ~40 ms of PCM). In a join the audio is the only thing encoded, and a 256 KB buffer made joins 21–34% faster on the S24 (2-minute join 16.5 → 11.6 s, 8 minutes 66 → 44 s), sync unchanged. With video also encoding, the larger bursts slowed exports by 5–15%, so encodes keep the default. (Tried and dropped: setting codecs to their maximum operating rate, no change; decoding each clip's audio to a WAV first, 10–27% slower, since decoding wasn't the bottleneck.)
+- **Audio is decoded in large batches on Android 15+** (`BatchedAudioDecoder`, merge and conform): Transformer's own audio decoder queues one access unit per codec buffer and takes one decoded frame at a time, each a round trip to the codec's process (S24: ~2 ms per AAC frame). With the platform's large audio frames (`FEATURE_MultipleFrames`), one input buffer carries ~64 KB of access units and one output buffer up to 256 KB of PCM, as `extractAudio` already does; video, and a decoder that can't batch or doesn't start this way, stay on Media3's factory. S24 (2026-10-13): copied joins 16–40 % faster than on 2026-10-01 (2-minute join 12.2 → 8.6 s), lip sync unchanged (see [Benchmarks](#benchmarks-on-device)); logcat says which decoder was used (`audio decoder: batched (c2.android.aac.decoder, input 64 KB, output 256 KB)`).
 - **One-clip joins are copied:** a single-item composition ignores `setTransmuxVideo` and asks the encoder factory whether video needs encoding, and Media3's default factory says yes whenever encoder settings are given, so a one-clip draft was re-encoded (S24: 5.2 Mbps out of a 0.7 Mbps clip). A join now says no; encodes are unchanged. S24: the clip comes out at its own 0.7 Mbps, still in sync. When a join fails and falls back to an encode, the reason is logged.
 - **Export errors are plain:** Media3's message can be a whole codec configuration dump; an export now fails with a short message per Media3 error code (couldn't decode a clip, couldn't encode, couldn't write the file…), and the full exception is logged (`adb logcat -s PulseEditor`), as are each encoder's measured priming and any encoder fallback.
 - **Encoder priming** is measured with a 10 ms chirp (a single sharp correlation peak), at most 2 s, once per encoder and layout; a failed measurement falls back to Media3's value and isn't retried.
@@ -444,9 +445,9 @@ Measured on 2026-10-01 on an **iPhone 17 Pro Max** (iOS 26.5.1) and a **Galaxy S
 - iOS joins drifted ~10 ms per clip in browsers (copied AAC padding; Apple players were fine). Fixed by re-encoding multi-clip audio: 0.0 ms in both, at the cost of joins taking about twice RNVT's time on the iPhone (1.0 s for a 2-minute join).
 - Android extractAudio was ~2 ms per AAC frame (one frame per codec round trip); batching frames on Android 15+ made it 5–9× faster on the S24 (2-minute draft 9.0 → 1.0 s).
 - Android one-clip drafts were re-encoded instead of copied; now copied.
-- Android joins feed the audio encoder in larger buffers: 21–34% faster on the S24.
+- Android joins feed the audio encoder in larger buffers: 21–34% faster on the S24. Since (2026-10-13), Android 15+ also decodes the audio in large batches: the 2-minute join 12.2 → 8.6 s, lip sync unchanged (table below).
 - Recordings have no B-frames on either phone, so edited iPhone drafts take the selective path; the recorder-match test clips were regenerated to match.
-- Known and accepted: Android joins are audio-pipeline bound (~10× realtime on the S24; the rest of the phone is idle, Media3 processes audio serially). A trimmed clip on Android can end with a 1–2 ms sliver frame at a clip boundary (invisible; FFmpeg's strict check notes it).
+- Known and accepted: Android joins are audio-pipeline bound (~10× realtime on the S24 on 2026-10-01, 13–15× with the batched decoder in a debug APK and 20–21× in a release APK on 2026-10-13; the rest of the phone is idle, Media3 processes audio serially). A trimmed clip on Android can end with a 1–2 ms sliver frame at a clip boundary (invisible; FFmpeg's strict check notes it).
 
 ### Lip sync and output checks
 
@@ -469,6 +470,8 @@ Measured on 2026-10-01 on an **iPhone 17 Pro Max** (iOS 26.5.1) and a **Galaxy S
 | Sync draft: rotate + crop + trim | 0.0 | 0.0 | 10.7 | 10.7 | faststart, 0 decode errors |
 | Sync draft: 2× / muted / 0.5×, 48 + 44.1 kHz | -17.5 | -17.5 | -24.0 | -24.0 | faststart, 0 decode errors |
 | Sync draft: trimmed starts | 0.0 | 0.0 | -16.6 | -16.6 | faststart, 0 decode errors |
+
+Re-measured on 2026-10-13 with the batched audio decoder (`android-s24-sync-1013`, pulse-editor only): the same values, 0.0 ms on the join, trims, rotate + crop + trim and the mixed-rate drafts, −17.5 ms on the two drafts with a 2× clip, in both players; every output faststart with 0 decode errors.
 
 ### Speed
 
@@ -503,6 +506,21 @@ Measured on 2026-10-01 on an **iPhone 17 Pro Max** (iOS 26.5.1) and a **Galaxy S
 | Sync draft: 2× / muted / 0.5×, 48 + 44.1 kHz | 7.7 s | 8.0 s | re-encoded (all or some clips) | +5 ms / +9 ms |
 | Sync draft: rotate + crop + trim | 5.7 s | 8.8 s | re-encoded (all or some clips) | +16 ms / +11 ms |
 | Sync draft: 48 + 44.1 kHz audio | 4.5 s | 8.3 s | copied | +0 ms / +34 ms |
+
+**Galaxy S24 Ultra (Android 16)**, 2026-10-13, with the batched audio decoder: pulse-editor only, median of 3 runs (`android-s24-joins-1013`, `android-s24-rel-joins-1013e-1`; the rows marked * from `android-s24-sync-1013`, 1 run, debug only)
+
+| Draft | 2026-10-01 (table above) | 2026-10-13, debug APK | 2026-10-13, release APK |
+|---|---|---|---|
+| Join 3 recorder clips (18 s) | 2.4 s | 1.4 s | 1.0 s |
+| Join 20 clips (2 min) | 12.2 s | 8.6 s (14× realtime) | 5.8 s (21×) |
+| Join 20 clips (8 min) | 44.5 s | 37.3 s (13×) | 24.2 s (20×) |
+| Sync draft: join (4 × 12 s) | 4.1 s | 3.1 s | 2.4 s |
+| Sync draft: trimmed starts (re-encoded) | 5.3 s | 5.1 s | 5.5 s |
+| Sync draft: rotate + crop + trim (re-encoded) | 5.7 s | 5.8 s | 6.0 s |
+| Sync draft: 2× / muted / 0.5×, 48 + 44.1 kHz * | 7.7 s | 5.3 s | — |
+| Sync draft: 48 + 44.1 kHz audio * | 4.5 s | 3.7 s | — |
+
+The three join rows used heavier test files on 2026-10-13 than on 2026-10-01 (2.9 against 2.2 MB for 3 clips, 16.9 against 12.5 MB for 2 minutes); the sync drafts are the same files on both days. Against 2026-10-07 (the same join files as 2026-10-13, without the batched decoder, on a phone that was hot): 3 clips 2.5 → 1.4 s, 2 minutes 12.2 → 8.6 s, 8 minutes 54.5 → 37.3 s. Durations and paths as on 2026-10-01 (joins copied, +0–5 ms). The release APK joins 25–35 % faster than the debug one; its re-encoded drafts are no faster.
 
 ### probe and extractAudio
 
@@ -558,7 +576,7 @@ Every row where RNVT comes out ahead or the outputs differ. "Measured" means a n
 | **Android file size** (edited and mixed drafts) | 1.7–5.7× RNVT's size (edits 18.3 MB vs 3.2 MB) | pulse-editor encodes at the export bitrate, 5 Mbps (the recorder's); RNVT's software encode lands at 0.85–3 Mbps. Picture quality hasn't been compared; the higher bitrate is likely the sharper picture, but that's inferred. | Bitrate is a setting (`EXPORT_BITRATE`), not an engine limit. |
 | **Output length** | iOS trimmed join −20 ms; iOS hostile imports −81 ms (RNVT +198 ms) | Join trims snap to the nearest frame (≤ half a frame each), so FFmpeg-based players start the picture with the sound. Odd-timing clips (VFR, 120 fps, NTSC 29.97) are resampled to a constant 30 fps, which rounds each clip to whole frames. | By design. |
 | **probe on the iPhone** | 12 ms vs RNVT 13–108 ms | RNVT's first read was ~110 ms in most runs and 13 ms in one, so its number is a range. | — |
-| **Android exports, absolute speed** | faster than RNVT everywhere, but joins ~10× realtime (2 min in 12.2 s) | Media3 runs the audio pipeline (decode, cut, mix, encode) one buffer at a time on one thread; during a join one core is busy and the rest of the phone is idle (measured with `top` on the S24). Feeding the encoder larger buffers made joins 21–34% faster; pre-decoding the audio didn't help (decoding isn't the bottleneck). | Accepted. Going further means replacing Media3's audio pipeline. |
+| **Android exports, absolute speed** | faster than RNVT everywhere, but joins ~10× realtime (2 min in 12.2 s; 8.6 s with the batched decoder, 2026-10-13) | Media3 runs the audio pipeline (decode, cut, mix, encode) one buffer at a time on one thread; during a join one core is busy and the rest of the phone is idle (measured with `top` on the S24). Feeding the encoder larger buffers made joins 21–34% faster; decoding the audio in batches on Android 15+ (as `extractAudio` does) took the 2-minute join from 12.2 to 8.6 s (13–15× realtime in a debug APK, 20–21× in a release APK, 2026-10-13); pre-decoding the whole audio to a WAV first didn't help. | Accepted. Going further means replacing Media3's audio pipeline. |
 
 ### Switching a trade-off later
 
@@ -573,6 +591,7 @@ Each choice above is one small, local change. Where it lives, and what changes i
 | Join bitrate allowance | `MergePlan.swift` `bitrateTolerance`, `MergePlan.kt` `BITRATE_TOLERANCE` (1.6×) | Lower it | Fewer joins (more re-encodes); smaller files from high-bitrate recordings |
 | Export bitrate | Pulse `src/features/export/editor-merge.ts`, `EXPORT_BITRATE` (5 Mbps) | Lower it | Smaller encoded files (Android's are 1.7–5.7× RNVT's); softer picture; recordings above 1.6× of it stop joining |
 | Android join audio encoder buffer | `transcode/AacPriming.kt`, `JOIN_AUDIO_INPUT_BYTES` (256 KB, joins only) | Change the size, or apply it to encodes | Joins 21–34% faster with it; encodes got 5–15% slower when it applied to them |
+| Android export audio decoded in batches | `transcode/BatchedAudioDecoder.kt`, used from `transcode/Transcode.kt` on Android 15+ when the decoder supports `FEATURE_MultipleFrames` | Use Media3's default decoder factory | Slower Android joins: the S24's 2-minute join took 12.2 s without it (2026-10-01) and 8.6 s with it (2026-10-13, debug APK); lip sync 0.0 ms with it, as without |
 | Android one-clip joins copy video | `transcode/AacPriming.kt`, `videoNeedsEncoding() = !copyVideo && …` | Return the default factory's answer | One-clip drafts re-encoded again |
 | Android Apple-player sync (AAC roll group) | `merge/Merge.kt` → `transcode/Mp4.kt` `addAacRollGroup` | Remove the call | Android exports 44 ms early on Apple players |
 | Android extractAudio batching | `ExtractAudio.kt`, the `FEATURE_MultipleFrames` check (Android 15+) | Force the one-frame path | 5–9× slower captions audio on the S24 |
