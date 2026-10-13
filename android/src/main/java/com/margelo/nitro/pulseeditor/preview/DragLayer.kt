@@ -104,9 +104,9 @@ internal class DragLayer(
 
     override fun onPlayerError(error: PlaybackException) {
       // Once: the player is let go (its decoder too) and every later seek goes to the composition.
-      // The picture stays up until the preview takes it down (the composition isn't there yet).
       Log.w("PulseEditor", "drag layer failed: ${error.errorCodeName}", error)
       usable = false
+      hide()
       main.post { release() }
       onFailed()
     }
