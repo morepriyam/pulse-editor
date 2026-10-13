@@ -8,11 +8,15 @@ import android.util.Log
 import android.view.Surface
 import android.view.TextureView
 import android.view.View
+import android.view.PixelCopy
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.annotation.OptIn
 import androidx.media3.common.C
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.common.util.Size
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -23,6 +27,7 @@ import com.facebook.proguard.annotations.DoNotStrip
 import com.facebook.react.uimanager.ThemedReactContext
 import com.margelo.nitro.core.Promise
 import com.margelo.nitro.pulseeditor.merge.Merge
+import com.margelo.nitro.pulseeditor.preview.DragLayer
 import com.margelo.nitro.pulseeditor.preview.PreviewComposition
 import kotlin.math.abs
 import kotlin.math.min
@@ -45,12 +50,22 @@ import kotlinx.coroutines.withContext
  * effects run (rotate, crop...), so it can't tell when an edited frame is on screen; the
  * TextureView reports every frame that reaches it. Drafts are SDR (conform), which a TextureView
  * shows as well as a SurfaceView.
+ *
+ * Drags show through a plain player on top (DragLayer) until the composition shows the frame the
+ * drag ended on.
  */
 @OptIn(UnstableApi::class)
 @DoNotStrip
 class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulsePreviewSpec() {
   private val texture = TextureView(context)
-  override val view: View = texture
+  /** Drags show the clip under the finger through a plain player on top (DragLayer). */
+  private val drag = DragLayer(context, { clip, ptsUs, releaseNs -> onDragFrame(clip, ptsUs, releaseNs) }, { onLayerFailed() })
+  private val root = Container(context).apply {
+    val full = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+    addView(texture, full)
+    addView(drag.box, FrameLayout.LayoutParams(full))
+  }
+  override val view: View = root
   private var videoSurface: Surface? = null
   /** The surface the player draws into (CompositionPlayer only clears the one it was given). */
   private var attachedSurface: Surface? = null
@@ -62,8 +77,12 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
   private var build: Job? = null
   private var changed = false
   private var durationMs = 0.0
-  /** Each clip's place on the timeline and its frame grid, for frame-exact seeks. */
-  private class Slot(val startMs: Double, val durationMs: Double, val trimStartMs: Double, val speed: Double, val fps: Double)
+  /** Each clip's place on the timeline and its frame grid, for frame-exact seeks; for the drag
+   * layer, the clip itself, its upright size, and whether the layer can draw it as the composition does. */
+  private class Slot(
+    val startMs: Double, val durationMs: Double, val trimStartMs: Double, val speed: Double, val fps: Double,
+    val clip: MergeClip, val size: VideoSize?, val layerOk: Boolean,
+  )
   private var slots: List<Slot> = emptyList()
   private var ready = false
 
@@ -91,11 +110,30 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
   // Seeks: the latest target, its start, and every caller still waiting for a frame.
   private var seekTargetUs = C.TIME_UNSET
   private var lastFrameUs = C.TIME_UNSET
+  /** The release time of the frame on screen, and when the composition was last sent elsewhere
+   * (a seek, a new timeline): a frame released before that isn't where the composition is going. */
+  private var lastFrameReleaseNs = C.TIME_UNSET
+  private var compositionMovedNs = 0L
   private var seekStartNs = 0L
   private val pendingSeeks = mutableListOf<Promise<Double>>()
   /** The millisecond last passed to the player's seekTo (or setComposition), to keep seeks real. */
   private var lastSentMs = C.TIME_UNSET
-  private val seekTimeout = Runnable { finishSeeks(player?.currentPosition?.toDouble() ?: 0.0) }
+  /** A drag is on (setScrubbing): seeks go to the drag layer. */
+  private var scrubbing = false
+  /** This drag runs on the composition in Media3's scrubbing mode: the layer failed, or can't draw a clip it reached. */
+  private var compositionScrub = false
+  /** The drag layer is up (from a drag's start until the composition shows where it ended). */
+  private var dragging = false
+  private var dragEndNs = 0L
+  /** The drag layer's latest target: its clip, the source frame asked for, and that frame's timeline time. */
+  private var dragClip = -1
+  private var dragSourceUs = C.TIME_UNSET
+  private var dragTimelineMs = 0.0
+  /** The frame the drag layer last drew (its clip and source time). */
+  private var layerClip = -1
+  private var layerPtsUs = C.TIME_UNSET
+  // A seek that never showed: resolved with where the picture is (the layer's target while it's up).
+  private val seekTimeout = Runnable { finishSeeks(if (dragging) dragTimelineMs else player?.currentPosition?.toDouble() ?: 0.0) }
 
   private val ticker = object : Runnable {
     override fun run() {
@@ -150,9 +188,11 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
         return true
       }
 
-      // A new frame reached the view: it's drawn in this frame.
+      // A new frame reached the view: it's drawn in this frame. The view takes it after this
+      // callback (the texture's timestamp here is still the previous frame's on the S24), so the
+      // frame is looked up once this draw is done.
       override fun onSurfaceTextureUpdated(st: SurfaceTexture) {
-        onShown(st.timestamp)
+        main.post { onShown(st.timestamp) }
       }
     }
   }
@@ -186,13 +226,28 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
         slots = list.zip(media).map { (c, m) ->
           val length = com.margelo.nitro.pulseeditor.merge.MergePlan.timelineMs(c, m)
           val trimmed = c.endMs > c.startMs
-          Slot(at, length, if (trimmed) c.startMs else 0.0, c.speed, m.video?.fps?.takeIf { it > 0 } ?: options.fps).also { at += length }
+          val v = m.video
+          // The layer is a plain player on a TextureView: no tone mapping (HDR, 10-bit), quarter turns only.
+          val layerOk = v != null && v.transfer == Transfer.SDR && v.bitDepth <= 8 && c.rotation.roundToInt() % 90 == 0
+          val upright = v?.let {
+            if (it.rotation.roundToInt() % 180 == 90) VideoSize(it.height.toInt(), it.width.toInt()) else VideoSize(it.width.toInt(), it.height.toInt())
+          }
+          Slot(at, length, if (trimmed) c.startMs else 0.0, c.speed, v?.fps?.takeIf { it > 0 } ?: options.fps, c, upright, layerOk)
+            .also { at += length }
         }
         durationMs = at
+        drag.setCanvas(options.width, options.height)
+        // The layer loads its clip again on its next seek. Over a hand-off it stays up until the
+        // composition shows that frame (taking it down now would flash the frame before the drag).
+        if (!scrubbing) {
+          if (dragging) drag.forget() else drag.invalidate()
+          layerClip = -1
+        }
         val p = ensurePlayer()
         val first = p.playbackState == Player.STATE_IDLE
         inFlight.clear()
         compositionSetNs = System.nanoTime()
+        compositionMovedNs = compositionSetNs
         if (first) {
           awaitingFirstFrame = true
           p.setComposition(composition)
@@ -271,9 +326,15 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     val match = inFlight.indexOfFirst { it.second == timestampNs }
     if (match < 0) {
       // Matched by order (no texture timestamp): frames a scrub released but never drew would be
-      // taken for this one. A frame reaches the view within a refresh or two of its release time.
-      val stale = System.nanoTime() - STALE_FRAME_MS * 1_000_000
-      while (inFlight.size > 1 && inFlight.first().second < stale) inFlight.removeFirst()
+      // taken for this one. A frame reaches the view within a refresh or two of its release time,
+      // and one released before the last seek (or timeline) that hasn't by now was flushed by it
+      // (frames released just before a pause, then a seek: else the seek's frame is taken for one
+      // of those and its seek waits). Not the latest one: frames are released into the effects
+      // pipeline, so later ones can be on their way behind the one drawn.
+      val now = System.nanoTime()
+      val stale = now - STALE_FRAME_MS * 1_000_000
+      val flushed = minOf(compositionMovedNs, now - FLUSHED_FRAME_MS * 1_000_000)
+      while (inFlight.size > 1 && (inFlight.first().second < stale || inFlight.first().second < flushed)) inFlight.removeFirst()
     }
     val (presentationTimeUs, releaseTimeNs) = when {
       match >= 0 -> inFlight[match].also { repeat(match + 1) { inFlight.removeFirst() } }
@@ -285,6 +346,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
       Log.i("PulseEditor", "Preview frames matched by order (texture timestamp $timestampNs, release $releaseTimeNs)")
     }
     lastFrameUs = presentationTimeUs
+    lastFrameReleaseNs = releaseTimeNs
     val shownNs = System.nanoTime()
     val afterShown = REFRESH_MARGIN_MS
     if (awaitingFirstFrame) {
@@ -312,12 +374,24 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
       // Told once it's up, unless a newer seek replaced the target meanwhile.
       main.postDelayed({ if (seekTargetUs == target) finishSeeks(presentationTimeUs / 1000.0) }, afterShown)
     }
+    // The composition is back on the drag's end frame (or playing on from it): take the layer down
+    // once that frame is up.
+    if (dragging && !scrubbing && releaseTimeNs != C.TIME_UNSET && releaseTimeNs > dragEndNs &&
+      (seekTargetUs == C.TIME_UNSET || (presentationTimeUs >= seekTargetUs - 1_000 && presentationTimeUs < seekTargetUs + frameUs()))) {
+      main.postDelayed({
+        if (dragging && !scrubbing) {
+          dragging = false
+          drag.hide()
+        }
+      }, afterShown)
+    }
     // A frame that reaches the view while paused with no seek waiting (released before a pause and
     // drawn after it, or an edit swapped in): the reported time follows the picture, so the playhead
-    // doesn't sit a frame or two behind it until the next seek or play.
-    if (seekTargetUs == C.TIME_UNSET && player?.isPlaying != true) {
+    // doesn't sit a frame or two behind it until the next seek or play. Not under the drag layer:
+    // the time is the layer's then.
+    if (seekTargetUs == C.TIME_UNSET && player?.isPlaying != true && !dragging) {
       main.postDelayed({
-        if (seekTargetUs == C.TIME_UNSET && player?.isPlaying != true) onTime(presentationTimeUs / 1000.0, false)
+        if (seekTargetUs == C.TIME_UNSET && player?.isPlaying != true && !dragging) onTime(presentationTimeUs / 1000.0, false)
       }, afterShown)
     }
   }
@@ -335,8 +409,8 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     val slot = slots.lastOrNull { it.startMs <= timeMs + 0.001 } ?: return timeMs
     // Sped up past the canvas rate, the clip plays on the canvas's frame grid (merge keeps a
     // frame per canvas frame), counted from the clip's start.
-    val outputMs = 1000 / options.fps.coerceAtLeast(1.0)
-    if (1000 / slot.fps / slot.speed < outputMs - 0.01) {
+    if (spedPastCanvas(slot)) {
+      val outputMs = 1000 / options.fps.coerceAtLeast(1.0)
       return slot.startMs + kotlin.math.floor((timeMs - slot.startMs) / outputMs + 1e-6) * outputMs
     }
     val sourceMs = slot.trimStartMs + (timeMs - slot.startMs) * slot.speed
@@ -358,16 +432,32 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
   private fun shownTimeMs(p: CompositionPlayer): Double =
     if (lastFrameUs != C.TIME_UNSET) lastFrameUs / 1000.0 else p.currentPosition.toDouble()
 
-  private fun startSeek(p: CompositionPlayer, target: Long) {
-    // Already showing that frame, with no seek on its way: nothing new will be drawn.
+  /**
+   * The composition shows the frame a seek to `target` ms lands on (the first frame starting at or
+   * after it, matched as onShown matches a seek's frame), released after it was last sent anywhere,
+   * and no seek is on its way: a seek there would draw nothing new.
+   */
+  private fun compositionShows(target: Long): Boolean {
     val shown = lastFrameUs
-    if (!p.isPlaying && seekTargetUs == C.TIME_UNSET && shown != C.TIME_UNSET && target * 1000 >= shown && target * 1000 < shown + frameUs()) {
+    return seekTargetUs == C.TIME_UNSET && shown != C.TIME_UNSET && lastFrameReleaseNs != C.TIME_UNSET &&
+      lastFrameReleaseNs > compositionMovedNs && shown >= target * 1000 - 1_000 && shown < target * 1000 + frameUs()
+  }
+
+  private fun startSeek(p: CompositionPlayer, target: Long) {
+    // Already showing that frame, with no seek on its way: nothing new will be drawn (and the drag
+    // layer over it, showing the same frame, can come down).
+    if (!p.isPlaying && compositionShows(target)) {
       lastSeekMs = 0.0
-      finishSeeks(shown / 1000.0)
+      if (dragging && !scrubbing) {
+        dragging = false
+        drag.hide()
+      }
+      finishSeeks(lastFrameUs / 1000.0)
       return
     }
     seekTargetUs = target * 1000
     seekStartNs = System.nanoTime()
+    compositionMovedNs = seekStartNs
     main.removeCallbacks(seekTimeout)
     main.postDelayed(seekTimeout, SEEK_TIMEOUT_MS)
     // The millisecond last sent again: ExoPlayer skips a seek to the millisecond it's at, so the
@@ -387,7 +477,8 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
   private fun slotAt(timeMs: Double): Slot? = slots.lastOrNull { it.startMs <= timeMs + 0.001 }
 
   override fun play() {
-    main.post { player?.play() }
+    // A drag holds the picture.
+    main.post { if (!scrubbing) player?.play() }
   }
 
   override fun pause() {
@@ -402,8 +493,17 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
         promise.resolve(0.0)
         return@post
       }
+      val t = timeMs.coerceIn(0.0, maxOf(0.0, durationMs - 1))
+      if (scrubbing && slots.isNotEmpty()) {
+        pendingSeeks += promise
+        if (compositionScrub || !layerCan(t)) {
+          scrubOnComposition(p)
+          startSeek(p, kotlin.math.floor(frameStartMs(t)).toLong())
+        } else dragSeek(t)
+        return@post
+      }
       // Whole milliseconds, rounded down: the first frame at or after it is the one starting there.
-      val target = kotlin.math.floor(frameStartMs(timeMs.coerceIn(0.0, maxOf(0.0, durationMs - 1)))).toLong()
+      val target = kotlin.math.floor(frameStartMs(t)).toLong()
       // Every seek goes to the player at once (in scrubbing mode it keeps only the latest);
       // callers all resolve when the latest target is on screen.
       pendingSeeks += promise
@@ -413,12 +513,143 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
   }
 
   override fun setScrubbing(scrubbing: Boolean) {
-    main.post { player?.setScrubbingModeEnabled(scrubbing) }
+    main.post {
+      val p = player
+      if (scrubbing == this.scrubbing || p == null || slots.isEmpty()) {
+        this.scrubbing = scrubbing && p != null && slots.isNotEmpty()
+        return@post
+      }
+      this.scrubbing = scrubbing
+      if (scrubbing) {
+        // The drag starts on the frame on screen (the layer's, if it's still up after the last
+        // drag), so the layer comes up without a jump.
+        if (p.isPlaying) p.pause()
+        val from = if (dragging) dragTimelineMs else shownTimeMs(p)
+        if (layerCan(from)) {
+          // A composition seek on its way (the last drag's hand-off) would land mid-drag: the drag replaces it.
+          seekTargetUs = C.TIME_UNSET
+          dragging = true
+          drag.arm()
+          dragSeek(from)
+        } else {
+          val layerUp = dragging
+          scrubOnComposition(p)
+          if (layerUp) startSeek(p, kotlin.math.floor(frameStartMs(from)).toLong())
+        }
+      } else {
+        // Let go: the composition goes to where the drag ended (a seek() that follows replaces
+        // this target), also when the layer's first frame never came; the layer stays up until
+        // that frame is on screen.
+        dragEndNs = System.nanoTime()
+        if (compositionScrub) {
+          compositionScrub = false
+          compositionMovedNs = dragEndNs
+          p.setScrubbingModeEnabled(false)
+        } else startSeek(p, kotlin.math.floor(frameStartMs(dragTimelineMs)).toLong())
+      }
+    }
+  }
+
+  /** The rest of this drag runs on the composition, in Media3's scrubbing mode (as before the drag layer). */
+  private fun scrubOnComposition(p: CompositionPlayer) {
+    if (compositionScrub) return
+    compositionScrub = true
+    dragging = false
+    drag.hide()
+    p.setScrubbingModeEnabled(true)
+  }
+
+  /** The drag layer's player failed: the rest of the drag goes to the composition. */
+  private fun onLayerFailed() {
+    val p = player ?: return
+    if (!scrubbing) return
+    scrubOnComposition(p)
+    startSeek(p, kotlin.math.floor(frameStartMs(dragTimelineMs)).toLong())
+  }
+
+  private fun slotIndexAt(timeMs: Double): Int = slots.indexOfLast { it.startMs <= timeMs + 0.001 }.coerceAtLeast(0)
+
+  /** The clip's frames come faster than the canvas's (sped up, or a higher frame rate): it plays on the canvas's grid. */
+  private fun spedPastCanvas(s: Slot) = 1000 / s.fps / s.speed < 1000 / options.fps.coerceAtLeast(1.0) - 0.01
+
+  /** The drag layer can draw the clip under `timeMs` as the composition does. */
+  private fun layerCan(timeMs: Double): Boolean = drag.usable && slots.getOrNull(slotIndexAt(timeMs))?.layerOk == true
+
+  /** Where the source frame the timeline shows at `timeMs` starts in slot `s`'s file, in ms. */
+  private fun sourceFrameMs(s: Slot, timeMs: Double): Double {
+    val frameMs = 1000 / s.fps
+    val first = kotlin.math.ceil(s.trimStartMs / frameMs - 1e-6)
+    val frame = if (spedPastCanvas(s)) {
+      // On the canvas's grid: after a seek to a canvas frame the composition shows the first
+      // source frame at or after it (its frame dropper starts over there), not the one before.
+      val sourceMs = s.trimStartMs + (frameStartMs(timeMs) - s.startMs) * s.speed
+      maxOf(first, kotlin.math.ceil(sourceMs / frameMs - 1e-6))
+    } else {
+      val sourceMs = s.trimStartMs + (timeMs - s.startMs) * s.speed
+      maxOf(first, kotlin.math.floor(sourceMs / frameMs + 1e-6))
+    }
+    return frame * frameMs
+  }
+
+  /**
+   * A drag seek: the source frame of the clip under `timeMs` (the frame the timeline shows
+   * there), through the drag layer's player. Callers resolve when it's on the layer.
+   */
+  private fun dragSeek(timeMs: Double) {
+    val index = slotIndexAt(timeMs)
+    val slot = slots[index]
+    val frameStart = sourceFrameMs(slot, timeMs)
+    val sourceUs = (frameStart * 1000).toLong()
+    val frameUs = (1_000_000 / slot.fps).toLong()
+    // Already the layer's target and on it: ExoPlayer would drop the seek (it's at that position),
+    // so no frame would come; the callers are told now.
+    val onLayer = drag.shown && index == dragClip && sourceUs == dragSourceUs && layerClip == index &&
+      layerPtsUs >= sourceUs - 1_000 && layerPtsUs < sourceUs + frameUs
+    dragClip = index
+    dragSourceUs = sourceUs
+    dragTimelineMs = slot.startMs + (frameStart - slot.trimStartMs) / slot.speed
+    if (onLayer) {
+      lastSeekMs = 0.0
+      finishSeeks(dragTimelineMs)
+      return
+    }
+    seekStartNs = System.nanoTime()
+    main.removeCallbacks(seekTimeout)
+    main.postDelayed(seekTimeout, SEEK_TIMEOUT_MS)
+    drag.seek(index, slot.clip, slot.size, kotlin.math.floor(frameStart).toLong(), frameUs)
+  }
+
+  /** A frame reached the drag layer: show the layer, report its time, resolve the drag's seeks. */
+  private fun onDragFrame(clip: Int, ptsUs: Long, releaseNs: Long) {
+    layerClip = clip
+    layerPtsUs = ptsUs
+    // Only while a drag is on the layer: a late frame after letting go isn't the picture (and must
+    // not resolve a seek that came after).
+    if (!dragging || clip != dragClip || !scrubbing) return
+    framesShown++
+    val slot = slots.getOrNull(clip) ?: return
+    val timeMs = slot.startMs + (ptsUs / 1000.0 - slot.trimStartMs) / slot.speed
+    if (!drag.shown) drag.show()
+    onTime(timeMs, false)
+    val frameUs = (1_000_000 / slot.fps).toLong()
+    if (ptsUs >= dragSourceUs - 1_000 && ptsUs < dragSourceUs + frameUs) {
+      lastSeekMs = (System.nanoTime() - seekStartNs) / 1e6
+      val releasedMs = if (releaseNs == C.TIME_UNSET) "?" else "${((releaseNs - seekStartNs) / 1e6).roundToInt()}"
+      Log.i("PulseEditor", "preview drag seek target=${dragTimelineMs.roundToInt()} released=+$releasedMs shown=+${lastSeekMs.roundToInt()}")
+      val target = dragSourceUs
+      main.postDelayed({
+        if (dragSourceUs == target && scrubbing && pendingSeeks.isNotEmpty()) finishSeeks(timeMs)
+      }, REFRESH_MARGIN_MS)
+    }
   }
 
   override fun snapshot(): Promise<String> {
     val promise = Promise<String>()
     main.post {
+      if (drag.shown) {
+        snapshotScreen(promise)
+        return@post
+      }
       // The frame the view shows now.
       val bitmap = texture.bitmap
       if (bitmap == null) {
@@ -435,6 +666,30 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     return promise
   }
 
+  /** What the preview shows on screen (the drag layer is a view on top: TextureView.getBitmap
+   * of the composition wouldn't have it). */
+  private fun snapshotScreen(promise: Promise<String>) {
+    val window = context.currentActivity?.window
+    if (window == null || root.width <= 0 || root.height <= 0) {
+      promise.reject(IllegalStateException("No window to copy the frame from."))
+      return
+    }
+    val at = IntArray(2).also { root.getLocationInWindow(it) }
+    val bitmap = android.graphics.Bitmap.createBitmap(root.width, root.height, android.graphics.Bitmap.Config.ARGB_8888)
+    PixelCopy.request(window, android.graphics.Rect(at[0], at[1], at[0] + root.width, at[1] + root.height), bitmap, { result ->
+      if (result != PixelCopy.SUCCESS) {
+        promise.reject(IllegalStateException("Couldn't copy the frame ($result)."))
+        return@request
+      }
+      scope.launch(Dispatchers.IO) {
+        val file = Merge.outputFile(context, "frame", "jpg")
+        file.parentFile?.mkdirs()
+        file.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.JPEG, 92, it) }
+        promise.resolve(Uri.fromFile(file).toString())
+      }
+    }, main)
+  }
+
   override fun stats(): PreviewStats = PreviewStats(firstFrameMs, lastSeekMs, lastSwapMs, framesShown, framesDropped)
 
   override fun onDropView() {
@@ -442,6 +697,12 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
       main.removeCallbacks(ticker)
       main.removeCallbacks(seekTimeout)
       scope.cancel()
+      // Nothing more will be drawn: whoever still waits gets the time on screen.
+      val waiting = pendingSeeks.toList()
+      pendingSeeks.clear()
+      val at = if (dragging) dragTimelineMs else if (lastFrameUs != C.TIME_UNSET) lastFrameUs / 1000.0 else 0.0
+      waiting.forEach { it.resolve(at) }
+      drag.release()
       player?.release()
       player = null
     }
@@ -454,5 +715,25 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     const val REFRESH_MARGIN_MS = 20L
     /** Older than this since its release time, a frame matched by order is one that never drew. */
     const val STALE_FRAME_MS = 300L
+    /** Released before the last seek and this long ago without being drawn: that seek flushed it. */
+    const val FLUSHED_FRAME_MS = 50L
+  }
+}
+
+/** React Native lays out only the views it manages: a child shown later (the drag layer) would
+ * stay unmeasured, so the container measures and lays itself out again when a child asks. */
+private class Container(context: android.content.Context) : FrameLayout(context) {
+  // Nullable: FrameLayout's constructor can ask for a layout before this is set.
+  private val relayout: Runnable? = Runnable {
+    measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY), MeasureSpec.makeMeasureSpec(height, MeasureSpec.EXACTLY))
+    layout(left, top, right, bottom)
+  }
+
+  override fun requestLayout() {
+    super.requestLayout()
+    relayout?.let {
+      removeCallbacks(it)
+      post(it)
+    }
   }
 }
