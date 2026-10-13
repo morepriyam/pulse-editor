@@ -37,7 +37,10 @@ import java.io.File
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
 /**
@@ -101,9 +104,7 @@ object Conform {
     }
 
     val effects = mutableListOf<Effect>()
-    if (video.fps <= 0 || video.fps.roundToInt() > options.fps.roundToInt()) {
-      effects += FrameDropEffect.createDefaultFrameDropEffect(options.fps.toFloat())
-    }
+    if (dropsFrames(video, options)) effects += FrameDropEffect.createDefaultFrameDropEffect(options.fps.toFloat())
     if (video.mirrored) effects += ScaleAndRotateTransformation.Builder().setScale(-1f, 1f).build()
     effects += Presentation.createForWidthAndHeight(
       options.width.roundToInt(), options.height.roundToInt(), Presentation.LAYOUT_SCALE_TO_FIT)
@@ -115,29 +116,37 @@ object Conform {
     }.build()
   }
 
+  /** Whether the composition adds the frame drop: above the target rate, or when the source's rate is unknown. */
+  private fun dropsFrames(video: ProbeVideo, options: ConformOptions) =
+    video.fps <= 0 || video.fps.roundToInt() > options.fps.roundToInt()
+
   /**
    * A damaged source must not come out with holes: the platform decoder drops the frames it can't
    * decode and Transformer carries on, so the output keeps the source's length with the picture
    * frozen over the gaps (a corrupt 114 s clip came out with 746 of its 3424 frames on a Galaxy
    * S24; AVFoundation conceals the same errors). The output's frame count is compared with the
-   * source's sample count, scaled by the frame drop when the source runs above the target rate.
+   * frames a clean decode of the source would give: its samples from time 0 on, put through the
+   * frame drop's own rule when the composition adds it.
    */
-  private fun checkFrameCount(
+  private suspend fun checkFrameCount(
     context: Context, uri: String, video: ProbeVideo, options: ConformOptions, outputFrames: Int, fallbacks: List<String>,
   ) {
     if (outputFrames <= 0) return  // not reported (Media3 counts only encoded video)
-    val samples = videoSampleCount(context, uri) ?: return
-    val keep = if (video.fps > 0 && video.fps > options.fps) options.fps / video.fps else 1.0
-    val expected = samples * keep
-    Log.i("PulseEditor", "conform frames: $outputFrames written, $samples in the source, ${expected.roundToInt()} expected")
+    val times = videoSampleTimes(context, uri) ?: return
+    val expected = if (dropsFrames(video, options)) framesKept(times, options.fps.toFloat()) else times.size
+    Log.i("PulseEditor", "conform frames: $outputFrames written, ${times.size} in the source, $expected expected")
     if (outputFrames < expected * MIN_FRAME_FRACTION) {
       throw MergeException(
-        (listOf("This phone couldn't decode all of the video ($outputFrames of ${expected.roundToInt()} frames).") + fallbacks).joinToString("; "))
+        (listOf("This phone couldn't decode all of the video ($outputFrames of $expected frames).") + fallbacks).joinToString("; "))
     }
   }
 
-  /** The number of samples in the first video track, from the container's index (no decoding). */
-  private fun videoSampleCount(context: Context, uri: String): Int? {
+  /**
+   * The presentation times of the first video track's samples, in presentation order, without
+   * the edit list's preroll (samples before time 0, which Transformer decodes and drops). Nothing
+   * is decoded, but the extractor reads every sample, so the whole file is read.
+   */
+  private suspend fun videoSampleTimes(context: Context, uri: String): LongArray? {
     val extractor = MediaExtractorCompat(context)
     try {
       extractor.setDataSource(mediaUri(uri), 0)
@@ -145,21 +154,48 @@ object Conform {
         extractor.getTrackFormat(it).getString(MediaFormat.KEY_MIME)?.startsWith("video/") == true
       } ?: return null
       extractor.selectTrack(track)
-      var count = 0
+      val times = ArrayList<Long>()
       while (extractor.sampleTrackIndex >= 0) {
-        count++
+        currentCoroutineContext().ensureActive()
+        val time = extractor.sampleTime
+        if (time >= 0) times += time
         if (!extractor.advance()) break
       }
-      return count
+      return times.toLongArray().apply { sort() }
+    } catch (e: CancellationException) {
+      throw e
     } catch (e: Exception) {
-      Log.w("PulseEditor", "Couldn't count the video samples of $uri", e)
+      Log.w("PulseEditor", "Couldn't read the video samples of $uri", e)
       return null
     } finally {
       extractor.release()
     }
   }
 
-  /** The output may lose this share of the frames the source has (frame-rate rounding, a trailing partial frame). */
+  /**
+   * The frames `FrameDropEffect.createDefaultFrameDropEffect(fps)` passes on for these times
+   * (Media3 1.11.1's DefaultFrameDroppingShaderProgram): the first frame; then a held frame is
+   * passed on when it's closer to the last one passed on + 1/fps than the next frame is; the
+   * frame held at the end of the stream is dropped. It keeps whole frames, so the count isn't the
+   * ratio of the rates (a constant 47 fps source keeps half its frames at 30).
+   */
+  private fun framesKept(times: LongArray, fps: Float): Int {
+    if (times.isEmpty()) return 0
+    val targetDeltaUs = (C.MICROS_PER_SECOND / fps).toLong()
+    var kept = 1
+    var last = times[0]
+    var previous = times[0]
+    for (i in 1 until times.size) {
+      if (i > 1 && abs(previous - last - targetDeltaUs) < abs(times[i] - last - targetDeltaUs)) {
+        kept++
+        last = previous
+      }
+      previous = times[i]
+    }
+    return kept
+  }
+
+  /** An output below this share of the expected frames lost them to the decoder (a clean one has them all, ± a frame). */
   private const val MIN_FRAME_FRACTION = 0.8
 
   /**
