@@ -124,6 +124,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
   private var compositionScrub = false
   /** The drag layer is up (from a drag's start until the composition shows where it ended). */
   private var dragging = false
+  /** From when a composition frame can take the layer's place: letting go, or the drag moving to the composition. */
   private var dragEndNs = 0L
   /** The drag layer's latest target: its clip, the source frame asked for, and that frame's timeline time. */
   private var dragClip = -1
@@ -133,7 +134,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
   private var layerClip = -1
   private var layerPtsUs = C.TIME_UNSET
   // A seek that never showed: resolved with where the picture is (the layer's target while it's up).
-  private val seekTimeout = Runnable { finishSeeks(if (dragging) dragTimelineMs else player?.currentPosition?.toDouble() ?: 0.0) }
+  private val seekTimeout = Runnable { finishSeeks(if (dragging && !compositionScrub) dragTimelineMs else player?.currentPosition?.toDouble() ?: 0.0) }
 
   private val ticker = object : Runnable {
     override fun run() {
@@ -374,12 +375,12 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
       // Told once it's up, unless a newer seek replaced the target meanwhile.
       main.postDelayed({ if (seekTargetUs == target) finishSeeks(presentationTimeUs / 1000.0) }, afterShown)
     }
-    // The composition is back on the drag's end frame (or playing on from it): take the layer down
-    // once that frame is up.
-    if (dragging && !scrubbing && releaseTimeNs != C.TIME_UNSET && releaseTimeNs > dragEndNs &&
+    // The composition is back on the drag's end frame (or playing on from it), or on the frame the
+    // drag moved to it on: take the layer down once that frame is up.
+    if (compositionTakesOver() && releaseTimeNs != C.TIME_UNSET && releaseTimeNs > dragEndNs &&
       (seekTargetUs == C.TIME_UNSET || (presentationTimeUs >= seekTargetUs - 1_000 && presentationTimeUs < seekTargetUs + frameUs()))) {
       main.postDelayed({
-        if (dragging && !scrubbing) {
+        if (compositionTakesOver()) {
           dragging = false
           drag.hide()
         }
@@ -448,7 +449,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     // layer over it, showing the same frame, can come down).
     if (!p.isPlaying && compositionShows(target)) {
       lastSeekMs = 0.0
-      if (dragging && !scrubbing) {
+      if (compositionTakesOver()) {
         dragging = false
         drag.hide()
       }
@@ -550,14 +551,20 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     }
   }
 
-  /** The rest of this drag runs on the composition, in Media3's scrubbing mode (as before the drag layer). */
+  /**
+   * The rest of this drag runs on the composition, in Media3's scrubbing mode (as before the drag
+   * layer). The layer stays up until the composition shows where the drag is: the composition
+   * wasn't sent anywhere while the layer had the drag, so it still shows where the drag started.
+   */
   private fun scrubOnComposition(p: CompositionPlayer) {
     if (compositionScrub) return
     compositionScrub = true
-    dragging = false
-    drag.hide()
+    dragEndNs = System.nanoTime()
     p.setScrubbingModeEnabled(true)
   }
+
+  /** The layer is up and the composition has the picture now (let go, or the drag moved to it). */
+  private fun compositionTakesOver() = dragging && (!scrubbing || compositionScrub)
 
   /** The drag layer's player failed: the rest of the drag goes to the composition. */
   private fun onLayerFailed() {
@@ -623,9 +630,9 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
   private fun onDragFrame(clip: Int, ptsUs: Long, releaseNs: Long) {
     layerClip = clip
     layerPtsUs = ptsUs
-    // Only while a drag is on the layer: a late frame after letting go isn't the picture (and must
-    // not resolve a seek that came after).
-    if (!dragging || clip != dragClip || !scrubbing) return
+    // Only while a drag is on the layer: a late frame after letting go, or after the drag moved to
+    // the composition, isn't the picture (and must not resolve a seek that came after).
+    if (!dragging || clip != dragClip || !scrubbing || compositionScrub) return
     framesShown++
     val slot = slots.getOrNull(clip) ?: return
     val timeMs = slot.startMs + (ptsUs / 1000.0 - slot.trimStartMs) / slot.speed

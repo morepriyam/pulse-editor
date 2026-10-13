@@ -61,6 +61,10 @@ internal class DragLayer(
   private var clipIndex = -1
   private var clip: MergeClip? = null
   private var videoSize: VideoSize? = null
+  /** Since a clip switch, the new clip and its size: applied once its first frame is up, so the old
+   * clip's last frame isn't redrawn with the new clip's geometry while the file loads. */
+  private var pendingClip: MergeClip? = null
+  private var pendingSize: VideoSize? = null
   private var lastSeekMs = -1L
   /** Since a clip switch, until a frame of the new file is up: the source frames asked for (a
    * frame the old file released late is dropped, it isn't one of them) and a frame's length. */
@@ -90,15 +94,19 @@ internal class DragLayer(
   private val listener = object : Player.Listener {
     override fun onVideoSizeChanged(size: VideoSize) {
       if (size.width <= 0 || size.height <= 0) return
+      if (switching) {
+        pendingSize = size
+        return
+      }
       videoSize = size
       applyTransform()
     }
 
     override fun onPlayerError(error: PlaybackException) {
       // Once: the player is let go (its decoder too) and every later seek goes to the composition.
+      // The picture stays up until the preview takes it down (the composition isn't there yet).
       Log.w("PulseEditor", "drag layer failed: ${error.errorCodeName}", error)
       usable = false
-      hide()
       main.post { release() }
       onFailed()
     }
@@ -151,6 +159,11 @@ internal class DragLayer(
       if (sinceSwitchUs.none { frame.first >= it - 1_000 && frame.first < it + frameUs }) return
       switching = false
       sinceSwitchUs.clear()
+      clip = pendingClip
+      videoSize = pendingSize
+      pendingClip = null
+      pendingSize = null
+      applyTransform()
     }
     onFrame(clipIndex, frame.first, frame.second)
   }
@@ -163,15 +176,15 @@ internal class DragLayer(
 
   /**
    * Seek the drag player to `sourceMs` of clip `index` (loading it first if it's another clip).
-   * `size` is the clip's upright size from the probe, so its first frame is drawn with its own
-   * geometry (the player's size report can come a draw later); `frameUs` its frame's length.
+   * `size` is the clip's upright size from the probe, so its first frame gets its own geometry
+   * (the player's size report can come a draw later); `frameUs` its frame's length.
    */
   fun seek(index: Int, c: MergeClip, size: VideoSize?, sourceMs: Long, frameUs: Long) {
     if (!usable) return
     val p = player ?: build()
-    if (index != clipIndex || c.uri != clip?.uri) {
+    if (index != clipIndex || c.uri != (if (switching) pendingClip else clip)?.uri) {
       clipIndex = index
-      videoSize = size
+      pendingSize = size
       inFlight.clear()
       lastSeekMs = -1L
       switching = true
@@ -184,8 +197,11 @@ internal class DragLayer(
       if (sinceSwitchUs.size > 16) sinceSwitchUs.removeAt(0)
     }
     this.frameUs = frameUs
-    clip = c
-    applyTransform()
+    if (switching) pendingClip = c
+    else {
+      clip = c
+      applyTransform()
+    }
     // ExoPlayer drops a seek to the position it's at (a new drag that starts where the last one
     // ended), and in scrubbing mode a later seek waits for that one's frame: 1 ms earlier is the
     // same frame (the first starting at or after it) through a real seek.
@@ -218,6 +234,7 @@ internal class DragLayer(
   fun forget() {
     clipIndex = -1
     clip = null
+    pendingClip = null
   }
 
   fun invalidate() {
@@ -230,6 +247,7 @@ internal class DragLayer(
     player = null
     forget()
     videoSize = null
+    pendingSize = null
     inFlight.clear()
     switching = false
     sinceSwitchUs.clear()
