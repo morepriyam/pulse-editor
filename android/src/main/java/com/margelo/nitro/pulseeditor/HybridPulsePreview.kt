@@ -93,6 +93,8 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
   private var lastFrameUs = C.TIME_UNSET
   private var seekStartNs = 0L
   private val pendingSeeks = mutableListOf<Promise<Double>>()
+  /** The millisecond last passed to the player's seekTo (or setComposition), to keep seeks real. */
+  private var lastSentMs = C.TIME_UNSET
   private val seekTimeout = Runnable { finishSeeks(player?.currentPosition?.toDouble() ?: 0.0) }
 
   private val ticker = object : Runnable {
@@ -194,10 +196,13 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
         if (first) {
           awaitingFirstFrame = true
           p.setComposition(composition)
+          lastSentMs = 0
           p.prepare()
         } else {
           awaitingSwap = true
-          p.setComposition(composition, min(p.currentPosition, durationMs.toLong()))
+          val position = min(p.currentPosition, durationMs.toLong())
+          p.setComposition(composition, position)
+          lastSentMs = position
           if (p.playbackState == Player.STATE_IDLE) p.prepare()
         }
         framesShown = 0.0
@@ -307,6 +312,14 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
       // Told once it's up, unless a newer seek replaced the target meanwhile.
       main.postDelayed({ if (seekTargetUs == target) finishSeeks(presentationTimeUs / 1000.0) }, afterShown)
     }
+    // A frame that reaches the view while paused with no seek waiting (released before a pause and
+    // drawn after it, or an edit swapped in): the reported time follows the picture, so the playhead
+    // doesn't sit a frame or two behind it until the next seek or play.
+    if (seekTargetUs == C.TIME_UNSET && player?.isPlaying != true) {
+      main.postDelayed({
+        if (seekTargetUs == C.TIME_UNSET && player?.isPlaying != true) onTime(presentationTimeUs / 1000.0, false)
+      }, afterShown)
+    }
   }
 
   private fun frameUs(): Long = (1_000_000 / options.fps.coerceAtLeast(1.0)).toLong()
@@ -357,8 +370,21 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     seekStartNs = System.nanoTime()
     main.removeCallbacks(seekTimeout)
     main.postDelayed(seekTimeout, SEEK_TIMEOUT_MS)
+    // The millisecond last sent again: ExoPlayer skips a seek to the millisecond it's at, so the
+    // earlier seek's frame would be the only one coming, and after a drag it can be lost (the settle
+    // seek after a drag timed out on the trims draft). A throwaway seek to another millisecond right
+    // before makes the one to the target real. The throwaway stays inside the target's clip: 1 ms
+    // earlier at a clip's start is in the previous clip (there it goes a canvas frame later, past the
+    // resolve window), where a paused player doesn't draw the
+    // next clip's first frame, and in scrubbing mode the target's seek would queue behind it.
+    // While dragging too, so letting go works whichever of setScrubbing(false) and the settle seek
+    // comes first.
+    if (lastSentMs == target) p.seekTo(if (target > 0 && slotAt(target - 1.0) === slotAt(target.toDouble())) target - 1 else target + kotlin.math.ceil(1000 / options.fps.coerceAtLeast(1.0)).toLong())
+    lastSentMs = target
     p.seekTo(target)
   }
+
+  private fun slotAt(timeMs: Double): Slot? = slots.lastOrNull { it.startMs <= timeMs + 0.001 }
 
   override fun play() {
     main.post { player?.play() }
