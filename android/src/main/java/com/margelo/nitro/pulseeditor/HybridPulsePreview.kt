@@ -93,6 +93,8 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
   private var lastFrameUs = C.TIME_UNSET
   private var seekStartNs = 0L
   private val pendingSeeks = mutableListOf<Promise<Double>>()
+  /** Media3's scrubbing mode is on (a drag). */
+  private var scrubbing = false
   private val seekTimeout = Runnable { finishSeeks(player?.currentPosition?.toDouble() ?: 0.0) }
 
   private val ticker = object : Runnable {
@@ -245,8 +247,10 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
 
   private fun ensurePlayer(): CompositionPlayer = player ?: CompositionPlayer.Builder(context.applicationContext)
     .setLooper(Looper.getMainLooper())
-    // Local files: start after 100 ms of media instead of the default second.
-    .setLoadControl(DefaultLoadControl.Builder().setBufferDurationsMs(500, 3_000, 100, 200).build())
+    // Local files: start after 100 ms of media instead of the default second. The back buffer keeps
+    // what was played, so a seek back inside a clip reads from memory instead of reloading the file.
+    .setLoadControl(
+      DefaultLoadControl.Builder().setBufferDurationsMs(500, 3_000, 100, 200).setBackBuffer(BACK_BUFFER_MS, true).build())
     .build()
     .also { p ->
       p.addListener(listener)
@@ -307,6 +311,14 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
       // Told once it's up, unless a newer seek replaced the target meanwhile.
       main.postDelayed({ if (seekTargetUs == target) finishSeeks(presentationTimeUs / 1000.0) }, afterShown)
     }
+    // A frame that reaches the view while paused with no seek waiting (released before a pause and
+    // drawn after it, or an edit swapped in): the reported time follows the picture, so the playhead
+    // doesn't sit a frame or two behind it until the next seek or play.
+    if (seekTargetUs == C.TIME_UNSET && player?.isPlaying != true) {
+      main.postDelayed({
+        if (seekTargetUs == C.TIME_UNSET && player?.isPlaying != true) onTime(presentationTimeUs / 1000.0, false)
+      }, afterShown)
+    }
   }
 
   private fun frameUs(): Long = (1_000_000 / options.fps.coerceAtLeast(1.0)).toLong()
@@ -353,11 +365,16 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
       finishSeeks(shown / 1000.0)
       return
     }
+    // The millisecond of the seek already on its way: ExoPlayer skips a seek to the position it's
+    // at, so that earlier seek's frame would be the only one coming, and after a drag it can be
+    // lost (the settle seek after a drag timed out on the trims draft). 1 ms earlier is the same
+    // frame (the first starting at or after it) through a real seek.
+    val again = !scrubbing && seekTargetUs == target * 1000
     seekTargetUs = target * 1000
     seekStartNs = System.nanoTime()
     main.removeCallbacks(seekTimeout)
     main.postDelayed(seekTimeout, SEEK_TIMEOUT_MS)
-    p.seekTo(target)
+    p.seekTo(if (again) maxOf(0L, target - 1) else target)
   }
 
   override fun play() {
@@ -387,7 +404,10 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
   }
 
   override fun setScrubbing(scrubbing: Boolean) {
-    main.post { player?.setScrubbingModeEnabled(scrubbing) }
+    main.post {
+      this.scrubbing = scrubbing
+      player?.setScrubbingModeEnabled(scrubbing)
+    }
   }
 
   override fun snapshot(): Promise<String> {
@@ -428,5 +448,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     const val REFRESH_MARGIN_MS = 20L
     /** Older than this since its release time, a frame matched by order is one that never drew. */
     const val STALE_FRAME_MS = 300L
+    /** Played media kept in memory behind the position (a seek back inside it needs no reload). */
+    const val BACK_BUFFER_MS = 30_000
   }
 }
