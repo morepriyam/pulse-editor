@@ -32,11 +32,13 @@ import kotlinx.coroutines.withContext
  * export renders it. Media3 turns the frame upright itself but leaves a mirrored source's flip to
  * us (as in conform). The picture is scaled to fit the maximum size, never up.
  *
- * The extractor is kept warm for the last source: `FrameExtractor` builds and prepares a player
- * per instance (160–600 ms per cover on a Galaxy S24 when every call built one), so covers of the
- * same clip — a cover picker, a strip — pay a seek instead. Its effects don't depend on the edit
- * (only the mirror flip and a size bound), which is what lets the same instance serve every edit;
- * a warm extractor whose effects changed per call returned the previous request's frame.
+ * The extractor is kept warm for the last source: Media3's extractors share one player, which
+ * prepares again whenever the media item changes (160–600 ms per cover on a Galaxy S24 when every
+ * call built and closed one), so covers of the same clip — a cover picker, a strip — pay a seek
+ * instead. Its effects don't depend on the edit (only the mirror flip and a size bound), which is
+ * what lets the same instance serve every edit; a warm extractor whose effects changed per call
+ * returned the previous request's frame. The item carries the file's size and modification time:
+ * a file rewritten at the same path is a new item, so the player can't serve the old file's frame.
  */
 @OptIn(UnstableApi::class)
 internal object FrameGrab {
@@ -52,7 +54,7 @@ internal object FrameGrab {
   private val main = Handler(Looper.getMainLooper())
   private val release = Runnable { closeWarm() }
 
-  /** Covers run one at a time: a call for another source would close the extractor a call in flight waits on. */
+  /** Covers run one at a time: `warm` is read and replaced across the frame's await. */
   private val oneAtATime = Mutex()
 
   suspend fun run(context: Context, uri: String, options: ThumbnailOptions): Thumbnail = oneAtATime.withLock {
@@ -66,7 +68,8 @@ internal object FrameGrab {
     val timeMs = min(max(0.0, options.timeMs), max(0.0, lengthMs - frameMs)).roundToLong()
 
     val (boundW, boundH) = boundedSize(video)
-    val key = "$uri|${video.mirrored}|${boundW}x$boundH"
+    val identity = "$uri|${fileStamp(uri)}"
+    val key = "$identity|${video.mirrored}|${boundW}x$boundH"
     val frame = withContext(Dispatchers.Main) {
       main.removeCallbacks(release)
       val w = warm?.takeIf { it.key == key } ?: run {
@@ -74,7 +77,8 @@ internal object FrameGrab {
         val effects = mutableListOf<Effect>()
         if (video.mirrored) effects += ScaleAndRotateTransformation.Builder().setScale(-1f, 1f).build()
         effects += Presentation.createForWidthAndHeight(boundW, boundH, Presentation.LAYOUT_SCALE_TO_FIT)
-        Warm(key, FrameExtractor.Builder(context, MediaItem.fromUri(mediaUri(uri))).setEffects(effects).build())
+        val item = MediaItem.Builder().setUri(mediaUri(uri)).setMediaId(identity).build()
+        Warm(key, FrameExtractor.Builder(context, item).setEffects(effects).build())
           .also { warm = it }
       }
       try {
@@ -104,6 +108,13 @@ internal object FrameGrab {
       height = bitmap.height.toDouble(),
       timeMs = frame.presentationTimeMs.toDouble(),
     )
+  }
+
+  /** A local file's size and modification time (empty for other URIs). */
+  private fun fileStamp(uri: String): String {
+    val path = mediaUri(uri).takeIf { it.scheme == null || it.scheme == "file" }?.path ?: return ""
+    val file = java.io.File(path)
+    return if (file.exists()) "${file.length()}|${file.lastModified()}" else ""
   }
 
   /** Drops the warm extractor (main thread). */
