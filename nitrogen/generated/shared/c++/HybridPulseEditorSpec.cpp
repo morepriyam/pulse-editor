@@ -19,6 +19,7 @@ namespace margelo::nitro::pulseeditor {
       prototype.registerHybridMethod("thumbnail", &HybridPulseEditorSpec::thumbnail);
       prototype.registerHybridMethod("createMerge", &HybridPulseEditorSpec::createMerge);
       prototype.registerHybridMethod("createConform", &HybridPulseEditorSpec::createConform);
+      prototype.registerHybridMethod("createSeekBench", &HybridPulseEditorSpec::createSeekBench);
     });
   }
 

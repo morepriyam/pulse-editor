@@ -23,6 +23,8 @@ namespace margelo::nitro::pulseeditor { struct Thumbnail; }
 namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
 // Forward declaration of `HybridConformJobSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridConformJobSpec; }
+// Forward declaration of `HybridSeekBenchSpec` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { class HybridSeekBenchSpec; }
 // Forward declaration of `ThumbnailOptions` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ThumbnailOptions; }
 // Forward declaration of `MergeCrop` to properly resolve imports.
@@ -59,6 +61,8 @@ namespace margelo::nitro::pulseeditor { struct ConformOptions; }
 #include "JHybridMergeJobSpec.hpp"
 #include "HybridConformJobSpec.hpp"
 #include "JHybridConformJobSpec.hpp"
+#include "HybridSeekBenchSpec.hpp"
+#include "JHybridSeekBenchSpec.hpp"
 #include "ThumbnailOptions.hpp"
 #include "JThumbnailOptions.hpp"
 #include "MergeCrop.hpp"
@@ -172,6 +176,11 @@ namespace margelo::nitro::pulseeditor {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JHybridConformJobSpec::JavaPart>(jni::alias_ref<jni::JString> /* uri */, jni::alias_ref<JConformOptions> /* options */)>("createConform");
     auto __result = method(_javaPart, jni::make_jstring(uri), JConformOptions::fromCpp(options));
     return __result->getJHybridConformJobSpec();
+  }
+  std::shared_ptr<HybridSeekBenchSpec> JHybridPulseEditorSpec::createSeekBench() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JHybridSeekBenchSpec::JavaPart>()>("createSeekBench");
+    auto __result = method(_javaPart);
+    return __result->getJHybridSeekBenchSpec();
   }
 
 } // namespace margelo::nitro::pulseeditor

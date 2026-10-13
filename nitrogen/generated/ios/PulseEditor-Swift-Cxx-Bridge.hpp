@@ -22,6 +22,8 @@ namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
 namespace margelo::nitro::pulseeditor { class HybridPulseEditorSpec; }
 // Forward declaration of `HybridPulsePreviewSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridPulsePreviewSpec; }
+// Forward declaration of `HybridSeekBenchSpec` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { class HybridSeekBenchSpec; }
 // Forward declaration of `MergeClip` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeClip; }
 // Forward declaration of `MergeCrop` to properly resolve imports.
@@ -38,6 +40,18 @@ namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
 namespace margelo::nitro::pulseeditor { struct ProbeResult; }
 // Forward declaration of `ProbeVideo` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ProbeVideo; }
+// Forward declaration of `SeekBenchDragMode` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { enum class SeekBenchDragMode; }
+// Forward declaration of `SeekBenchDragResult` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct SeekBenchDragResult; }
+// Forward declaration of `SeekBenchDrag` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct SeekBenchDrag; }
+// Forward declaration of `SeekBenchPicture` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct SeekBenchPicture; }
+// Forward declaration of `SeekBenchResult` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct SeekBenchResult; }
+// Forward declaration of `SeekBenchSeek` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct SeekBenchSeek; }
 // Forward declaration of `Thumbnail` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct Thumbnail; }
 // Forward declaration of `Transfer` to properly resolve imports.
@@ -52,6 +66,8 @@ namespace PulseEditor { class HybridMergeJobSpec_cxx; }
 namespace PulseEditor { class HybridPulseEditorSpec_cxx; }
 // Forward declaration of `HybridPulsePreviewSpec_cxx` to properly resolve imports.
 namespace PulseEditor { class HybridPulsePreviewSpec_cxx; }
+// Forward declaration of `HybridSeekBenchSpec_cxx` to properly resolve imports.
+namespace PulseEditor { class HybridSeekBenchSpec_cxx; }
 
 // Include C++ defined types
 #include "AudioPCM.hpp"
@@ -60,6 +76,7 @@ namespace PulseEditor { class HybridPulsePreviewSpec_cxx; }
 #include "HybridMergeJobSpec.hpp"
 #include "HybridPulseEditorSpec.hpp"
 #include "HybridPulsePreviewSpec.hpp"
+#include "HybridSeekBenchSpec.hpp"
 #include "MergeClip.hpp"
 #include "MergeCrop.hpp"
 #include "MergeResult.hpp"
@@ -68,6 +85,12 @@ namespace PulseEditor { class HybridPulsePreviewSpec_cxx; }
 #include "ProbeAudio.hpp"
 #include "ProbeResult.hpp"
 #include "ProbeVideo.hpp"
+#include "SeekBenchDrag.hpp"
+#include "SeekBenchDragMode.hpp"
+#include "SeekBenchDragResult.hpp"
+#include "SeekBenchPicture.hpp"
+#include "SeekBenchResult.hpp"
+#include "SeekBenchSeek.hpp"
 #include "Thumbnail.hpp"
 #include "Transfer.hpp"
 #include <NitroModules/ArrayBuffer.hpp>
@@ -249,6 +272,116 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
   }
   inline Result_std__shared_ptr_Promise_ConformResult___ create_Result_std__shared_ptr_Promise_ConformResult___(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<Promise<ConformResult>>>::withError(error);
+  }
+  
+  // pragma MARK: std::vector<SeekBenchSeek>
+  /**
+   * Specialized version of `std::vector<SeekBenchSeek>`.
+   */
+  using std__vector_SeekBenchSeek_ = std::vector<SeekBenchSeek>;
+  inline std::vector<SeekBenchSeek> create_std__vector_SeekBenchSeek_(size_t size) noexcept {
+    std::vector<SeekBenchSeek> vector;
+    vector.reserve(size);
+    return vector;
+  }
+  
+  // pragma MARK: std::vector<SeekBenchPicture>
+  /**
+   * Specialized version of `std::vector<SeekBenchPicture>`.
+   */
+  using std__vector_SeekBenchPicture_ = std::vector<SeekBenchPicture>;
+  inline std::vector<SeekBenchPicture> create_std__vector_SeekBenchPicture_(size_t size) noexcept {
+    std::vector<SeekBenchPicture> vector;
+    vector.reserve(size);
+    return vector;
+  }
+  
+  // pragma MARK: std::vector<SeekBenchDragResult>
+  /**
+   * Specialized version of `std::vector<SeekBenchDragResult>`.
+   */
+  using std__vector_SeekBenchDragResult_ = std::vector<SeekBenchDragResult>;
+  inline std::vector<SeekBenchDragResult> create_std__vector_SeekBenchDragResult_(size_t size) noexcept {
+    std::vector<SeekBenchDragResult> vector;
+    vector.reserve(size);
+    return vector;
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<SeekBenchResult>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<SeekBenchResult>>`.
+   */
+  using std__shared_ptr_Promise_SeekBenchResult__ = std::shared_ptr<Promise<SeekBenchResult>>;
+  inline std::shared_ptr<Promise<SeekBenchResult>> create_std__shared_ptr_Promise_SeekBenchResult__() noexcept {
+    return Promise<SeekBenchResult>::create();
+  }
+  inline PromiseHolder<SeekBenchResult> wrap_std__shared_ptr_Promise_SeekBenchResult__(std::shared_ptr<Promise<SeekBenchResult>> promise) noexcept {
+    return PromiseHolder<SeekBenchResult>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const SeekBenchResult& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const SeekBenchResult&)>`.
+   */
+  using Func_void_SeekBenchResult = std::function<void(const SeekBenchResult& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const SeekBenchResult& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_SeekBenchResult_Wrapper final {
+  public:
+    explicit Func_void_SeekBenchResult_Wrapper(std::function<void(const SeekBenchResult& /* result */)>&& func): _function(std::make_unique<std::function<void(const SeekBenchResult& /* result */)>>(std::move(func))) {}
+    inline void call(SeekBenchResult result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const SeekBenchResult& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_SeekBenchResult create_Func_void_SeekBenchResult(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_SeekBenchResult_Wrapper wrap_Func_void_SeekBenchResult(Func_void_SeekBenchResult value) noexcept {
+    return Func_void_SeekBenchResult_Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::vector<double>
+  /**
+   * Specialized version of `std::vector<double>`.
+   */
+  using std__vector_double_ = std::vector<double>;
+  inline std::vector<double> create_std__vector_double_(size_t size) noexcept {
+    std::vector<double> vector;
+    vector.reserve(size);
+    return vector;
+  }
+  
+  // pragma MARK: std::vector<SeekBenchDrag>
+  /**
+   * Specialized version of `std::vector<SeekBenchDrag>`.
+   */
+  using std__vector_SeekBenchDrag_ = std::vector<SeekBenchDrag>;
+  inline std::vector<SeekBenchDrag> create_std__vector_SeekBenchDrag_(size_t size) noexcept {
+    std::vector<SeekBenchDrag> vector;
+    vector.reserve(size);
+    return vector;
+  }
+  
+  // pragma MARK: std::shared_ptr<HybridSeekBenchSpec>
+  /**
+   * Specialized version of `std::shared_ptr<HybridSeekBenchSpec>`.
+   */
+  using std__shared_ptr_HybridSeekBenchSpec_ = std::shared_ptr<HybridSeekBenchSpec>;
+  std::shared_ptr<HybridSeekBenchSpec> create_std__shared_ptr_HybridSeekBenchSpec_(void* NON_NULL swiftUnsafePointer) noexcept;
+  void* NON_NULL get_std__shared_ptr_HybridSeekBenchSpec_(std__shared_ptr_HybridSeekBenchSpec_ cppType);
+  
+  // pragma MARK: std::weak_ptr<HybridSeekBenchSpec>
+  using std__weak_ptr_HybridSeekBenchSpec_ = std::weak_ptr<HybridSeekBenchSpec>;
+  inline std__weak_ptr_HybridSeekBenchSpec_ weakify_std__shared_ptr_HybridSeekBenchSpec_(const std::shared_ptr<HybridSeekBenchSpec>& strong) noexcept { return strong; }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<SeekBenchResult>>>
+  using Result_std__shared_ptr_Promise_SeekBenchResult___ = Result<std::shared_ptr<Promise<SeekBenchResult>>>;
+  inline Result_std__shared_ptr_Promise_SeekBenchResult___ create_Result_std__shared_ptr_Promise_SeekBenchResult___(const std::shared_ptr<Promise<SeekBenchResult>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<SeekBenchResult>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_SeekBenchResult___ create_Result_std__shared_ptr_Promise_SeekBenchResult___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<SeekBenchResult>>>::withError(error);
   }
   
   // pragma MARK: std::optional<ProbeVideo>
@@ -464,6 +597,15 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
   }
   inline Result_std__shared_ptr_HybridConformJobSpec__ create_Result_std__shared_ptr_HybridConformJobSpec__(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<HybridConformJobSpec>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<HybridSeekBenchSpec>>
+  using Result_std__shared_ptr_HybridSeekBenchSpec__ = Result<std::shared_ptr<HybridSeekBenchSpec>>;
+  inline Result_std__shared_ptr_HybridSeekBenchSpec__ create_Result_std__shared_ptr_HybridSeekBenchSpec__(const std::shared_ptr<HybridSeekBenchSpec>& value) noexcept {
+    return Result<std::shared_ptr<HybridSeekBenchSpec>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_HybridSeekBenchSpec__ create_Result_std__shared_ptr_HybridSeekBenchSpec__(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<HybridSeekBenchSpec>>::withError(error);
   }
   
   // pragma MARK: std::function<void(double /* timeMs */, bool /* playing */)>

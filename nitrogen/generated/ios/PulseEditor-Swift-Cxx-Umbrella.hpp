@@ -22,6 +22,8 @@ namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
 namespace margelo::nitro::pulseeditor { class HybridPulseEditorSpec; }
 // Forward declaration of `HybridPulsePreviewSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridPulsePreviewSpec; }
+// Forward declaration of `HybridSeekBenchSpec` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { class HybridSeekBenchSpec; }
 // Forward declaration of `MergeAudio` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeAudio; }
 // Forward declaration of `MergeClip` to properly resolve imports.
@@ -42,6 +44,20 @@ namespace margelo::nitro::pulseeditor { struct ProbeAudio; }
 namespace margelo::nitro::pulseeditor { struct ProbeResult; }
 // Forward declaration of `ProbeVideo` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ProbeVideo; }
+// Forward declaration of `SeekBenchDragMode` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { enum class SeekBenchDragMode; }
+// Forward declaration of `SeekBenchDragResult` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct SeekBenchDragResult; }
+// Forward declaration of `SeekBenchDrag` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct SeekBenchDrag; }
+// Forward declaration of `SeekBenchOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct SeekBenchOptions; }
+// Forward declaration of `SeekBenchPicture` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct SeekBenchPicture; }
+// Forward declaration of `SeekBenchResult` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct SeekBenchResult; }
+// Forward declaration of `SeekBenchSeek` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct SeekBenchSeek; }
 // Forward declaration of `ThumbnailOptions` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ThumbnailOptions; }
 // Forward declaration of `Thumbnail` to properly resolve imports.
@@ -57,6 +73,7 @@ namespace margelo::nitro::pulseeditor { enum class Transfer; }
 #include "HybridMergeJobSpec.hpp"
 #include "HybridPulseEditorSpec.hpp"
 #include "HybridPulsePreviewSpec.hpp"
+#include "HybridSeekBenchSpec.hpp"
 #include "MergeAudio.hpp"
 #include "MergeClip.hpp"
 #include "MergeCrop.hpp"
@@ -67,6 +84,13 @@ namespace margelo::nitro::pulseeditor { enum class Transfer; }
 #include "ProbeAudio.hpp"
 #include "ProbeResult.hpp"
 #include "ProbeVideo.hpp"
+#include "SeekBenchDrag.hpp"
+#include "SeekBenchDragMode.hpp"
+#include "SeekBenchDragResult.hpp"
+#include "SeekBenchOptions.hpp"
+#include "SeekBenchPicture.hpp"
+#include "SeekBenchResult.hpp"
+#include "SeekBenchSeek.hpp"
 #include "Thumbnail.hpp"
 #include "ThumbnailOptions.hpp"
 #include "Transfer.hpp"
@@ -98,6 +122,8 @@ namespace PulseEditor { class HybridMergeJobSpec_cxx; }
 namespace PulseEditor { class HybridPulseEditorSpec_cxx; }
 // Forward declaration of `HybridPulsePreviewSpec_cxx` to properly resolve imports.
 namespace PulseEditor { class HybridPulsePreviewSpec_cxx; }
+// Forward declaration of `HybridSeekBenchSpec_cxx` to properly resolve imports.
+namespace PulseEditor { class HybridSeekBenchSpec_cxx; }
 
 // Include Swift defined types
 #if __has_include("PulseEditor-Swift.h")

@@ -18,6 +18,7 @@
 #include "JHybridMergeJobSpec.hpp"
 #include "JFunc_void_double.hpp"
 #include "JHybridConformJobSpec.hpp"
+#include "JHybridSeekBenchSpec.hpp"
 #include "JHybridPulseEditorSpec.hpp"
 #include "JHybridPulsePreviewSpec.hpp"
 #include "JFunc_void_double_bool.hpp"
@@ -58,6 +59,7 @@ void registerAllNatives() {
   margelo::nitro::pulseeditor::JHybridMergeJobSpec::CxxPart::registerNatives();
   margelo::nitro::pulseeditor::JFunc_void_double_cxx::registerNatives();
   margelo::nitro::pulseeditor::JHybridConformJobSpec::CxxPart::registerNatives();
+  margelo::nitro::pulseeditor::JHybridSeekBenchSpec::CxxPart::registerNatives();
   margelo::nitro::pulseeditor::JHybridPulseEditorSpec::CxxPart::registerNatives();
   margelo::nitro::pulseeditor::JHybridPulsePreviewSpec::CxxPart::registerNatives();
   margelo::nitro::pulseeditor::JFunc_void_double_bool_cxx::registerNatives();
