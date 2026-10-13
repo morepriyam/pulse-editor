@@ -401,14 +401,18 @@ private class SeekBenchPass(
   /**
    * Seek to `targetMs` (a frame start) and wait until that frame reaches the view, or
    * [SEEK_TIMEOUT_MS]. ExoPlayer skips a seek to the position it's already at, so that seek goes
-   * 1 ms earlier: the first frame starting at or after it is still the same frame.
+   * 1 ms earlier: the first frame starting at or after it is still the same frame. At 0 a seek to
+   * 1 ms goes first instead. Releases still queued from before (a drag's frames that never drew)
+   * are dropped, so matching by order can't answer this seek with one of them.
    */
   private suspend fun seekAndWait(kind: String, targetMs: Long, log: Boolean): SeekBenchSeek {
     val same = targetMs == lastSeekPosMs || targetMs == player.currentPosition
-    val seeked = if (same) max(0L, targetMs - 1) else targetMs
+    val seeked = if (same && targetMs > 0) targetMs - 1 else targetMs
     val w = Waiter(targetMs * 1000, System.nanoTime())
     waiter = w
     lastSeekPosMs = seeked
+    synchronized(inFlight) { inFlight.clear() }
+    if (same && targetMs == 0L) player.seekTo(1)
     player.seekTo(seeked)
     val landed = withTimeoutOrNull(SEEK_TIMEOUT_MS) { w.done.await() }
     if (waiter === w) waiter = null

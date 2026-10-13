@@ -228,7 +228,8 @@ export interface SeekBenchSeek {
   /** `paused`, `pre-<drag name>` or `settle-<drag name>`. */
   kind: string;
   /** Where the seek was asked to go (a frame start) and what the player was given (1 ms earlier
-   * when the player already sat at that position, so the seek isn't skipped). */
+   * when the player already sat at that position, so the seek isn't skipped; at 0, 0 after a seek
+   * to 1 ms). */
   targetMs: number;
   seekedMs: number;
   /** Presentation time of the frame that answered it, ms; -1 when none came (timed out). */
