@@ -42,7 +42,9 @@ import kotlinx.coroutines.withContext
  */
 @OptIn(UnstableApi::class)
 internal object FrameGrab {
-  /** Frames are extracted no larger than this on the longer side: enough for any cover, bounded memory. */
+  /** Frames are extracted no larger than this on the longer side, before the edit: bounded memory and
+   * time per cover. A larger `maxWidth`/`maxHeight`, or a tight crop of a 4K source, comes out smaller
+   * than asked on Android (Pulse's covers are 192×256). */
   private const val MAX_FRAME_SIDE = 1920
   /** How long the last source's extractor is kept after a cover. */
   private const val WARM_MS = 4000L
