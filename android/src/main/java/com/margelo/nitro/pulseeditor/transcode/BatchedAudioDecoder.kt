@@ -26,6 +26,7 @@ import androidx.media3.transformer.DefaultCodec
 import androidx.media3.transformer.ExportException
 import java.nio.ByteBuffer
 import java.util.ArrayDeque
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -55,12 +56,12 @@ internal class BatchedAudioDecoderFactory(
       ).firstOrNull()
     }.getOrNull()
     if (decoder == null || decoder.capabilities?.isFeatureSupported(CodecCapabilities.FEATURE_MultipleFrames) != true) {
-      logOnce("audio decoder: default (${decoder?.name ?: "no decoder found"} doesn't batch)")
+      logOnce("default ${decoder?.name}", "audio decoder: default (${decoder?.name ?: "no decoder found"} doesn't batch)")
       return decoders.createForAudioDecoding(format, logSessionId)
     }
     return try {
       BatchedAudioDecoder(format, decoder.name, decoder.codecMimeType, logSessionId).also {
-        logOnce("audio decoder: batched (${it.name}, input ${it.inputBytes / 1024} KB, output ${BATCH_OUTPUT_BYTES / 1024} KB)")
+        logOnce("batched ${it.name}", "audio decoder: batched (${it.name}, input ${it.inputBytes / 1024} KB, output ${BATCH_OUTPUT_BYTES / 1024} KB)")
       }
     } catch (e: Exception) {
       Log.w("PulseEditor", "The batched audio decoder ${decoder.name} didn't start; using Media3's", e)
@@ -73,10 +74,11 @@ internal class BatchedAudioDecoderFactory(
   ): Codec = decoders.createForVideoDecoding(format, outputSurface, requestSdrToneMapping, logSessionId)
 
   private companion object {
-    val logged = AtomicBoolean()
+    /** The decoder choices logged so far (path + decoder name): each one is logged the first time. */
+    val logged: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
-    fun logOnce(message: String) {
-      if (logged.compareAndSet(false, true)) Log.i("PulseEditor", message)
+    fun logOnce(key: String, message: String) {
+      if (logged.add(key)) Log.i("PulseEditor", message)
     }
   }
 }
