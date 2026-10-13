@@ -96,8 +96,7 @@
       [
         "custom",
         {
-          "script": "nitrogen",
-          "clean": "nitrogen/"
+          "script": "nitrogen"
         }
       ],
       [
