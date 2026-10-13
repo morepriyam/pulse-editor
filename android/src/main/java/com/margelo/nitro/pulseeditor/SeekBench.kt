@@ -73,9 +73,6 @@ import kotlinx.coroutines.withTimeoutOrNull
  */
 @DoNotStrip
 class SeekBench : HybridSeekBenchSpec() {
-  /** A pass already running: passes share the screen and the decoder, so they never overlap. */
-  private val running = AtomicBoolean(false)
-
   override fun run(uri: String, options: SeekBenchOptions): Promise<SeekBenchResult> {
     val context = NitroModules.applicationContext
       ?: return Promise.rejected(IllegalStateException("React context not ready"))
@@ -90,6 +87,12 @@ class SeekBench : HybridSeekBenchSpec() {
         running.set(false)
       }
     }
+  }
+
+  private companion object {
+    /** A pass already running, across instances (`seekBench()` creates one per call): passes share
+     * the screen and the decoder, so they never overlap. */
+    val running = AtomicBoolean(false)
   }
 }
 
@@ -156,6 +159,10 @@ private class SeekBenchPass(
   private var decoderInitMs = -1.0
 
   private lateinit var player: ExoPlayer
+
+  /** Low-latency decoding asked for and applied: `KEY_LOW_LATENCY` is API 30+, so on API 29 the
+   * pass runs as a plain one. */
+  private val lowLatency = options.lowLatency && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R
 
   /** Called on the playback thread just before each frame is rendered to the surface. */
   private val frameListener = VideoFrameMetadataListener { ptsUs, releaseNs, _, _ ->
@@ -242,7 +249,7 @@ private class SeekBenchPass(
       if (readyNs == null || firstNs == null) throw IllegalStateException("The player showed no first frame within $PREPARE_TIMEOUT_MS ms.")
       val durationMs = player.duration.toDouble()
       val (lowLatencySupported, instances) = decoderCapabilities(decoder)
-      Log.i(TAG, "seekbench decoder ${decoder.ifEmpty { "?" }} init=${decoderInitMs.roundToInt()} lowLatency=${options.lowLatency} supported=$lowLatencySupported instances=$instances pass=${options.label}")
+      Log.i(TAG, "seekbench decoder ${decoder.ifEmpty { "?" }} init=${decoderInitMs.roundToInt()} lowLatency=$lowLatency supported=$lowLatencySupported instances=$instances pass=${options.label}")
       Log.i(TAG, "seekbench prewarm pass=${options.label} build=+${ms(builtNs - t0).roundToInt()} ready=+${ms(readyNs - t0).roundToInt()} firstFrame=+${ms(firstNs - t0).roundToInt()}")
       delay(options.restMs.toLong())
 
@@ -271,7 +278,7 @@ private class SeekBenchPass(
         label = options.label,
         decoder = decoder,
         decoderInitMs = decoderInitMs,
-        lowLatency = options.lowLatency,
+        lowLatency = lowLatency,
         lowLatencySupported = lowLatencySupported,
         maxDecoderInstances = instances.toDouble(),
         viewMs = viewMs,
@@ -315,7 +322,7 @@ private class SeekBenchPass(
     p.setVideoFrameMetadataListener(frameListener)
     // A drag layer never plays sound: no audio renderer at all, not just while scrubbing.
     p.trackSelectionParameters = p.trackSelectionParameters.buildUpon().setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true).build()
-    if (options.lowLatency && Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+    if (lowLatency) {
       // Applied to the decoder's MediaFormat when it's configured (MediaCodecRenderer
       // .applyCodecParametersToMediaFormat, API 29+); a decoder without FEATURE_LowLatency ignores it.
       p.setVideoCodecParameters(CodecParameters.Builder().setInteger(MediaFormat.KEY_LOW_LATENCY, 1).build())
@@ -327,10 +334,13 @@ private class SeekBenchPass(
    * One drag: start settled on its first frame, turn scrubbing on with the drag's knob, seek at
    * [SeekBenchDrag.hz] for [SeekBenchDrag.durationMs], counting the pictures that reach the view,
    * then let go: scrubbing off, knobs back to exact, and an exact seek to the end target (its time
-   * is the drag's settle). The settle seek is added to [seeks].
+   * is the drag's settle). The seek to the drag's start (`pre-<name>`) and the settle seek are
+   * added to [seeks]; when the first timed out (`shownMs` -1), its frame may still land inside the
+   * drag's window and be counted with the drag's pictures.
    */
   private suspend fun runDrag(d: SeekBenchDrag, durationMs: Double, seeks: MutableList<SeekBenchSeek>): SeekBenchDragResult {
-    seekAndWait("pre-${d.name}", frameStartMs(d.fromMs), log = false)
+    val pre = seekAndWait("pre-${d.name}", frameStartMs(d.fromMs), log = true)
+    seeks += pre
     delay(options.restMs.toLong())
 
     when (d.mode) {
@@ -371,8 +381,9 @@ private class SeekBenchPass(
     delay(options.restMs.toLong())
 
     val windowMs = ms(collector.endNs - collector.startNs)
-    val perSecond = (collector.pictures / (windowMs / 1000) * 10).roundToInt() / 10.0
-    Log.i(TAG, "seekbench drag pass=${options.label} name=${d.name} mode=${d.mode.name.lowercase()} seeks=${collector.seeksIssued} pictures=${collector.pictures} distinct=${collector.distinct.size} perSecond=$perSecond settle=+${settle.shownMs.roundToInt()}")
+    // Distinct frames: a frame drawn twice, or one with no matched release, isn't a new picture.
+    val perSecond = (collector.distinct.size / (windowMs / 1000) * 10).roundToInt() / 10.0
+    Log.i(TAG, "seekbench drag pass=${options.label} name=${d.name} mode=${d.mode.name.lowercase()} seeks=${collector.seeksIssued} pictures=${collector.pictures} distinct=${collector.distinct.size} perSecond=$perSecond pre=+${pre.shownMs.roundToInt()} settle=+${settle.shownMs.roundToInt()}")
     return SeekBenchDragResult(
       name = d.name,
       mode = d.mode,

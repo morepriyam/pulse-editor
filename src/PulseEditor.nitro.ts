@@ -223,9 +223,9 @@ export interface SeekBenchOptions {
   viewHeight: number;
 }
 
-/** Bench only: one landed seek (paused, or the exact settle seek after a drag). */
+/** Bench only: one seek (paused, to a drag's start, or the exact settle seek after a drag). */
 export interface SeekBenchSeek {
-  /** `paused`, or `settle-<drag name>`. */
+  /** `paused`, `pre-<drag name>` or `settle-<drag name>`. */
   kind: string;
   /** Where the seek was asked to go (a frame start) and what the player was given (1 ms earlier
    * when the player already sat at that position, so the seek isn't skipped). */
@@ -262,7 +262,7 @@ export interface SeekBenchDragResult {
   /** The measured window: from the first seek to one period after the last, ms. */
   windowMs: number;
   /** Pictures that reached the view in the window, how many distinct frames they were, and the
-   * pictures per second of window. */
+   * distinct frames per second of window. */
   pictures: number;
   distinctFrames: number;
   picturesPerSecond: number;
@@ -274,7 +274,8 @@ export interface SeekBenchDragResult {
 /** Bench only: one `SeekBench` pass. Times are ms. */
 export interface SeekBenchResult {
   label: string;
-  /** The decoder the player initialised (AnalyticsListener), its init time, and what it supports. */
+  /** The decoder the player initialised (AnalyticsListener), its init time, whether low-latency
+   * decoding was applied (asked for, on API 30+), and what the decoder supports. */
   decoder: string;
   decoderInitMs: number;
   lowLatency: boolean;
