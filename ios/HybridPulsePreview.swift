@@ -76,7 +76,9 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
         guard let self else { return }
         let playing = p.timeControlStatus == .playing
         self.onTime(Self.ms(p.currentTime()), playing)
+        // Follow what plays, not the calls: a swap resumes playback without play().
         if p.timeControlStatus == .paused { Self.audioStopped() }
+        if playing && self.hasAudio { Self.audioPlaying = true }
         if playing { self.startCounting() } else if !self.scrubbing { self.stopCounting() }
       }
     }
@@ -124,7 +126,10 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
         item.audioTimePitchAlgorithm = .spectral  // natural pitch, as the export
         item.seekingWaitsForVideoCompositionRendering = true
         self.durationMs = Self.ms(composed.duration)
+        let hadAudio = self.hasAudio
         self.hasAudio = !composed.composition.tracks(withMediaType: .audio).isEmpty
+        // Sound gone from a playing draft (every clip muted): the output goes idle from now.
+        if hadAudio && !self.hasAudio { Self.audioStopped() }
         self.swap(to: item, started: started)
       } catch is CancellationError {
       } catch {
