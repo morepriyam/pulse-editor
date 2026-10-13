@@ -25,6 +25,11 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
   private var changed = false
   private var durationMs = 0.0
   private var ready = false
+  private var hasAudio = false
+  /// When audio last stopped in this process (0: nothing played yet). The output goes idle a few
+  /// seconds after that, and waking it drops the first ~100-160 ms of a play (iPhone, 2026-10-13).
+  private static var audioStoppedAt = 0.0
+  private static var audioPlaying = false
 
   var clips: [MergeClip] = [] { didSet { changed = true } }
   var options = MergeOptions(width: 1080, height: 1920, fps: 30, bitrate: 5_000_000, audio: MergeAudio(sampleRate: 48_000, channels: 2)) {
@@ -71,6 +76,9 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
         guard let self else { return }
         let playing = p.timeControlStatus == .playing
         self.onTime(Self.ms(p.currentTime()), playing)
+        // Follow what plays, not the calls: a swap resumes playback without play().
+        if p.timeControlStatus == .paused { Self.audioStopped() }
+        if playing && self.hasAudio { Self.audioPlaying = true }
         if playing { self.startCounting() } else if !self.scrubbing { self.stopCounting() }
       }
     }
@@ -118,6 +126,10 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
         item.audioTimePitchAlgorithm = .spectral  // natural pitch, as the export
         item.seekingWaitsForVideoCompositionRendering = true
         self.durationMs = Self.ms(composed.duration)
+        let hadAudio = self.hasAudio
+        self.hasAudio = !composed.composition.tracks(withMediaType: .audio).isEmpty
+        // Sound gone from a playing draft (every clip muted): the output goes idle from now.
+        if hadAudio && !self.hasAudio { Self.audioStopped() }
         self.swap(to: item, started: started)
       } catch is CancellationError {
       } catch {
@@ -202,9 +214,21 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
       // allow for media loading (AVPlayer.h, setRate:time:atHostTime:), which held the picture
       // still for 170-300 ms after a paused seek on a local, prepared item; nothing is loading.
       // Allowed because automaticallyWaitsToMinimizeStalling is off.
-      self.player.setRate(1, time: .invalid, atHostTime: CMClockGetTime(CMClockGetHostTimeClock()))
+      // A cold audio output (idle ≥ 5 s, or never started) takes ~125 ms to its first buffer and
+      // would drop the opening: start the clock that much later (160 ms covers the wake plus the
+      // output latency). Warm plays start now.
+      let now = CACurrentMediaTime()
+      let cold = self.hasAudio && !Self.audioPlaying && (Self.audioStoppedAt == 0 || now - Self.audioStoppedAt >= Self.coldAfter)
+      if self.hasAudio { Self.audioPlaying = true }
+      self.player.setRate(1, time: .invalid, atHostTime: CMTimeAdd(CMClockGetTime(CMClockGetHostTimeClock()), cold ? Self.coldLead : .zero))
     }
   }
+
+  private static func audioStopped() {
+    if audioPlaying { audioPlaying = false; audioStoppedAt = CACurrentMediaTime() }
+  }
+  private static let coldAfter = 5.0
+  private static let coldLead = CMTime(value: 160, timescale: 1000)
 
   func pause() throws {
     DispatchQueue.main.async { self.player.pause() }
@@ -363,6 +387,7 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
       if let observer = self.timeObserver { self.player.removeTimeObserver(observer) }
       self.timeObserver = nil
       self.player.pause()
+      Self.audioStopped()
       self.player.replaceCurrentItem(with: nil)
       self.frameOutput = nil
     }
