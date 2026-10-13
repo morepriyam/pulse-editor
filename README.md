@@ -10,7 +10,7 @@ The native video engine behind [Pulse](https://github.com/mieweb/pulse): fast, s
 
 ## Status: migrating from react-native-video-trim
 
-Pulse is moving every native video method it uses from its react-native-video-trim fork into pulse-editor, **one method at a time**. Each method is added here, switched over in the app, and tested on both phones. `conform` and `thumbnail` are switched over and tested on both phones (2026-10-07), macOS, the Android emulator and the iOS Simulator. `<PulsePreview>`, the player the timeline editor will be built on, shows the export's frames on both phones and meets its speed targets on the iPhone; on the S24 seeks, drags and edits are 2–3× slower than the targets (Media3's decode and composition per seek). RNVT's editor (`showEditor`) is now the only part of the fork Pulse still uses; it moves last.
+Pulse is moving every native video method it uses from its react-native-video-trim fork into pulse-editor, **one method at a time**. Each method is added here, switched over in the app, and tested on both phones. `conform` and `thumbnail` are switched over and tested on both phones (2026-10-07, re-run on both 2026-10-13), macOS, the Android emulator and the iOS Simulator. `<PulsePreview>`, the player the timeline editor will be built on, shows the export's frames on both phones and meets its speed targets on the iPhone; on the S24 drags run on a plain player (about 31 seeks landed/s), while paused seeks (p90 199–294 ms) and the start after a seek (120–239 ms) still miss theirs. RNVT's editor (`showEditor`) is now the only part of the fork Pulse still uses; it moves last.
 
 ✅ done · ⏳ left to do · 📋 not started. Devices: **iPhone 17 Pro Max** (iOS) and **Galaxy S24 Ultra, Android 16** (Android); "macOS" = the same iOS code run on a Mac against references; "emulator" = Android 17 emulator.
 
@@ -24,9 +24,9 @@ Pulse is moving every native video method it uses from its react-native-video-tr
 |  | `merge`: RNVT fallback removed | the FFmpeg merge | ✅ in code: the app merges with pulse-editor only, and an error shows the retry state (tsc, lint, tests; not run on a device since) | ✅ same | 
 | 5 | `extractAudio` → Whisper captions | `extractAudio` | ✅ iPhone: captions (extract 80–180 ms, VAD 128 ms, Whisper 123 ms); macOS: PCM vs FFmpeg reference within 0.1 ms; local whisper.cpp 1.9.3 gives the same transcripts | ✅ S24: captions (extract 0.4–0.8 s, Whisper 1.5 s on CPU); emulator: length and speech onset exact vs FFmpeg; local whisper.cpp gives the same transcripts | 
 | | Cleanups from the whisper.rn audit (VAD comment, real CPU fallback) | | ✅ from whisper.rn 0.7.4's source, not run: the Whisper fallback now asks for the CPU (it only runs if the GPU context fails to load) | ✅ comments only (whisper.rn has no Android GPU backend) | 
-| 6 | `conform`: import normalization, HDR | `compress`, `cancelCompress` | ✅ iPhone (2026-10-07): 42 inputs (the fixtures and the real-recording corpus, 4 already matched) all to contract, no decode errors, lip sync 0.0–0.1 ms, cancel settled 377 ms after the abort with nothing left; HDR tone-mapped (levels −7…−48 below the source, the same as RNVT within a level); 1080p re-encodes 5–7× realtime, 4K Dolby Vision 1.5×; faster than RNVT on 33 of 38 (slower on audio-only) · macOS: 51 of 51 sample files to contract | ✅ S24 (2026-10-07): 38 of 38 converted, HLG / PQ / Dolby Vision included (the emulator couldn't decode them), lip sync 0.0 ms, cancel settled 15 ms, 1080p 4–7× realtime; RNVT's full conform fails on the phone by its own bug · S24 (2026-10-13): a corrupt source is rejected instead of coming out with gaps (746 of 3430 frames; iOS conceals it), odd-timing inputs keep every frame, no full-range level shift, cancel settled 3 ms (see `conform`) · emulator: every 8-bit input | 
-| 7 | `thumbnail` | `getFrameAt` | ✅ iPhone (2026-10-07): 39 of 39 covers (8 edits, HDR, rotated, square, slow motion, screen recording, past the end, the corpus), every one at or above RNVT's match to the FFmpeg reference; RNVT fails past the end and on a < 1 s clip and picks wrong frames on two corpus clips; 22–50 ms per cover (10–20 ms slower than RNVT) · macOS + Simulator: every edit matches merge / FFmpeg | ✅ S24 (2026-10-07): 39 of 39 covers (RNVT fails the < 1 s clip and ignores a mirror), the better match on most · S24 (2026-10-13, a warm extractor per file): later covers of a file 9–44 ms (were 160–600 ms each), the first cover of a file 136–481 ms, the same match to the reference · emulator: every edit matches RNVT and FFmpeg | 
-| 8 | `<PulsePreview>`: composition player | (needed by the editor) | ✅ iPhone (2026-10-07, this code): seeks show the export's frame 79 of 80 (the 1: the sped-up-clip quirk), p95 61–63 ms; first frame 56–122 ms; edits on screen in 41–92 ms, all showing the edit; ~60 pictures/s while dragging; 30 fps, none dropped; play starts in 0 ms (was 169–301) · iPhone (2026-10-13): a play on a cold audio output (idle ≥ 5 s, or nothing played yet) starts the clock 160 ms later, so its first sound isn't cut (from the trace; by ear next); every other play still starts in 1 ms; Release: seeks p90 56–64 ms, 54–62 pictures/s while dragging, edits 42–99 ms, 30 fps (see [`<PulsePreview>`](#pulsepreview)) | ⏳ S24 (2026-10-07): seeks show the export's frame 80 of 80, edits 8 of 8, 29–29.6 fps none dropped, first frame 119–481 ms; but seek p90 239–281 ms, 8–10 pictures/s while dragging, edits on screen 288–491 ms and play starts ~120 ms late — the speed targets are missed; 141 ms of a seek is Media3 decode + composition, 24 ms the view (see [`<PulsePreview>`](#pulsepreview)) · emulator: 60 of 60 in six runs | 
+| 6 | `conform`: import normalization, HDR | `compress`, `cancelCompress` | ✅ iPhone (2026-10-07): 42 inputs (the fixtures and the real-recording corpus, 4 already matched) all to contract, no decode errors, lip sync 0.0–0.1 ms, cancel settled 377 ms after the abort with nothing left; HDR tone-mapped (levels −7…−48 below the source, the same as RNVT within a level); 1080p re-encodes 5–7× realtime, 4K Dolby Vision 1.5×; faster than RNVT on 33 of 38 (slower on audio-only) · iPhone Release (2026-10-13, `ios-ios-rel-conform-1013`): 41 inputs, 38 converted and 3 already matching, the same 7 HDR level flags (−7…−48), lip sync 0.0 / 0.1 ms, cancel settled 753 ms after the abort; 1.1× 2026-10-07's times (median; the iPhone ran slower that day, see [Benchmarks](#benchmarks-on-device)) · macOS: 51 of 51 sample files to contract | ✅ S24 (2026-10-07): 38 of 38 converted, HLG / PQ / Dolby Vision included (the emulator couldn't decode them), lip sync 0.0 ms, cancel settled 15 ms, 1080p 4–7× realtime; RNVT's full conform fails on the phone by its own bug · S24 (2026-10-13, the full corpus `android-s24-conform-pe-1013h-1` and the merged frame rule `android-s24-conform-pe-1013k-1`): 34 converted, 7 passed through (the phone's own recording, and 6 clips that differ from the recorder only in audio layout: Android's import policy now that the app passes the platform to `decideImport`), the corrupt source rejected (746 of 3430 frames; iOS conceals it), every clean source keeps every frame (written = expected, the 60 fps screen recording 645 of 645, a 60 fps clip 600 of 600), HDR levels −10…−65 below the source (the tone map), the 4K HEVC and 23.976 fps HLG clips keep their variable timing, lip sync 0.0 ms, cancel settled 5–12 ms (see `conform`) · emulator: every 8-bit input | 
+| 7 | `thumbnail` | `getFrameAt` | ✅ iPhone (2026-10-07): 37 of 37 covers (8 edits, HDR, rotated, square, slow motion, screen recording, past the end, the corpus), every one at or above RNVT's match to the FFmpeg reference; RNVT fails past the end and on a < 1 s clip and picks wrong frames on two corpus clips; 22–50 ms per cover (10–20 ms slower than RNVT) · iPhone Release (2026-10-13, `ios-ios-rel-thumb-1013`): 37 of 37, the same match to the reference; 37–849 ms per cover (median 107), 2.3× 2026-10-07's, RNVT 2.3× too (the iPhone that day) · macOS + Simulator: every edit matches merge / FFmpeg | ✅ S24 (2026-10-07): 37 of 37 covers (RNVT fails the < 1 s clip and ignores a mirror), the better match on most · S24 (2026-10-13, a warm extractor per file; `android-s24-thumb-1013j-1`, the merged code): 37 of 37, the same match to the reference (PSNR unchanged), median per call 15 ms; later covers of a file 10–40 ms (were 160–600 ms each), a file's first cover 144–516 ms · emulator: every edit matches RNVT and FFmpeg | 
+| 8 | `<PulsePreview>`: composition player | (needed by the editor) | ✅ iPhone (2026-10-07, this code): seeks show the export's frame 79 of 80 (the 1: the sped-up-clip quirk), p95 61–63 ms; first frame 56–122 ms; edits on screen in 41–92 ms, all showing the edit; ~60 pictures/s while dragging; 30 fps, none dropped; play starts in 0 ms (was 169–301) · iPhone (2026-10-13): a play on a cold audio output (idle ≥ 5 s, or nothing played yet) starts the clock 160 ms later, so its first sound isn't cut (from the trace; by ear next); every other play still starts in 1 ms; Release: seeks p90 56–64 ms, 54–62 pictures/s while dragging, edits 42–99 ms, 30 fps; on main (Debug): seeks 40 of 40, p90 59–64 ms, the lead only on cold plays with sound, warm and muted plays 0 ms (see [`<PulsePreview>`](#pulsepreview)) | ⏳ S24 (2026-10-13, with the drag layer, `android-s24-preview-1013o-1`): seeks show the export's frame 80 of 80, edits 8 of 8 in 165–354 ms, first frame 85–192 ms, 28.7–29.2 fps none dropped; while dragging about 31 seeks land per second (the composition alone 0.5, 9–13 pictures/s), a drag into another clip shows it in 63–162 ms, the drag picture matched the composition's in 16 of 16 checked pairs (≥ 51.8 dB), settle 120–189 ms; still missed: paused seek p90 202–281 ms (the composition; a plain player p95 115–157 ms) and play 120–154 ms after a paused seek (the audio clock, open) (see [Preview](#preview-pulsepreview)) · emulator: 60 of 60 in six runs | 
 | 9 | Timeline editor UI (React Native), replacing the clip preview and the per-clip editor (see [The timeline editor](#the-timeline-editor-plan)) | `showEditor` | 📋 | 📋 | 
 | 10 | File helpers to `expo-file-system` | `deleteFile`, `cleanFiles`, `saveToDocuments` | ✅ in code: `deleteFile` → `File.delete`; `cleanFiles` → a sweep of RNVT's `trimmedVideo*` files (Simulator: removed them, left other files); "Save to Files" dropped, Share's sheet already offers it | ✅ same code; the sweep not yet run on Android | 
 | 11 | **Last commit:** remove the fork and FFmpeg (package, Podfile, Gradle, submodule), then merge | the fork | 📋 | 📋 | 
@@ -434,7 +434,7 @@ Through Pulse's debug build (bench mode `preview`) with four recorder-shaped tes
 
 ## Benchmarks (on device)
 
-Measured on 2026-10-01 on an **iPhone 17 Pro Max** (iOS 26.5.1) and a **Galaxy S24 Ultra** (Android 16), each running a Pulse debug build of #240 with pulse-editor and react-native-video-trim (RNVT, what Pulse merged with before) side by side. The live copy of these tables is on [Pulse #242](https://github.com/mieweb/pulse/issues/242).
+Measured on 2026-10-13 on an **iPhone 17 Pro Max** (iOS 26.5.1) and a **Galaxy S24 Ultra** (Android 16), each running a Pulse debug build of #240 with pulse-editor and react-native-video-trim (RNVT, what Pulse merged with before) side by side; the real-recording tables are from 2026-10-01. The same day each phone also ran a release build of the same code ([Debug and release builds](#debug-and-release-builds)). The live copy of these tables is on [Pulse #242](https://github.com/mieweb/pulse/issues/242).
 
 **How it's measured.** A temporary bench screen in the Pulse debug build (kept out of the repo) runs the same drafts through both engines on the phone, alternating which goes first, two runs each, and reports the median. RNVT gets exactly what Pulse used to pass it (`merge(urls, { outputExt: 'mp4', ...REELS_TARGET, clipEdits })`). The outputs are pulled to a Mac and checked:
 
@@ -446,26 +446,28 @@ Measured on 2026-10-01 on an **iPhone 17 Pro Max** (iOS 26.5.1) and a **Galaxy S
 **What the phone runs found, and what changed** (all re-measured on the phones):
 
 - Android exports played 44 ms early on Apple players: Media3's muxer omits the AAC roll sample group, so AVFoundation trimmed the encoder priming twice (see How a merge runs (Android)). Fixed: 0.0 ms in both players.
-- iOS joins drifted ~10 ms per clip in browsers (copied AAC padding; Apple players were fine). Fixed by re-encoding multi-clip audio: 0.0 ms in both, at the cost of joins taking about twice RNVT's time on the iPhone (1.0 s for a 2-minute join).
+- iOS joins drifted ~10 ms per clip in browsers (copied AAC padding; Apple players were fine). Fixed by re-encoding multi-clip audio: 0.0 ms in both, at the cost of joins taking 1.3–2.3× RNVT's time on the iPhone (2-minute join 1.6 s against 1.2 s on 2026-10-13, 1.0 against 0.58 s on 2026-10-01).
 - Android extractAudio was ~2 ms per AAC frame (one frame per codec round trip); batching frames on Android 15+ made it 5–9× faster on the S24 (2-minute draft 9.0 → 1.0 s).
 - Android one-clip drafts were re-encoded instead of copied; now copied.
-- Android joins feed the audio encoder in larger buffers: 21–34% faster on the S24. Since (2026-10-13), Android 15+ also decodes the audio in large batches: the 2-minute join 12.2 → 8.6 s, lip sync unchanged (table below).
+- Android joins feed the audio encoder in larger buffers: 21–34% faster on the S24. Since (2026-10-13), Android 15+ also decodes the audio in large batches: the 2-minute join 12.2 → 8.6 s against 2026-10-01 while RNVT's own time on the phone stayed 23.1–23.2 s, lip sync unchanged.
 - Recordings have no B-frames on either phone, so edited iPhone drafts take the selective path; the recorder-match test clips were regenerated to match.
-- Known and accepted: Android joins are audio-pipeline bound (~10× realtime on the S24 on 2026-10-01, 13–15× with the batched decoder in a debug APK and 20–21× in a release APK on 2026-10-13; the rest of the phone is idle, Media3 processes audio serially). A trimmed clip on Android can end with a 1–2 ms sliver frame at a clip boundary (invisible; FFmpeg's strict check notes it).
+- Known and accepted: Android joins are audio-pipeline bound (~10× realtime on the S24 on 2026-10-01; 2- and 8-minute joins 13–14× with the batched decoder in a debug APK and 20–21× in a release APK on 2026-10-13; the rest of the phone is idle, Media3 processes audio serially). A trimmed clip on Android can end with a 1–2 ms sliver frame at a clip boundary (invisible; FFmpeg's strict check notes it).
+- **Debug and release builds** (2026-10-13, same code, same day): the S24's release APK joins 25–35% faster than its debug APK; its re-encoded drafts, preview and seeks are no faster. iPhone Release merges land within −19…+18% of Debug with no direction; `extractAudio` is 15–43% faster in Release. So these debug tables hold for iOS merges and overstate Android join times by about a third ([Debug and release builds](#debug-and-release-builds)).
+- **The iPhone was slower on 2026-10-13 than on 2026-10-01 / 2026-10-07, for both engines:** copied joins 1.2–1.9× slower with pulse-editor and 1.1–2.3× with RNVT, whose code hasn't changed (its submodule pointer is the same); pulse-editor's encodes 1.0–1.1×; covers 2.3× slower for both engines (median, Release, against 2026-10-07's Debug run) and conforms 1.1×. The S24 on the same day: RNVT within −3…+11% of 2026-10-01. Inference: the iPhone, not the code; the cause isn't known (same iOS 26.5.1; whether Low Power Mode was on wasn't checked). The ratios between the engines held (pulse-editor's iPhone joins 1.3–1.9× RNVT's, 1.7–2.3× on 2026-10-01).
 
 ### Lip sync and output checks
 
-**iPhone 17 Pro Max (iOS 26.5.1)**: worst audio − video offset over every event, ms (+ = sound late)
+**iPhone 17 Pro Max (iOS 26.5.1)**, 2026-10-13 (`ios-ios-compare-1013`): worst audio − video offset over every event, ms (+ = sound late)
 
 | Draft | pulse-editor, browsers (FFmpeg) | pulse-editor, Apple (AVFoundation) | RNVT, browsers | RNVT, Apple | pulse-editor output |
 |---|---|---|---|---|---|
 | Sync draft: join (4 × 12 s) | 0.0 | 0.0 | 32.0 | 0.0 | faststart, 0 decode errors |
 | Sync draft: 48 + 44.1 kHz audio | 0.1 | 0.1 | 32.0 | 0.0 | faststart, 0 decode errors |
 | Sync draft: rotate + crop + trim | 0.0 | 0.0 | 26.7 | 0.0 | faststart, 4 decode errors |
-| Sync draft: 2× / muted / 0.5×, 48 + 44.1 kHz | -25.0 | -25.0 | 496.5 | -58.5 | faststart, 0 decode errors |
+| Sync draft: 2× / muted / 0.5×, 48 + 44.1 kHz | -25.0 | -25.0 | 496.5 | -34.0 to -58.5 * | faststart, 0 decode errors |
 | Sync draft: trimmed starts | 0.0 | 0.0 | 27.4 | 0.0 | faststart, 0 decode errors |
 
-**Galaxy S24 Ultra (Android 16)**: worst audio − video offset over every event, ms (+ = sound late)
+**Galaxy S24 Ultra (Android 16)**, 2026-10-13 (`android-s24-compare-1013h-1`): worst audio − video offset over every event, ms (+ = sound late)
 
 | Draft | pulse-editor, browsers (FFmpeg) | pulse-editor, Apple (AVFoundation) | RNVT, browsers | RNVT, Apple | pulse-editor output |
 |---|---|---|---|---|---|
@@ -475,82 +477,89 @@ Measured on 2026-10-01 on an **iPhone 17 Pro Max** (iOS 26.5.1) and a **Galaxy S
 | Sync draft: 2× / muted / 0.5×, 48 + 44.1 kHz | -17.5 | -17.5 | -24.0 | -24.0 | faststart, 0 decode errors |
 | Sync draft: trimmed starts | 0.0 | 0.0 | -16.6 | -16.6 | faststart, 0 decode errors |
 
-Re-measured on 2026-10-13 with the batched audio decoder (`android-s24-sync-1013`, pulse-editor only): the same values, 0.0 ms on the join, trims, rotate + crop + trim and the mixed-rate drafts, −17.5 ms on the two drafts with a 2× clip, in both players; every output faststart with 0 decode errors.
+Every value on both phones, for both engines, is the same as on 2026-10-01, except the one marked *: the AVFoundation read of RNVT's 2× draft gives −34.0 or −58.5 ms on the same file from one run of the checker to the next (2026-10-01: −58.5; pulse-editor's values don't move); the iPhone's Release run (`ios-ios-rel-compare-1013`) and the S24's sync drafts in a separate run (`android-s24-sync-1013`, including an edited draft with a 2× clip: −17.5 ms) give the same again.
 
 ### Speed
 
-**iPhone 17 Pro Max (iOS 26.5.1)**: median of 2 runs each, engines alternating
+**iPhone 17 Pro Max (iOS 26.5.1)**, 2026-10-13: median of 2 runs each, engines alternating
 
 | Draft | pulse-editor | RNVT | pulse-editor path | Output duration vs clips (pulse-editor / RNVT) |
 |---|---|---|---|---|
-| Join 3 recorder clips (18 s) | 213 ms | 91 ms | copied | +0 ms / +0 ms |
-| Join 20 clips (2 min) | 1.0 s | 584 ms | copied | +0 ms / +0 ms |
-| Join 20 clips (8 min) | 4.0 s | 2.1 s | copied | +0 ms / +0 ms |
-| 6 clips: trim, rotate+flip, crop, 2×, 0.5× muted | 3.1 s | 2.5 s | re-encoded (all or some clips) | +0 ms / +0 ms |
-| 20 clips, 6 in other formats (HEVC, 60 fps, 4K, landscape) | 17.6 s | 9.0 s | re-encoded (all or some clips) | +0 ms / +0 ms |
-| 12 hostile imports (HDR, Opus, no audio, VFR, 120 fps…) | 14.4 s | 27.8 s | re-encoded (all or some clips) | -81 ms / +198 ms |
-| Sync draft: join (4 × 12 s) | 374 ms | 205 ms | copied | +0 ms / +0 ms |
-| Sync draft: trimmed starts | 330 ms | 182 ms | copied | -20 ms / +0 ms |
-| Sync draft: 2× / muted / 0.5×, 48 + 44.1 kHz | 2.7 s | 2.3 s | re-encoded (all or some clips) | +0 ms / +0 ms |
-| Sync draft: rotate + crop + trim | 3.6 s | 3.0 s | re-encoded (all or some clips) | +0 ms / +0 ms |
-| Sync draft: 48 + 44.1 kHz audio | 506 ms | 269 ms | copied | +0 ms / +0 ms |
+| Join 3 recorder clips (18 s) | 397 ms | 205 ms | copied | +0 ms / +0 ms |
+| Join 20 clips (2 min) | 1.6 s | 1.2 s | copied | +0 ms / +0 ms |
+| Join 20 clips (8 min) | 7.5 s | 4.8 s | copied | +0 ms / +0 ms |
+| 6 clips: trim, rotate+flip, crop, 2×, 0.5× muted | 3.2 s | 2.9 s | re-encoded (all or some clips) | +0 ms / +0 ms |
+| 20 clips, 6 in other formats (HEVC, 60 fps, 4K, landscape) | 18.6 s | 12.2 s | re-encoded (all or some clips) | +0 ms / +0 ms |
+| 12 hostile imports (HDR, Opus, no audio, VFR, 120 fps…) | 15.8 s | 17.5 s | re-encoded (all or some clips) | -81 ms / -37 ms |
+| Sync draft: join (4 × 12 s) | 454 ms | 235 ms | copied | +0 ms / +0 ms |
+| Sync draft: trimmed starts | 383 ms | 204 ms | copied | -20 ms / +0 ms |
+| Sync draft: 2× / muted / 0.5×, 48 + 44.1 kHz | 2.8 s | 2.5 s | re-encoded (all or some clips) | +0 ms / +0 ms |
+| Sync draft: rotate + crop + trim | 3.7 s | 4.2 s | re-encoded (all or some clips) | +0 ms / +0 ms |
+| Sync draft: 48 + 44.1 kHz audio | 680 ms | 403 ms | copied | +0 ms / +0 ms |
 
-**Galaxy S24 Ultra (Android 16)**: median of 2 runs each, engines alternating
+**Galaxy S24 Ultra (Android 16)**, 2026-10-13: median of 2 runs each, engines alternating
 
 | Draft | pulse-editor | RNVT | pulse-editor path | Output duration vs clips (pulse-editor / RNVT) |
 |---|---|---|---|---|
-| Join 3 recorder clips (18 s) | 2.4 s | 3.8 s | copied | +5 ms / +48 ms |
-| Join 20 clips (2 min) | 12.2 s | 23.1 s | copied | +0 ms / +320 ms |
-| Join 20 clips (8 min) | 44.5 s | 78.6 s | copied | +0 ms / +0 ms |
-| 6 clips: trim, rotate+flip, crop, 2×, 0.5× muted | 4.4 s | 7.9 s | re-encoded (all or some clips) | +11 ms / +16 ms |
-| 20 clips, 6 in other formats (HEVC, 60 fps, 4K, landscape) | 17.9 s | 29.3 s | re-encoded (all or some clips) | +0 ms / +320 ms |
-| 12 hostile imports (HDR, Opus, no audio, VFR, 120 fps…) | 14.1 s | 24.1 s | re-encoded (all or some clips) | +0 ms / +36 ms |
-| Sync draft: join (4 × 12 s) | 4.1 s | 8.3 s | copied | +0 ms / +43 ms |
-| Sync draft: trimmed starts | 5.3 s | 7.4 s | re-encoded (all or some clips) | +5 ms / +58 ms |
-| Sync draft: 2× / muted / 0.5×, 48 + 44.1 kHz | 7.7 s | 8.0 s | re-encoded (all or some clips) | +5 ms / +9 ms |
-| Sync draft: rotate + crop + trim | 5.7 s | 8.8 s | re-encoded (all or some clips) | +16 ms / +11 ms |
-| Sync draft: 48 + 44.1 kHz audio | 4.5 s | 8.3 s | copied | +0 ms / +34 ms |
+| Join 3 recorder clips (18 s) | 1.8 s | 3.8 s | copied | +5 ms / +48 ms |
+| Join 20 clips (2 min) | 8.6 s | 23.2 s | copied | +0 ms / +320 ms |
+| Join 20 clips (8 min) | 41.0 s | 81.2 s | copied | +0 ms / +0 ms |
+| 6 clips: trim, rotate+flip, crop, 2×, 0.5× muted | 4.2 s | 8.2 s | re-encoded (all or some clips) | +11 ms / +16 ms |
+| 20 clips, 6 in other formats (HEVC, 60 fps, 4K, landscape) | 18.7 s | 32.5 s | re-encoded (all or some clips) | +0 ms / +320 ms |
+| 12 hostile imports (HDR, Opus, no audio, VFR, 120 fps…) | 14.6 s | 25.6 s | re-encoded (all or some clips) | +0 ms / +36 ms |
+| Sync draft: join (4 × 12 s) | 3.6 s | 8.2 s | copied | +0 ms / +43 ms |
+| Sync draft: trimmed starts | 5.1 s | 7.2 s | re-encoded (all or some clips) | +5 ms / +58 ms |
+| Sync draft: 2× / muted / 0.5×, 48 + 44.1 kHz | 5.6 s | 7.8 s | re-encoded (all or some clips) | +5 ms / +9 ms |
+| Sync draft: rotate + crop + trim | 6.0 s | 8.9 s | re-encoded (all or some clips) | +16 ms / +11 ms |
+| Sync draft: 48 + 44.1 kHz audio | 3.7 s | 8.2 s | copied | +0 ms / +34 ms |
 
-**Galaxy S24 Ultra (Android 16)**, 2026-10-13, with the batched audio decoder: pulse-editor only, median of 3 runs (`android-s24-joins-1013`, `android-s24-rel-joins-1013e-1`; the rows marked * from `android-s24-sync-1013`, 1 run, debug only)
+On the S24 against 2026-10-01: pulse-editor's copied drafts (the joins and the two copied sync drafts) 8–29% faster with the batched audio decoder, though the join test files were heavier on 2026-10-13 (2.9 against 2.2 MB for 3 clips); the 2× draft 28% faster; its other encodes −3…+5%; RNVT's own times −3…+11%. pulse-editor's time is 0.37–0.71× RNVT's on every draft (0.50–0.96× on 2026-10-01).
 
-| Draft | 2026-10-01 (table above) | 2026-10-13, debug APK | 2026-10-13, release APK |
+**Galaxy S24 Ultra (Android 16)**, 2026-10-13, debug APK against release APK: pulse-editor only, median of 3 runs (`android-s24-joins-1013`, `android-s24-rel-joins-1013e-1`)
+
+| Draft | Debug APK | Release APK | Release vs debug |
 |---|---|---|---|
-| Join 3 recorder clips (18 s) | 2.4 s | 1.4 s | 1.0 s |
-| Join 20 clips (2 min) | 12.2 s | 8.6 s (14× realtime) | 5.8 s (21×) |
-| Join 20 clips (8 min) | 44.5 s | 37.3 s (13×) | 24.2 s (20×) |
-| Sync draft: join (4 × 12 s) | 4.1 s | 3.1 s | 2.4 s |
-| Sync draft: trimmed starts (re-encoded) | 5.3 s | 5.1 s | 5.5 s |
-| Sync draft: rotate + crop + trim (re-encoded) | 5.7 s | 5.8 s | 6.0 s |
-| Sync draft: 2× / muted / 0.5×, 48 + 44.1 kHz * | 7.7 s | 5.3 s | — |
-| Sync draft: 48 + 44.1 kHz audio * | 4.5 s | 3.7 s | — |
+| Join 3 recorder clips (18 s) | 1.4 s | 1.0 s | −29% |
+| Join 20 clips (2 min) | 8.6 s (14× realtime) | 5.8 s (21×) | −32% |
+| Join 20 clips (8 min) | 37.3 s (13×) | 24.2 s (20×) | −35% |
+| Sync draft: join (4 × 12 s) | 3.1 s | 2.4 s | −25% |
+| Sync draft: trimmed starts (re-encoded) | 5.1 s | 5.5 s | +9% |
+| Sync draft: rotate + crop + trim (re-encoded) | 5.8 s | 6.0 s | +2% |
 
-The three join rows used heavier test files on 2026-10-13 than on 2026-10-01 (2.9 against 2.2 MB for 3 clips, 16.9 against 12.5 MB for 2 minutes); the sync drafts are the same files on both days. Against 2026-10-07 (the same join files as 2026-10-13, without the batched decoder, on a phone that was hot): 3 clips 2.5 → 1.4 s, 2 minutes 12.2 → 8.6 s, 8 minutes 54.5 → 37.3 s. Durations and paths as on 2026-10-01 (joins copied, +0–5 ms). The release APK joins 25–35 % faster than the debug one; its re-encoded drafts are no faster.
+### Debug and release builds
+
+The tables above are from debug builds (Android: a debuggable APK; iOS: the Debug configuration). On 2026-10-13 each phone also ran a release build of the same code, the same day.
+
+- **iPhone, Release vs Debug** (`ios-ios-rel-compare-1013` vs `ios-ios-compare-1013`, both engines, 2 runs each): pulse-editor's merges −19…+18% with no direction (3-clip join 364 vs 397 ms, 2-minute join 1.9 vs 1.6 s, 8-minute join 8.8 vs 7.5 s, edited draft 3.5 vs 3.2 s, mixed 20.0 vs 18.6 s); RNVT the same picture. Inference: merges are bound by AVFoundation, not by Swift built without optimization, so the Debug tables stand. `extractAudio` is faster in Release (2-minute draft 391 vs 690 ms, 24 s 5.1 clip 176 vs 262 ms, Opus 141 vs 165 ms; inference: its resampling loop is Swift that Debug doesn't optimize). Lip sync, durations and decode errors identical. The preview in Release: [Preview](#preview-pulsepreview), in line with Debug on 2026-10-07.
+- **S24, release APK vs debug APK** (non-debuggable; results read from logcat, so timings only: output files and screenshots stay on the phone): copied joins 25–35% faster (table above), re-encoded drafts +2…+9%, preview seeks, drags and edits within each other's spread ([Preview](#preview-pulsepreview)), the plain-player seek bench no faster (paused seek p95 142–157 against 115–155 ms). Inference: a join's time is Media3's audio pipeline running as Java/Kotlin, which runs slower in a debuggable app; encodes, decodes and seeks wait on the hardware codecs.
 
 ### probe and extractAudio
 
-**iPhone 17 Pro Max (iOS 26.5.1)**
+**iPhone 17 Pro Max (iOS 26.5.1)**, 2026-10-13 (Debug; Release in brackets, `ios-ios-rel-compare-1013`)
 
 | Method | pulse-editor | RNVT |
 |---|---|---|
-| probe, 26 test files (median, first read) | 12 ms | 108 ms |
-| extractAudio, 24 s 5.1 clip | 228 ms | 37 ms |
-| extractAudio, 2-minute draft | 464 ms | 82 ms |
-| extractAudio, 8 s Opus clip | 89 ms | 25 ms |
-| extractAudio, clip without audio | 2 ms | fails |
+| probe, 26 test files (median, first read) | 8 ms (8) | 106 ms (106) |
+| extractAudio, 24 s 5.1 clip | 262 ms (176) | 63 ms (60) |
+| extractAudio, 2-minute draft | 690 ms (391) | 103 ms (100) |
+| extractAudio, 8 s Opus clip | 165 ms (141) | 37 ms (20) |
+| extractAudio, clip without audio | 4 ms (3) | fails |
 
-**Galaxy S24 Ultra (Android 16)**
+**Galaxy S24 Ultra (Android 16)**, 2026-10-13
 
 | Method | pulse-editor | RNVT |
 |---|---|---|
-| probe, 26 test files (median, first read) | 29 ms | 117 ms |
-| extractAudio, 24 s 5.1 clip | 368 ms | 82 ms |
-| extractAudio, 2-minute draft | 990 ms | 181 ms |
-| extractAudio, 8 s Opus clip | 105 ms | 59 ms |
-| extractAudio, clip without audio | 5 ms | fails |
+| probe, 26 test files (median, first read) | 24 ms | 117 ms |
+| extractAudio, 24 s 5.1 clip | 402 ms | 98 ms |
+| extractAudio, 2-minute draft | 1.0 s | 211 ms |
+| extractAudio, 8 s Opus clip | 140 ms | 47 ms |
+| extractAudio, clip without audio | 7 ms | fails |
+
+S24 `extractAudio` in a quick run the same day (`android-s24-quick-1013g-2`): 51–126× realtime over five clips with sound, and a merge cancelled mid-way settled 12 ms after the abort with nothing left. The iPhone's own-recording clip failed to extract for both engines on 2026-10-13 (not in the table; not investigated; 46 ms on 2026-10-01).
 
 ### Real recordings
 
-**iPhone 17 Pro Max (iOS 26.5.1)**, its own recording
+**iPhone 17 Pro Max (iOS 26.5.1)**, its own recording, 2026-10-01
 
 | Draft | Time | Path | Output |
 |---|---|---|---|
@@ -558,7 +567,7 @@ The three join rows used heavier test files on 2026-10-13 than on 2026-10-01 (2.
 | Real recording alone | 44 ms | copied | 7.77 s, 5.4 Mbps, 0 decode errors |
 | Real recordings: as is / rotated / trimmed / 2× | 2.0 s | re-encoded (all or some clips) | 23.93 s, 5.3 Mbps, 0 decode errors |
 
-**Galaxy S24 Ultra (Android 16)**, its own recording
+**Galaxy S24 Ultra (Android 16)**, its own recording, 2026-10-01
 
 | Draft | Time | Path | Output |
 |---|---|---|---|
@@ -566,21 +575,44 @@ The three join rows used heavier test files on 2026-10-13 than on 2026-10-01 (2.
 | Real recording alone | 886 ms | copied | 7.47 s, 6.0 Mbps, 0 decode errors |
 | Real recordings: as is / rotated / trimmed / 2× | 3.4 s | re-encoded (all or some clips) | 23.10 s, 5.5 Mbps, 1 FFmpeg timestamp warning (see below) |
 
+### Preview (`<PulsePreview>`)
+
+Bench mode `preview`, as described under [`<PulsePreview>` → Tested](#tested-4): four drafts (join, trims, edits, all-muted) of recorder-shaped clips carrying each frame's number, 20 seeks each with screenshots against the export of the same draft, a 2 s drag, two edits, 8 s of playback, then play-start rows. 2026-10-13.
+
+| (target) | iPhone 17 Pro Max, Release (`ios-ios-rel-preview-1013`) | S24 with the drag layer, debug APK (`android-s24-preview-1013o-1`) | S24, composition only, debug APK (`android-s24-preview-1013`) | S24, composition only, release APK (`android-s24-rel-preview-1013e-1`, timings only) |
+|---|---|---|---|---|
+| Seeks on the export's frame | 77 of 80 (the 3: the export lags a frame at the end of the sped-up clip; the preview shows the expected frame) | 80 of 80 | 80 of 80 | not checked |
+| Seek p90 (p95 ≤ 100 ms) | 56–64 ms | 202–281 ms (paused seeks stay on the composition) | 199–294 ms | 206–247 ms |
+| First frame (≤ 300 iPhone / ≤ 500 S24) | 61–86 ms | 85–192 ms | 119–260 ms | 112–218 ms |
+| Edit on screen (≤ 250 / ≤ 400) | 42–99 ms, 8 of 8 showing the edit | 165–354 ms, 8 of 8 showing the edit | 245–407 ms, 8 of 8 (the trims draft's 1.5× swap: 407) | 246–369 ms |
+| Playback (≥ 29 fps, ≤ 1% dropped) | 30.1–30.2 fps, 0 dropped | 28.7–29.2 fps, 0 dropped (trims 28.7) | 29.0–29.4 fps, 0 dropped | 29.2–29.5 fps, 0 dropped |
+| Picture vs reported time while playing | 10 of 16 exact, 6 one frame off | 7 of 16 exact, 8 one frame off, 1 two | 33–67 ms ahead (11 of 16 at 67) | not read |
+| While dragging (≥ 20 pictures/s) | 54–62 pictures/s | 30.2–31.3 seeks landed/s, 51–54 view updates/s; a drag into another clip shows it in 63–162 ms; the drag picture matched the composition's frame at the same time in 16 of 16 checked pairs (PSNR ≥ 51.8 dB) | 9.4–12 pictures/s, 0.5 seeks landed/s | 9.4–13.5 pictures/s |
+| Settle after the drag | 33–100 ms | 120–189 ms, no timeouts | 147–191 ms (2026-10-07: a 3 s timeout on the trims draft) | 145–272 ms |
+| Play-start lag | 1 ms; 161 ms on a cold play (first play, or after ≥ 5 s paused) by design: the cold-audio lead; the all-muted draft 1 ms throughout | first play 128–245 ms, after a pause 10–120, after a paused seek 120–154 | first play 175–219 ms, after a pause 69–78, after a paused seek 136–239 | first play 169–247 ms, after a pause 37–105, after a paused seek 138–206 |
+| Lip sync while playing | not measured | not measured | not measured | not measured |
+
+- **iPhone:** every target met in Release, as in Debug on 2026-10-07 (seek p95 61–63 ms, first frame 56–122, edits 41–92, 58–60 pictures/s). The cold-audio lead gates on the clock: in Release a 4 s pause starts at once and a 6 s pause holds 161 ms (`ios-ios-rel-audio-1013`), as the 5 s rule says. On main (Debug, `ios-ios-main-preview-1013`, the join and all-muted drafts): seeks 40 of 40 on the export's frame, p90 59–64 ms; first frame 54–72 ms; edits 43–148 ms, all showing the edit; 48–61 pictures/s while dragging; 30.1–30.2 fps, nothing dropped; the 160 ms lead only on cold plays with sound (the join draft's first play and its play after 10 s paused), every warm play and every play of the all-muted draft 0 ms.
+- **S24, composition only:** the frames are right (80 of 80 seeks, 8 of 8 edits) and first frame, playback and edits meet their targets (one 1.5× swap at 407 ms); paused seeks (p90 199–294 ms) and drags (9–13 pictures/s) don't, in either build. The settle seek after a drag lands in 145–272 ms (was a 3 s timeout). The restart after a pause reads +37–105 ms, where 2026-10-07 read impossible negatives (−22…−89): `onTime` reports the frame on screen while paused too, so these lags are honest.
+- **Plain ExoPlayer on the same phone** (seek bench, `android-s24-seekbench-1013b` debug and `android-s24-rel-seekbench-1013e-1` release, one 12 s recorder-shaped clip, four player setups each): exact drags 25–27.5 new pictures/s (passes ≥ 20), paused seeks p95 115–157 ms (misses ≤ 100); low-latency decoding isn't supported by the S24's `c2.qti.avc.decoder`. So a plain player fixes drags and halves the paused-seek time, without reaching the seek target.
+- **Play start after a seek on the S24 (open):** 120–239 ms in every build and with or without the drag layer, against 10–120 ms after a pause and 1 ms on the iPhone. From reading Media3 1.11's code (not measured): every seek flushes the audio sink, which releases the AudioTrack, and the picture follows the audio clock, which stands still until the new track has played its first sample. A low-latency AudioTrack for the preview was tried on the phone and left out (no measurable gain).
+- **Android drag layer** (pulse-editor #10, 2026-10-13): while a finger drags, a plain ExoPlayer on the dragged clip draws the pictures; paused seeks, edits and playback stay on the composition. Run `android-s24-preview-1013o-1` (the merged branch's head, debug APK): about 31 seeks land per second while dragging (the composition alone: 0.5); a drag into another clip shows it in 63–162 ms; the drag picture matched the composition's frame at the same time in 16 of 16 checked pairs (PSNR ≥ 51.8 dB); the settle after release 120–189 ms with no timeouts; seeks still 80 of 80 on the export's frame and edits 8 of 8. Tried and left out: paused tap-seeks on the layer (wrong frames and settle timeouts, `android-s24-preview-1013j-1`: 14 and 16 of 20 seeks right on two drafts) and a low-latency AudioTrack (above).
+
 ### Where pulse-editor is slower than RNVT, or differs, and why
 
 Every row where RNVT comes out ahead or the outputs differ. "Measured" means a number from these runs or from pulse-editor's own iOS code timed stage by stage on macOS; anything else is marked.
 
 | Case | Numbers | Why | Status |
 |---|---|---|---|
-| **iOS joins** (3 clips, 2 min, 8 min; sync joins) | 1.7–2.3× RNVT's time (2-minute join 1.0 s vs 0.58 s) | pulse-editor re-encodes the joined audio; RNVT copies it. Measured on macOS for a 2-minute join: 0.67 s of 0.89 s is the audio re-encode, 0.14 s the video copy and export. Copied AAC needs per-clip edit lists that FFmpeg-based players ignore, which is why RNVT's joins are +27–32 ms off in browsers. A single clip has no seams, so its audio is copied (one-clip draft 44 ms). | By design: correct sync everywhere. Apple's faster AAC settings would halve the cost but lose ~6 dB of signal-to-distortion, so they aren't used. |
-| **iOS edited drafts** (6-clip edits, 2×/0.5×, rotate + crop + trim) | 1.2× RNVT (3.1 s vs 2.5 s; 2.7 vs 2.3; 3.6 vs 3.0) | Both re-render only the edited clips. pulse-editor also re-encodes the audio over the whole draft: 0.55 s of the edited draft's 3.9 s on macOS. The iPhone gap (0.4–0.6 s) is about that size; that the renders themselves cost the same on both engines is inferred, not measured on the phone. | Same trade as joins. |
-| **iOS mixed-format draft** (20 clips, 6 in HEVC / 60 fps / 4K / landscape) | 2.0× RNVT (17.6 s vs 8.5 s) | Clips in another format send pulse-editor to a full encode of all 20 clips (19.0 s on macOS, all of it rendering); its selective path covers edited clips only. RNVT re-encodes the 6 odd clips and copies the 14 recorder clips. Outputs differ too: pulse-editor 2.67 Mbps upright 1080×1920, RNVT 1.49 Mbps 1920×1080 + rotation. | Not worth optimizing before `conform`: imports will be converted to the recorder format at import, so a merge won't see mixed formats. Rendering only the odd clips is possible later if needed. |
-| **extractAudio** (both platforms) | RNVT 4–6× faster (2-minute draft: iPhone 0.46 s vs 0.08 s, S24 0.99 s vs 0.18 s) | Not the same job. RNVT's FFmpeg writes a WAV at the source's rate and channels, in-process, with no downmix or resampling. pulse-editor returns 16 kHz mono ready for Whisper: downmixed and band-limited resampled, through AVAssetReader (iOS) or the platform codec (Android, batched on 15+). With RNVT, Pulse's caption path then read that WAV back and resampled it before Whisper, a cost not in RNVT's number (from the old code, not timed here). RNVT also fails on a clip with no audio. | Fine: 260× realtime on the iPhone, 120× on the S24. |
+| **iOS joins** (3 clips, 2 min, 8 min; sync joins) | 1.3–1.9× RNVT's time on 2026-10-13 (2-minute join 1.6 s vs 1.2 s); 1.7–2.3× on 2026-10-01 (1.0 s vs 0.58 s) | pulse-editor re-encodes the joined audio; RNVT copies it. Measured on macOS for a 2-minute join: 0.67 s of 0.89 s is the audio re-encode, 0.14 s the video copy and export. Copied AAC needs per-clip edit lists that FFmpeg-based players ignore, which is why RNVT's joins are +27–32 ms off in browsers. A single clip has no seams, so its audio is copied (one-clip draft 44 ms). | By design: correct sync everywhere. Apple's faster AAC settings would halve the cost but lose ~6 dB of signal-to-distortion, so they aren't used. |
+| **iOS edited drafts** (6-clip edits, 2×/0.5×, rotate + crop + trim) | 1.1× RNVT (3.2 s vs 2.9 s; 2.8 vs 2.5); rotate + crop + trim 3.7 vs 4.2 s in Debug, 3.7 vs 3.3 s in Release (RNVT's own spread) | Both re-render only the edited clips. pulse-editor also re-encodes the audio over the whole draft: 0.55 s of the edited draft's 3.9 s on macOS. The iPhone gap (0.4–0.6 s) is about that size; that the renders themselves cost the same on both engines is inferred, not measured on the phone. | Same trade as joins. |
+| **iOS mixed-format draft** (20 clips, 6 in HEVC / 60 fps / 4K / landscape) | 1.5× RNVT (18.6 s vs 12.2 s) | Clips in another format send pulse-editor to a full encode of all 20 clips (19.0 s on macOS, all of it rendering); its selective path covers edited clips only. RNVT re-encodes the 6 odd clips and copies the 14 recorder clips. Outputs differ too: pulse-editor 2.67 Mbps upright 1080×1920, RNVT 1.49 Mbps 1920×1080 + rotation. | Not worth optimizing before `conform`: imports will be converted to the recorder format at import, so a merge won't see mixed formats. Rendering only the odd clips is possible later if needed. |
+| **extractAudio** (both platforms) | RNVT 4–7× faster (2-minute draft: iPhone 0.69 s vs 0.10 s in Debug, 0.39 vs 0.10 in Release; S24 1.0 s vs 0.21 s) | Not the same job. RNVT's FFmpeg writes a WAV at the source's rate and channels, in-process, with no downmix or resampling. pulse-editor returns 16 kHz mono ready for Whisper: downmixed and band-limited resampled, through AVAssetReader (iOS) or the platform codec (Android, batched on 15+). With RNVT, Pulse's caption path then read that WAV back and resampled it before Whisper, a cost not in RNVT's number (from the old code, not timed here). RNVT also fails on a clip with no audio. | Fine: 170–310× realtime on the iPhone (Debug / Release), 116× on the S24. |
 | **Android edited drafts: frame rate** | average 25.7–27.9 fps vs RNVT's constant 30 | Media3's frame-rate setting caps the rate but doesn't fill gaps, so slowed-down clips come out at a variable rate. They play correctly, in sync (0.0 ms; 2× clips −17.5 ms, half a frame). | Known; iOS fills to a constant 30 fps. A constant rate on Android would need a frame-repeat effect. |
-| **Android file size** (edited and mixed drafts) | 1.7–5.7× RNVT's size (edits 18.3 MB vs 3.2 MB) | pulse-editor encodes at the export bitrate, 5 Mbps (the recorder's); RNVT's software encode lands at 0.85–3 Mbps. Picture quality hasn't been compared; the higher bitrate is likely the sharper picture, but that's inferred. | Bitrate is a setting (`EXPORT_BITRATE`), not an engine limit. |
-| **Output length** | iOS trimmed join −20 ms; iOS hostile imports −81 ms (RNVT +198 ms) | Join trims snap to the nearest frame (≤ half a frame each), so FFmpeg-based players start the picture with the sound. Odd-timing clips (VFR, 120 fps, NTSC 29.97) are resampled to a constant 30 fps, which rounds each clip to whole frames. | By design. |
-| **probe on the iPhone** | 12 ms vs RNVT 13–108 ms | RNVT's first read was ~110 ms in most runs and 13 ms in one, so its number is a range. | — |
-| **Android exports, absolute speed** | faster than RNVT everywhere, but joins ~10× realtime (2 min in 12.2 s; 8.6 s with the batched decoder, 2026-10-13) | Media3 runs the audio pipeline (decode, cut, mix, encode) one buffer at a time on one thread; during a join one core is busy and the rest of the phone is idle (measured with `top` on the S24). Feeding the encoder larger buffers made joins 21–34% faster; decoding the audio in batches on Android 15+ (as `extractAudio` does) took the 2-minute join from 12.2 to 8.6 s (13–15× realtime in a debug APK, 20–21× in a release APK, 2026-10-13); pre-decoding the whole audio to a WAV first didn't help. | Accepted. Going further means replacing Media3's audio pipeline. |
+| **Android file size** (edited and mixed drafts) | 1.7–4.3× RNVT's size (edits 18.4 MB vs 4.3 MB; 2026-10-01: up to 5.7×) | pulse-editor encodes at the export bitrate, 5 Mbps (the recorder's); RNVT's software encode lands at 0.85–3 Mbps. Picture quality hasn't been compared; the higher bitrate is likely the sharper picture, but that's inferred. | Bitrate is a setting (`EXPORT_BITRATE`), not an engine limit. |
+| **Output length** | iOS trimmed join −20 ms; iOS hostile imports −81 ms (RNVT −37 ms on 2026-10-13, +198 ms on 2026-10-01) | Join trims snap to the nearest frame (≤ half a frame each), so FFmpeg-based players start the picture with the sound. Odd-timing clips (VFR, 120 fps, NTSC 29.97) are resampled to a constant 30 fps, which rounds each clip to whole frames. | By design. |
+| **probe on the iPhone** | 8 ms vs RNVT 13–108 ms | RNVT's first read was ~106–110 ms in most runs (both builds on 2026-10-13) and 13 ms in one, so its number is a range. | — |
+| **Android exports, absolute speed** | faster than RNVT everywhere (0.37–0.71× its time), but joins 13–14× realtime in a debug APK (2 min in 8.6 s; 12.2 s on 2026-10-01 before the batched decoder) and 20–21× in a release APK | Media3 runs the audio pipeline (decode, cut, mix, encode) one buffer at a time on one thread; during a join one core is busy and the rest of the phone is idle (measured with `top` on the S24). Feeding the encoder larger buffers made joins 21–34% faster; decoding the audio in batches on Android 15+ (as `extractAudio` does) took the 2-minute join from 12.2 to 8.6 s (13–15× realtime in a debug APK, 20–21× in a release APK, 2026-10-13); pre-decoding the whole audio to a WAV first didn't help. | Accepted. Going further means replacing Media3's audio pipeline. |
 
 ### Switching a trade-off later
 
@@ -593,7 +625,7 @@ Each choice above is one small, local change. Where it lives, and what changes i
 | AAC encoder quality (iOS) | `ios/Merge/SampleTransfer.swift`, `EncodeSettings.aac` | Add `AVEncoderAudioQualityKey: AVAudioQuality.low` | ~2× faster audio encode (joins); ~6 dB lower signal-to-distortion |
 | Format mismatches → full encode (iOS) | `ios/Merge/MergePlan.swift`, `init`: any join blocker → `.encode` | Render only the mismatched clips, like `.selective` does for edited ones | Mixed-format drafts ~2× faster; worth it only if mixed formats still reach merge after `conform` |
 | Join bitrate allowance | `MergePlan.swift` `bitrateTolerance`, `MergePlan.kt` `BITRATE_TOLERANCE` (1.6×) | Lower it | Fewer joins (more re-encodes); smaller files from high-bitrate recordings |
-| Export bitrate | Pulse `src/features/export/editor-merge.ts`, `EXPORT_BITRATE` (5 Mbps) | Lower it | Smaller encoded files (Android's are 1.7–5.7× RNVT's); softer picture; recordings above 1.6× of it stop joining |
+| Export bitrate | Pulse `src/features/export/editor-merge.ts`, `EXPORT_BITRATE` (5 Mbps) | Lower it | Smaller encoded files (Android's are 1.7–4.3× RNVT's); softer picture; recordings above 1.6× of it stop joining |
 | Android join audio encoder buffer | `transcode/AacPriming.kt`, `JOIN_AUDIO_INPUT_BYTES` (256 KB, joins only) | Change the size, or apply it to encodes | Joins 21–34% faster with it; encodes got 5–15% slower when it applied to them |
 | Android export audio decoded in batches | `transcode/BatchedAudioDecoder.kt`, used from `transcode/Transcode.kt` on Android 15+ when the decoder supports `FEATURE_MultipleFrames` | Use Media3's default decoder factory | Slower Android joins: the S24's 2-minute join took 12.2 s without it (2026-10-01) and 8.6 s with it (2026-10-13, debug APK); lip sync 0.0 ms with it, as without |
 | Android one-clip joins copy video | `transcode/AacPriming.kt`, `videoNeedsEncoding() = !copyVideo && …` | Return the default factory's answer | One-clip drafts re-encoded again |
