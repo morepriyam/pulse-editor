@@ -372,17 +372,15 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     main.postDelayed(seekTimeout, SEEK_TIMEOUT_MS)
     // The millisecond last sent again: ExoPlayer skips a seek to the millisecond it's at, so the
     // earlier seek's frame would be the only one coming, and after a drag it can be lost (the settle
-    // seek after a drag timed out on the trims draft). 1 ms earlier is the same frame (the first
-    // starting at or after it) through a real seek; at 0, a seek to 1 ms right before makes the one
-    // to 0 real. While dragging too, so letting go works whichever of setScrubbing(false) and the
-    // settle seek comes first.
-    val send = when {
-      lastSentMs != target -> target
-      target == 0L -> 0L.also { p.seekTo(1) }
-      else -> target - 1
-    }
-    lastSentMs = send
-    p.seekTo(send)
+    // seek after a drag timed out on the trims draft). A throwaway seek to another millisecond right
+    // before makes the one to the target real. Not to the target 1 ms earlier: at a clip's start
+    // that's in the previous clip, and by Media3's source a paused player doesn't draw the next
+    // clip's first frame from there.
+    // While dragging too, so letting go works whichever of setScrubbing(false) and the settle seek
+    // comes first.
+    if (lastSentMs == target) p.seekTo(if (target > 0) target - 1 else 1)
+    lastSentMs = target
+    p.seekTo(target)
   }
 
   override fun play() {
