@@ -374,11 +374,12 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     // earlier seek's frame would be the only one coming, and after a drag it can be lost (the settle
     // seek after a drag timed out on the trims draft). A throwaway seek to another millisecond right
     // before makes the one to the target real. The throwaway stays inside the target's clip: 1 ms
-    // earlier at a clip's start is in the previous clip, where a paused player doesn't draw the
+    // earlier at a clip's start is in the previous clip (there it goes a canvas frame later, past the
+    // resolve window), where a paused player doesn't draw the
     // next clip's first frame, and in scrubbing mode the target's seek would queue behind it.
     // While dragging too, so letting go works whichever of setScrubbing(false) and the settle seek
     // comes first.
-    if (lastSentMs == target) p.seekTo(if (target > 0 && slotAt(target - 1.0) === slotAt(target.toDouble())) target - 1 else target + 1)
+    if (lastSentMs == target) p.seekTo(if (target > 0 && slotAt(target - 1.0) === slotAt(target.toDouble())) target - 1 else target + kotlin.math.ceil(1000 / options.fps.coerceAtLeast(1.0)).toLong())
     lastSentMs = target
     p.seekTo(target)
   }
