@@ -93,8 +93,8 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
   private var lastFrameUs = C.TIME_UNSET
   private var seekStartNs = 0L
   private val pendingSeeks = mutableListOf<Promise<Double>>()
-  /** Media3's scrubbing mode is on (a drag). */
-  private var scrubbing = false
+  /** The millisecond last passed to the player's seekTo (or setComposition), to keep seeks real. */
+  private var lastSentMs = C.TIME_UNSET
   private val seekTimeout = Runnable { finishSeeks(player?.currentPosition?.toDouble() ?: 0.0) }
 
   private val ticker = object : Runnable {
@@ -196,10 +196,13 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
         if (first) {
           awaitingFirstFrame = true
           p.setComposition(composition)
+          lastSentMs = 0
           p.prepare()
         } else {
           awaitingSwap = true
-          p.setComposition(composition, min(p.currentPosition, durationMs.toLong()))
+          val position = min(p.currentPosition, durationMs.toLong())
+          p.setComposition(composition, position)
+          lastSentMs = position
           if (p.playbackState == Player.STATE_IDLE) p.prepare()
         }
         framesShown = 0.0
@@ -247,10 +250,8 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
 
   private fun ensurePlayer(): CompositionPlayer = player ?: CompositionPlayer.Builder(context.applicationContext)
     .setLooper(Looper.getMainLooper())
-    // Local files: start after 100 ms of media instead of the default second. The back buffer keeps
-    // what was played, so a seek back inside a clip reads from memory instead of reloading the file.
-    .setLoadControl(
-      DefaultLoadControl.Builder().setBufferDurationsMs(500, 3_000, 100, 200).setBackBuffer(BACK_BUFFER_MS, true).build())
+    // Local files: start after 100 ms of media instead of the default second.
+    .setLoadControl(DefaultLoadControl.Builder().setBufferDurationsMs(500, 3_000, 100, 200).build())
     .build()
     .also { p ->
       p.addListener(listener)
@@ -365,16 +366,23 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
       finishSeeks(shown / 1000.0)
       return
     }
-    // The millisecond of the seek already on its way: ExoPlayer skips a seek to the position it's
-    // at, so that earlier seek's frame would be the only one coming, and after a drag it can be
-    // lost (the settle seek after a drag timed out on the trims draft). 1 ms earlier is the same
-    // frame (the first starting at or after it) through a real seek.
-    val again = !scrubbing && seekTargetUs == target * 1000
     seekTargetUs = target * 1000
     seekStartNs = System.nanoTime()
     main.removeCallbacks(seekTimeout)
     main.postDelayed(seekTimeout, SEEK_TIMEOUT_MS)
-    p.seekTo(if (again) maxOf(0L, target - 1) else target)
+    // The millisecond last sent again: ExoPlayer skips a seek to the millisecond it's at, so the
+    // earlier seek's frame would be the only one coming, and after a drag it can be lost (the settle
+    // seek after a drag timed out on the trims draft). 1 ms earlier is the same frame (the first
+    // starting at or after it) through a real seek; at 0, a seek to 1 ms right before makes the one
+    // to 0 real. While dragging too, so letting go works whichever of setScrubbing(false) and the
+    // settle seek comes first.
+    val send = when {
+      lastSentMs != target -> target
+      target == 0L -> 0L.also { p.seekTo(1) }
+      else -> target - 1
+    }
+    lastSentMs = send
+    p.seekTo(send)
   }
 
   override fun play() {
@@ -404,10 +412,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
   }
 
   override fun setScrubbing(scrubbing: Boolean) {
-    main.post {
-      this.scrubbing = scrubbing
-      player?.setScrubbingModeEnabled(scrubbing)
-    }
+    main.post { player?.setScrubbingModeEnabled(scrubbing) }
   }
 
   override fun snapshot(): Promise<String> {
@@ -448,7 +453,5 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     const val REFRESH_MARGIN_MS = 20L
     /** Older than this since its release time, a frame matched by order is one that never drew. */
     const val STALE_FRAME_MS = 300L
-    /** Played media kept in memory behind the position (a seek back inside it needs no reload). */
-    const val BACK_BUFFER_MS = 30_000
   }
 }
