@@ -31,6 +31,9 @@ class PulseEditor : HybridPulseEditorSpec() {
   override fun createConform(uri: String, options: ConformOptions): HybridConformJobSpec =
     com.margelo.nitro.pulseeditor.conform.ConformJob(uri, options)
 
+  /** Bench only: see [SeekBench]. */
+  override fun createSeekBench(): HybridSeekBenchSpec = SeekBench()
+
   private fun context() =
     NitroModules.applicationContext ?: throw IllegalStateException("React context not ready")
 }

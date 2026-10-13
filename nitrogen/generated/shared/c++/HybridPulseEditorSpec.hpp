@@ -31,6 +31,8 @@ namespace margelo::nitro::pulseeditor { struct MergeOptions; }
 namespace margelo::nitro::pulseeditor { class HybridConformJobSpec; }
 // Forward declaration of `ConformOptions` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ConformOptions; }
+// Forward declaration of `HybridSeekBenchSpec` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { class HybridSeekBenchSpec; }
 
 #include "ProbeResult.hpp"
 #include <NitroModules/Promise.hpp>
@@ -45,6 +47,7 @@ namespace margelo::nitro::pulseeditor { struct ConformOptions; }
 #include "MergeOptions.hpp"
 #include "HybridConformJobSpec.hpp"
 #include "ConformOptions.hpp"
+#include "HybridSeekBenchSpec.hpp"
 
 namespace margelo::nitro::pulseeditor {
 
@@ -82,6 +85,7 @@ namespace margelo::nitro::pulseeditor {
       virtual std::shared_ptr<Promise<Thumbnail>> thumbnail(const std::string& uri, const ThumbnailOptions& options) = 0;
       virtual std::shared_ptr<HybridMergeJobSpec> createMerge(const std::vector<MergeClip>& clips, const MergeOptions& options) = 0;
       virtual std::shared_ptr<HybridConformJobSpec> createConform(const std::string& uri, const ConformOptions& options) = 0;
+      virtual std::shared_ptr<HybridSeekBenchSpec> createSeekBench() = 0;
 
     protected:
       // Hybrid Setup

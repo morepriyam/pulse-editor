@@ -7,6 +7,8 @@ import type {
   MergeOptions,
   MergeResult,
   ProbeResult,
+  SeekBenchOptions,
+  SeekBenchResult,
   Thumbnail,
   ThumbnailOptions,
 } from './PulseEditor.nitro';
@@ -23,6 +25,13 @@ export type {
   ProbeAudio,
   ProbeResult,
   ProbeVideo,
+  SeekBenchDrag,
+  SeekBenchDragMode,
+  SeekBenchDragResult,
+  SeekBenchOptions,
+  SeekBenchPicture,
+  SeekBenchResult,
+  SeekBenchSeek,
   Thumbnail,
   ThumbnailOptions,
   Transfer,
@@ -166,5 +175,26 @@ export async function conform(
     throw nativeError(e);
   } finally {
     signal?.removeEventListener('abort', cancel);
+  }
+}
+
+/**
+ * Bench only (Android): one pass of the plain-ExoPlayer seek bench on `uri`. A fresh Media3
+ * ExoPlayer with no effects draws the file into a TextureView laid over the app for the pass;
+ * it measures the player's create + prepare + first frame, paused exact seeks and scrubbing-mode
+ * drags (to on screen), then releases the player. Rejects on iOS and while another pass runs.
+ */
+export async function seekBench(
+  uri: string,
+  options: SeekBenchOptions
+): Promise<SeekBenchResult> {
+  if (!uri?.trim().length) {
+    throw new Error('File path cannot be empty.');
+  }
+  const bench = editor.createSeekBench();
+  try {
+    return await bench.run(uri, options);
+  } catch (e) {
+    throw nativeError(e);
   }
 }
