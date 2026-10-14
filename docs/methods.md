@@ -292,7 +292,8 @@ import { PulsePreview, type PulsePreviewRef } from '@mieweb/pulse-editor';
   style={{ flex: 1 }}
   clips={clips}           // MergeClip[] as merge takes them; keep the array stable (useMemo): a new one rebuilds
   options={options}       // the MergeOptions the draft will be merged with (canvas, fps, ...)
-  onStatus={({ durationMs, ready, error }) => {}}  // ready once the first frame is on screen
+  onStatus={({ durationMs, clipStartsMs, ready, error }) => {}}  // ready once the first frame is on screen
+                                                    // clipStartsMs: where each clip starts on the timeline (ms, clips order)
   onTime={(timeMs, playing) => {}}                  // ~12×/s while playing (the on-screen frame's time), and after every seek, play, pause
   onReady={(ref: PulsePreviewRef) => {}}            // the handle for the methods below
 />

@@ -12,6 +12,8 @@ enum Timeline {
     let audioTrack: AVMutableCompositionTrack?
     let videoComposition: AVMutableVideoComposition
     let duration: CMTime
+    /// Where each clip's slot starts, in the items' order.
+    let starts: [CMTime]
   }
 
   /// A clip is whole source frames: both trim ends snap to the nearest frame, as the join's do,
@@ -28,7 +30,9 @@ enum Timeline {
 
     var instructions: [AVVideoCompositionInstruction] = []
     var cursor = CMTime.zero
+    var starts: [CMTime] = []
     for (clip, media) in items {
+      starts.append(cursor)
       guard let sourceVideo = media.videoTrack else { throw MergeError.failed("A clip has no video.") }
       let (sourceSize, sourceTransform, sourceRange, frame) = try await sourceVideo.load(
         .naturalSize, .preferredTransform, .timeRange, .minFrameDuration)
@@ -79,6 +83,6 @@ enum Timeline {
 
     return Composed(
       composition: composition, videoTrack: video, audioTrack: audio,
-      videoComposition: videoComposition, duration: duration)
+      videoComposition: videoComposition, duration: duration, starts: starts)
   }
 }

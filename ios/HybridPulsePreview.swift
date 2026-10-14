@@ -24,6 +24,7 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
   private var build: Task<Void, Never>?
   private var changed = false
   private var durationMs = 0.0
+  private var clipStartsMs: [Double] = []
   private var ready = false
   private var hasAudio = false
   /// When audio last stopped in this process (0: nothing played yet). The output goes idle a few
@@ -125,6 +126,7 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
         item.audioTimePitchAlgorithm = .spectral  // natural pitch, as the export
         item.seekingWaitsForVideoCompositionRendering = true
         self.durationMs = Self.ms(composed.duration)
+        self.clipStartsMs = composed.starts.map(Self.ms)
         let hadAudio = self.hasAudio
         self.hasAudio = !composed.composition.tracks(withMediaType: .audio).isEmpty
         // Sound gone from a playing draft (every clip muted): the output goes idle from now.
@@ -132,7 +134,7 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
         self.swap(to: item, started: started)
       } catch is CancellationError {
       } catch {
-        self.onStatus(PreviewStatus(durationMs: 0, ready: false, error: error.localizedDescription))
+        self.onStatus(PreviewStatus(durationMs: 0, clipStartsMs: [], ready: false, error: error.localizedDescription))
       }
     }
   }
@@ -144,7 +146,7 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
     statusObservation = item.observe(\.status) { [weak self] item, _ in
       DispatchQueue.main.async {
         guard let self, item.status == .failed else { return }
-        self.onStatus(PreviewStatus(durationMs: self.durationMs, ready: self.ready, error: item.error?.localizedDescription ?? "The preview couldn't play."))
+        self.onStatus(PreviewStatus(durationMs: self.durationMs, clipStartsMs: self.clipStartsMs, ready: self.ready, error: item.error?.localizedDescription ?? "The preview couldn't play."))
       }
     }
     // The counter's output goes on with the item: adding one to a playing or about-to-play item
@@ -161,12 +163,12 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
         if !self.ready {
           self.ready = true
           self.firstFrameMs = (CACurrentMediaTime() - started) * 1000
-          self.onStatus(PreviewStatus(durationMs: self.durationMs, ready: true, error: nil))
+          self.onStatus(PreviewStatus(durationMs: self.durationMs, clipStartsMs: self.clipStartsMs, ready: true, error: nil))
         }
         self.finishSwapIfShown()
       }
     }
-    onStatus(PreviewStatus(durationMs: durationMs, ready: ready, error: nil))
+    onStatus(PreviewStatus(durationMs: durationMs, clipStartsMs: clipStartsMs, ready: ready, error: nil))
     // An exact seek to the same time shows the new timeline's frame there.
     player.seek(to: at, toleranceBefore: .zero, toleranceAfter: .zero) { [weak self] _ in
       DispatchQueue.main.async {

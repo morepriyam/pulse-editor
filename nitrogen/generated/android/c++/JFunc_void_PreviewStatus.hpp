@@ -14,6 +14,7 @@
 #include <functional>
 #include <NitroModules/JNICallable.hpp>
 #include "JPreviewStatus.hpp"
+#include <vector>
 #include <string>
 #include <optional>
 

@@ -12,6 +12,7 @@
 
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace margelo::nitro::pulseeditor {
 
@@ -34,12 +35,20 @@ namespace margelo::nitro::pulseeditor {
       static const auto clazz = javaClassStatic();
       static const auto fieldDurationMs = clazz->getField<double>("durationMs");
       double durationMs = this->getFieldValue(fieldDurationMs);
+      static const auto fieldClipStartsMs = clazz->getField<jni::JArrayDouble>("clipStartsMs");
+      jni::local_ref<jni::JArrayDouble> clipStartsMs = this->getFieldValue(fieldClipStartsMs);
       static const auto fieldReady = clazz->getField<jboolean>("ready");
       jboolean ready = this->getFieldValue(fieldReady);
       static const auto fieldError = clazz->getField<jni::JString>("error");
       jni::local_ref<jni::JString> error = this->getFieldValue(fieldError);
       return PreviewStatus(
         durationMs,
+        [&]() {
+          size_t __size = clipStartsMs->size();
+          std::vector<double> __vector(__size);
+          clipStartsMs->getRegion(0, __size, __vector.data());
+          return __vector;
+        }(),
         static_cast<bool>(ready),
         error != nullptr ? std::make_optional(error->toStdString()) : std::nullopt
       );
@@ -51,12 +60,18 @@ namespace margelo::nitro::pulseeditor {
      */
     [[maybe_unused]]
     static jni::local_ref<JPreviewStatus::javaobject> fromCpp(const PreviewStatus& value) {
-      using JSignature = JPreviewStatus(double, jboolean, jni::alias_ref<jni::JString>);
+      using JSignature = JPreviewStatus(double, jni::alias_ref<jni::JArrayDouble>, jboolean, jni::alias_ref<jni::JString>);
       static const auto clazz = javaClassStatic();
       static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
       return create(
         clazz,
         value.durationMs,
+        [&]() {
+          size_t __size = value.clipStartsMs.size();
+          jni::local_ref<jni::JArrayDouble> __array = jni::JArrayDouble::newArray(__size);
+          __array->setRegion(0, __size, value.clipStartsMs.data());
+          return __array;
+        }(),
         value.ready,
         value.error.has_value() ? jni::make_jstring(value.error.value()) : nullptr
       );
