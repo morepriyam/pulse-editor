@@ -3,7 +3,8 @@ import Foundation
 /// Which path a merge takes.
 /// - join: every clip shares one format that fits the output, and none has a rendered edit.
 /// - selective: the clips share that format, but some have a rotate / flip / crop / speed edit:
-///   only those are rendered (into the shared format), then everything joins.
+///   only those (and copied clips trimmed at their start) are rendered into the shared format,
+///   then everything joins.
 /// - encode: the clips don't share a format that fits: the whole timeline is encoded once.
 struct MergePlan {
   enum Path {
@@ -27,7 +28,11 @@ struct MergePlan {
     } else if render.isEmpty {
       path = .join
     } else {
-      path = .selective(render: render)
+      // A copied clip trimmed at its start keeps the frames back to its keyframe, hidden by an edit
+      // list. Next to rendered clips (a second sample description) FFmpeg then drops the frames
+      // before each such join (trac #6584), so those clips are rendered too.
+      let trimmed = clips.indices.filter { !render.contains($0) && clips[$0].startMs > 0 }
+      path = .selective(render: (render + trimmed).sorted())
     }
   }
 
