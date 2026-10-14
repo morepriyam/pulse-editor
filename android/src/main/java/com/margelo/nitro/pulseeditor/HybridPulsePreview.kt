@@ -2,6 +2,7 @@ package com.margelo.nitro.pulseeditor
 
 import android.graphics.SurfaceTexture
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -57,7 +58,7 @@ import kotlinx.coroutines.withContext
 @OptIn(UnstableApi::class)
 @DoNotStrip
 class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulsePreviewSpec() {
-  private val texture = TextureView(context)
+  private val texture = PreviewTexture(context)
   /** Drags show the clip under the finger through a plain player on top (DragLayer). */
   private val drag = DragLayer(context, { clip, ptsUs, releaseNs -> onDragFrame(clip, ptsUs, releaseNs) }, { onLayerFailed() })
   private val root = Container(context).apply {
@@ -151,6 +152,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
       onTime(shownTimeMs(p), isPlaying)
       main.removeCallbacks(ticker)
       if (isPlaying) main.postDelayed(ticker, TICK_MS)
+      texture.playing = isPlaying
     }
 
     override fun onPlayerError(error: PlaybackException) {
@@ -337,7 +339,12 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
       while (inFlight.size > 1 && (inFlight.first().second < stale || inFlight.first().second < flushed)) inFlight.removeFirst()
     }
     val (presentationTimeUs, releaseTimeNs) = when {
-      match >= 0 -> inFlight[match].also { repeat(match + 1) { inFlight.removeFirst() } }
+      match >= 0 -> inFlight[match].also {
+        // Released before this one and never drawn: the view keeps only the newest frame. Counted
+        // while playing (a seek flushes frames too); frames matched by order can't be counted.
+        if (player?.isPlaying == true) framesDropped += match
+        repeat(match + 1) { inFlight.removeFirst() }
+      }
       inFlight.isNotEmpty() -> inFlight.removeFirst()
       else -> return
     }
@@ -705,6 +712,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
       drag.release()
       player?.release()
       player = null
+      texture.playing = false
     }
   }
 
@@ -717,6 +725,25 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     const val STALE_FRAME_MS = 300L
     /** Released before the last seek and this long ago without being drawn: that seek flushed it. */
     const val FLUSHED_FRAME_MS = 50L
+  }
+}
+
+/**
+ * The composition's view. While playing it asks to draw at the display's high rate. Left alone, the
+ * player's Surface.setFrameRate(30) becomes this view's requested rate (TextureView forwards it,
+ * API 35+), the app then draws every 33 ms, and two frames released with jitter often land in one
+ * draw: the older is never shown (Pixel 6a trace, 2026-10-13: ~23 of 30 fps).
+ */
+private class PreviewTexture(context: android.content.Context) : TextureView(context) {
+  var playing = false
+    set(value) {
+      field = value
+      if (Build.VERSION.SDK_INT >= 35) super.setRequestedFrameRate(if (value) REQUESTED_FRAME_RATE_CATEGORY_HIGH else REQUESTED_FRAME_RATE_CATEGORY_DEFAULT)
+    }
+
+  // The player's rate, forwarded by TextureView: held off while playing.
+  override fun setRequestedFrameRate(frameRate: Float) {
+    super.setRequestedFrameRate(if (playing) REQUESTED_FRAME_RATE_CATEGORY_HIGH else frameRate)
   }
 }
 
