@@ -52,12 +52,9 @@ internal object PreviewComposition {
   /** A clip's sound in its window, retimed, in the preview's audio layout. */
   private fun audioItem(clip: MergeClip, media: ProbeResult, options: MergeOptions): EditedMediaItem {
     val mediaItem = MediaItem.Builder().setUri(mediaUri(clip.uri))
-    if (clip.endMs > clip.startMs) {
+    MergePlan.windowUs(clip, media)?.let { (startUs, endUs) ->
       mediaItem.setClippingConfiguration(
-        MediaItem.ClippingConfiguration.Builder()
-          .setStartPositionMs(clip.startMs.toLong())
-          .setEndPositionMs(minOf(clip.endMs, media.durationMs).toLong())
-          .build(),
+        MediaItem.ClippingConfiguration.Builder().setStartPositionUs(startUs).setEndPositionUs(endUs).build(),
       )
     }
     val item = EditedMediaItem.Builder(mediaItem.build()).setRemoveVideo(true)

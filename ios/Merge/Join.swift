@@ -91,20 +91,31 @@ enum Join {
   /// The window inside a source video track (the whole track when unset). A window that starts at
   /// or past the track's end is an error, not the whole clip. With `frame`, both ends move to the
   /// nearest frame boundary: a copied cut inside a frame is shown by Apple players but dropped by
-  /// FFmpeg-based ones, which then start the picture up to a frame after the sound.
-  static func trimRange(startMs: Double, endMs: Double, in track: CMTimeRange, frame: CMTime? = nil) throws -> CMTimeRange {
-    guard endMs > startMs else { return track }
-    func at(_ ms: Double) -> CMTime {
-      let t = CMTime(value: CMTimeValue(ms.rounded()), timescale: 1000)
-      guard let frame, frame.isNumeric, frame > .zero else { return track.start + t }
-      return track.start + CMTimeMultiply(frame, multiplier: Int32((t.seconds / frame.seconds).rounded()))
+  /// FFmpeg-based ones, which then start the picture up to a frame after the sound. A trim inside
+  /// one frame is that frame. Then the end moves earlier, by under 1 ms of timeline, so the clip's
+  /// timeline length (the window at `speed`) is whole ms, as on Android: both export the same
+  /// lengths and every clip starts on a whole ms.
+  static func trimRange(
+    startMs: Double, endMs: Double, in track: CMTimeRange, frame: CMTime? = nil, speed: Double = 1
+  ) throws -> CMTimeRange {
+    let frame = frame.flatMap { $0.isNumeric && $0 > .zero ? $0 : nil }
+    var start = track.start
+    var end = track.end
+    if endMs > startMs {
+      func at(_ ms: Double) -> CMTime {
+        let t = CMTime(value: CMTimeValue(ms.rounded()), timescale: 1000)
+        guard let frame else { return track.start + t }
+        return track.start + CMTimeMultiply(frame, multiplier: Int32((t.seconds / frame.seconds).rounded()))
+      }
+      start = at(startMs)
+      end = CMTimeMinimum(at(endMs), track.end)
+      guard start < track.end else {
+        throw MergeError.invalid("The trim starts at \(Int(startMs)) ms, past the end of the video (\(Probe.ms(track.duration)) ms).")
+      }
+      if end <= start { end = CMTimeMinimum(start + (frame ?? CMTime(value: 1, timescale: 1000)), track.end) }
     }
-    let start = at(startMs)
-    let end = CMTimeMinimum(at(endMs), track.end)
-    guard start < end else {
-      throw MergeError.invalid("The trim starts at \(Int(startMs)) ms, past the end of the video (\(Probe.ms(track.duration)) ms).")
-    }
-    return CMTimeRange(start: start, end: end)
+    let lengthMs = ((end - start).seconds * 1000 / speed + 1e-6).rounded(.down)
+    return CMTimeRange(start: start, duration: CMTime(value: CMTimeValue((lengthMs * speed * 1000).rounded()), timescale: 1_000_000))
   }
 
   /// Replace the composition's audio track with one encoded audio file; returns that file's asset.

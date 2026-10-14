@@ -225,14 +225,14 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
         var at = 0.0
         slots = list.zip(media).map { (c, m) ->
           val length = com.margelo.nitro.pulseeditor.merge.MergePlan.timelineMs(c, m)
-          val trimmed = c.endMs > c.startMs
+          val trimStartMs = com.margelo.nitro.pulseeditor.merge.MergePlan.windowUs(c, m)?.let { it.first / 1000.0 } ?: 0.0
           val v = m.video
           // The layer is a plain player on a TextureView: no tone mapping (HDR, 10-bit), quarter turns only.
           val layerOk = v != null && v.transfer == Transfer.SDR && v.bitDepth <= 8 && c.rotation.roundToInt() % 90 == 0
           val upright = v?.let {
             if (it.rotation.roundToInt() % 180 == 90) VideoSize(it.height.toInt(), it.width.toInt()) else VideoSize(it.width.toInt(), it.height.toInt())
           }
-          Slot(at, length, if (trimmed) c.startMs else 0.0, c.speed, v?.fps?.takeIf { it > 0 } ?: options.fps, c, upright, layerOk)
+          Slot(at, length, trimStartMs, c.speed, v?.fps?.takeIf { it > 0 } ?: options.fps, c, upright, layerOk)
             .also { at += length }
         }
         durationMs = at
@@ -402,8 +402,11 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
    * Where the frame showing at `timeMs` starts on the timeline. What plays (and what merge
    * exports) at a time is the frame that started at or before it; Media3's exact seek shows the
    * first frame starting at or after the seek position, so seeks go to that start. Source frames
-   * are taken to be on the clip's average frame rate; a clip trimmed inside a frame starts on its
-   * first whole frame, as Media3 clips it.
+   * are taken to be on the clip's average frame rate. A clip's window starts on a frame and its
+   * timeline length is whole ms (MergePlan.windowUs), so every clip starts on a whole ms with its
+   * first frame there: the seek to that start resolves to the clip itself, at its first sample,
+   * and shows it. (A start inside a ms can't be hit: a seek below it shows the previous clip's
+   * last frame, one above it skips the first frame as decode-only.)
    */
   private fun frameStartMs(timeMs: Double): Double {
     val slot = slots.lastOrNull { it.startMs <= timeMs + 0.001 } ?: return timeMs
