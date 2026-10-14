@@ -103,6 +103,9 @@ enum SampleTransfer {
       session.queue.sync { writer.cancelWriting() }
       throw reader.error ?? MergeError.failed("Reading failed.")
     }
+    // A rendered clip ends at `duration`, not at its last frame's end: a slot of 100.5 frames
+    // (3350 ms at 2×) would otherwise come out 101 frames long and shift every later clip.
+    if frameDuration != nil { writer.endSession(atSourceTime: duration) }
     await writer.finishWriting()
     guard writer.status == .completed else {
       throw writer.error ?? MergeError.failed("Writing failed.")

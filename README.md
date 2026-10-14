@@ -196,7 +196,7 @@ type MergeResult = { uri: string; durationMs: number; encoded: boolean; bitrate:
 | Path | When | What happens |
 |---|---|---|
 | **Fast join** | Every clip shares one H.264 format that fits the canvas (AAC audio, any sample rate or channel count), at most 1.6× the chosen bitrate, and no clip has a rendered edit | `AVMutableComposition` with edit-list trims on frame boundaries, passthrough export. No video decoding or encoding; the audio is re-encoded once when it comes from more than one clip (see Audio). |
-| **Selective** | Same, but some clips are rotated, flipped, cropped or sped up, and no copied clip reorders frames (camera recordings don't) | Only those clips are rendered, into the draft's own format, two at a time, then everything is joined. |
+| **Selective** | Same, but some clips are rotated, flipped, cropped or sped up, and no copied clip reorders frames (camera recordings don't) | Only those clips are rendered, into the draft's own format, two at a time, then everything is joined. On iOS, copied clips trimmed at their start are rendered too: next to rendered clips, FFmpeg drops the frames before each of their joins ([trac #6584](https://trac.ffmpeg.org/ticket/6584)). |
 | **Full encode** | The clips don't share a format that fits, a copied clip would reorder frames, or the selective path fails | Every clip is rendered onto the upright canvas at the chosen bitrate, two at a time, then they're joined. |
 
 - **Rendering:** each clip gets a trimmed slot, `scaleTimeRange` for speed, and a video-composition instruction for rotate → flip → crop → letterboxed fit. Encoding is `AVAssetReader` → `AVAssetWriter` (H.264 High, BT.709, keyframe every 2 s, no B-frames), with frames filled to a constant 30 fps.
@@ -237,6 +237,7 @@ Media3 can't mix copied and re-encoded clips in one export, and its copy mode is
 - **Known difference from iOS:** slowed-down clips come out at a variable frame rate (Media3's frame rate setting only caps it). They play correctly.
 
 ### Tested
+- **iOS selective merges, read the way a server re-encode reads them (2026-10-14, iPhone 17 Pro Max, Debug, `ios-ios-wms-1014`, `ios-ios-drift-1014`, `ios-ios-quick-drift-1014`):** copied clips trimmed at their start are now rendered when other clips are, so the file has no pre-roll edits. Decoded by FFmpeg through the edit list, the 20-clip draft's export has 0 errors and 6319 frames, the timeline's count (before: 53 errors, 6305 frames), the 40-clip draft's 0 and 12548 (before: 107, 12516), and the quick pass's `sync-select` 0 (before: 4); every export has one video edit. `sync-select` takes 5.6 s (3.7 s before: its trimmed copied clips are rendered now). A rendered clip whose slot ends inside a frame (a trimmed 2× clip, 100.5 frames) was written a frame long, so every later clip started 16 ms late; it now ends at its slot (`trimedits` export 27.383 s, the timeline's; was 27.400). Preview against export on `trimedits` (trimmed + rotated, 2×, flipped + cropped, ½×): 16 of 20 (was 13), the 4 in the 2× clip. Lip sync on every path unchanged (0.0 / ±0.1 ms; speed −25.0 ms).
 - **Android, on an emulator (Android 17, arm64, software codecs), same fixtures as iOS:**
   - fast join of 3 clips without re-encoding, and with a muted last clip (silent);
   - trims; every rotation, flip and crop, and combinations (frames identical to iOS);
