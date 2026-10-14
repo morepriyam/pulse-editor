@@ -78,7 +78,7 @@ internal object MergeExport {
       // which can't be cut mid-frame, so every clip would push the next clip's audio later.
       val trackTypes = if (hasAudio) setOf(C.TRACK_TYPE_AUDIO, C.TRACK_TYPE_VIDEO) else setOf(C.TRACK_TYPE_VIDEO)
       val items = pairs.map { (clip, m) ->
-        EditedMediaItem.Builder(MediaItem.fromUri(mediaUri(clip.uri)))
+        EditedMediaItem.Builder(clippedItem(clip, m))
           .setRemoveAudio(clip.muted)
           .setEffects(Effects(audioChain(clip, m, options), emptyList()))
           .build()
@@ -111,15 +111,22 @@ internal object MergeExport {
   /** A clip's picture: trimmed, retimed, with its geometry, capped at the frame rate. Shared
    * with the preview, which draws the same picture (at a smaller size). */
   internal fun videoItem(clip: MergeClip, media: ProbeResult, options: MergeOptions): EditedMediaItem {
+    val item = EditedMediaItem.Builder(clippedItem(clip, media)).setRemoveAudio(true)
+    speed(clip)?.let { item.setSpeed(it) }
+    return item.setFrameRate(options.fps.roundToInt()).setEffects(Effects(emptyList(), videoEffects(clip, options))).build()
+  }
+
+  /** The clip's file clipped to its window (MergePlan.windowUs). The join needs it too: an untrimmed
+   * clip's window ends under 1 ms early when its length isn't whole ms, and the preview and
+   * timelineMs use that length, so an unclipped join would start every later clip late. */
+  private fun clippedItem(clip: MergeClip, media: ProbeResult): MediaItem {
     val mediaItem = MediaItem.Builder().setUri(mediaUri(clip.uri))
     MergePlan.windowUs(clip, media)?.let { (startUs, endUs) ->
       mediaItem.setClippingConfiguration(
         MediaItem.ClippingConfiguration.Builder().setStartPositionUs(startUs).setEndPositionUs(endUs).build(),
       )
     }
-    val item = EditedMediaItem.Builder(mediaItem.build()).setRemoveAudio(true)
-    speed(clip)?.let { item.setSpeed(it) }
-    return item.setFrameRate(options.fps.roundToInt()).setEffects(Effects(emptyList(), videoEffects(clip, options))).build()
+    return mediaItem.build()
   }
 
   /** A clip's sound, from the file's start, retimed; the window is cut by [audioChain]. */
