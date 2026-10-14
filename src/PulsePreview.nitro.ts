@@ -9,6 +9,11 @@ import type { MergeClip, MergeOptions } from './PulseEditor.nitro';
 export interface PreviewStatus {
   /** The timeline's length in ms (0 while loading or empty). */
   durationMs: number;
+  /** Where each clip starts on the timeline in ms, in `clips` order (empty while loading or on an
+   * error). A clip ends where the next starts, the last at `durationMs`. Take clip positions from
+   * here, not from probed lengths: an untrimmed clip ends at its video track's end on iOS and at
+   * the file's end on Android, so a recording whose audio runs longer differs by that gap. */
+  clipStartsMs: number[];
   /** True once the first frame of the current timeline is on screen. */
   ready: boolean;
   /** Set when the timeline couldn't be loaded or played. */

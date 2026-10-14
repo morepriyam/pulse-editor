@@ -107,7 +107,7 @@ const clips: MergeClip[] = [
   style={{ flex: 1 }}
   clips={clips}
   options={options}
-  onStatus={({ durationMs, ready, error }) => {}}
+  onStatus={({ durationMs, clipStartsMs, ready, error }) => {}}
   onTime={(timeMs, playing) => {}}
   onReady={(ref) => ref.play()}
 />;

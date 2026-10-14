@@ -23,6 +23,9 @@ data class PreviewStatus(
   val durationMs: Double,
   @DoNotStrip
   @Keep
+  val clipStartsMs: DoubleArray,
+  @DoNotStrip
+  @Keep
   val ready: Boolean,
   @DoNotStrip
   @Keep
@@ -34,6 +37,7 @@ data class PreviewStatus(
     if (this === other) return true
     if (other !is PreviewStatus) return false
     return Objects.deepEquals(this.durationMs, other.durationMs)
+      && Objects.deepEquals(this.clipStartsMs, other.clipStartsMs)
       && Objects.deepEquals(this.ready, other.ready)
       && Objects.deepEquals(this.error, other.error)
   }
@@ -41,6 +45,7 @@ data class PreviewStatus(
   override fun hashCode(): Int {
     return arrayOf<Any?>(
       durationMs,
+      clipStartsMs,
       ready,
       error
     ).contentDeepHashCode()
@@ -54,8 +59,8 @@ data class PreviewStatus(
     @Keep
     @Suppress("unused")
     @JvmStatic
-    private fun fromCpp(durationMs: Double, ready: Boolean, error: String?): PreviewStatus {
-      return PreviewStatus(durationMs, ready, error)
+    private fun fromCpp(durationMs: Double, clipStartsMs: DoubleArray, ready: Boolean, error: String?): PreviewStatus {
+      return PreviewStatus(durationMs, clipStartsMs, ready, error)
     }
   }
 }

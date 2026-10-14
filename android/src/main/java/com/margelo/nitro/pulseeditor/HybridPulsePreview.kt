@@ -84,6 +84,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     val clip: MergeClip, val size: VideoSize?, val layerOk: Boolean,
   )
   private var slots: List<Slot> = emptyList()
+  private fun clipStartsMs() = DoubleArray(slots.size) { slots[it].startMs }
   private var ready = false
 
   override var clips: Array<MergeClip> = emptyArray()
@@ -155,7 +156,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
 
     override fun onPlayerError(error: PlaybackException) {
       Log.w("PulseEditor", "Preview failed: ${error.errorCodeName}", error)
-      onStatus(PreviewStatus(durationMs, ready, error.message ?: error.errorCodeName))
+      onStatus(PreviewStatus(durationMs, clipStartsMs(), ready, error.message ?: error.errorCodeName))
     }
   }
 
@@ -262,11 +263,11 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
         }
         framesShown = 0.0
         framesDropped = 0.0
-        onStatus(PreviewStatus(durationMs, ready, null))
+        onStatus(PreviewStatus(durationMs, clipStartsMs(), ready, null))
       } catch (e: Exception) {
         if (e is kotlinx.coroutines.CancellationException) throw e
         Log.w("PulseEditor", "Preview couldn't load the clips", e)
-        onStatus(PreviewStatus(0.0, false, e.message ?: e.javaClass.simpleName))
+        onStatus(PreviewStatus(0.0, DoubleArray(0), false, e.message ?: e.javaClass.simpleName))
       }
     }
   }
@@ -354,7 +355,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
       firstFrameMs = (shownNs - compositionSetNs) / 1e6
       main.postDelayed({
         ready = true
-        onStatus(PreviewStatus(durationMs, true, null))
+        onStatus(PreviewStatus(durationMs, clipStartsMs(), true, null))
       }, afterShown)
     }
     // A frame the old timeline released before the swap can still arrive: wait for a newer one,

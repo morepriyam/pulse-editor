@@ -18,8 +18,14 @@ public extension PreviewStatus {
   /**
    * Create a new instance of `PreviewStatus`.
    */
-  init(durationMs: Double, ready: Bool, error: String?) {
-    self.init(durationMs, ready, { () -> bridge.std__optional_std__string_ in
+  init(durationMs: Double, clipStartsMs: [Double], ready: Bool, error: String?) {
+    self.init(durationMs, { () -> bridge.std__vector_double_ in
+      var __vector = bridge.create_std__vector_double_(clipStartsMs.count)
+      for __item in clipStartsMs {
+        __vector.push_back(__item)
+      }
+      return __vector
+    }(), ready, { () -> bridge.std__optional_std__string_ in
       if let __unwrappedValue = error {
         return bridge.create_std__optional_std__string_(std.string(__unwrappedValue))
       } else {
@@ -31,6 +37,11 @@ public extension PreviewStatus {
   @inline(__always)
   var durationMs: Double {
     return self.__durationMs
+  }
+  
+  @inline(__always)
+  var clipStartsMs: [Double] {
+    return self.__clipStartsMs.map({ __item in __item })
   }
   
   @inline(__always)

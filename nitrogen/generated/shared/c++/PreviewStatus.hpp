@@ -30,6 +30,7 @@
 
 
 
+#include <vector>
 #include <string>
 #include <optional>
 
@@ -41,12 +42,13 @@ namespace margelo::nitro::pulseeditor {
   struct PreviewStatus final {
   public:
     double durationMs     SWIFT_PRIVATE;
+    std::vector<double> clipStartsMs     SWIFT_PRIVATE;
     bool ready     SWIFT_PRIVATE;
     std::optional<std::string> error     SWIFT_PRIVATE;
 
   public:
     PreviewStatus() = default;
-    explicit PreviewStatus(double durationMs, bool ready, std::optional<std::string> error): durationMs(durationMs), ready(ready), error(error) {}
+    explicit PreviewStatus(double durationMs, std::vector<double> clipStartsMs, bool ready, std::optional<std::string> error): durationMs(durationMs), clipStartsMs(clipStartsMs), ready(ready), error(error) {}
 
   public:
     friend bool operator==(const PreviewStatus& lhs, const PreviewStatus& rhs) = default;
@@ -63,6 +65,7 @@ namespace margelo::nitro {
       jsi::Object obj = arg.asObject(runtime);
       return margelo::nitro::pulseeditor::PreviewStatus(
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "durationMs"))),
+        JSIConverter<std::vector<double>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "clipStartsMs"))),
         JSIConverter<bool>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "ready"))),
         JSIConverter<std::optional<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "error")))
       );
@@ -70,6 +73,7 @@ namespace margelo::nitro {
     static inline jsi::Value toJSI(jsi::Runtime& runtime, const margelo::nitro::pulseeditor::PreviewStatus& arg) {
       jsi::Object obj(runtime);
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "durationMs"), JSIConverter<double>::toJSI(runtime, arg.durationMs));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "clipStartsMs"), JSIConverter<std::vector<double>>::toJSI(runtime, arg.clipStartsMs));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "ready"), JSIConverter<bool>::toJSI(runtime, arg.ready));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "error"), JSIConverter<std::optional<std::string>>::toJSI(runtime, arg.error));
       return obj;
@@ -83,6 +87,7 @@ namespace margelo::nitro {
         return false;
       }
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "durationMs")))) return false;
+      if (!JSIConverter<std::vector<double>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "clipStartsMs")))) return false;
       if (!JSIConverter<bool>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "ready")))) return false;
       if (!JSIConverter<std::optional<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "error")))) return false;
       return true;
