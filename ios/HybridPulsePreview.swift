@@ -88,7 +88,8 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
     }
     timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 12), queue: .main) { [weak self] t in
       guard let self, self.player.timeControlStatus == .playing else { return }
-      self.onTime(Self.ms(t), true)
+      // Mid-swap the new item reads ~0 (and the observer fires on the jump): report its target.
+      self.onTime(Self.ms(self.swapTarget ?? t), true)
     }
   }
 
@@ -186,6 +187,8 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
         }
         self.pendingSwap?.seeked = true
         self.finishSwapIfShown()
+        // A seek asked for while the swap landed waited for it: run it now.
+        if !self.waiters.isEmpty && !self.seeking { self.seekToChaseTime() }
         if wasPlaying { self.player.play() }
       }
     }
@@ -263,7 +266,10 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
   /// One seek at a time, always to the latest time asked for; exact unless the person is dragging.
   private func seekToChaseTime() {
     guard let item = player.currentItem, item.status == .readyToPlay else {
-      // Not loaded yet: answer with where it is; the timeline swap seeks on its own.
+      // A swap is landing (its new item not ready): its seek runs this one once it's done, rather
+      // than answering with the new item's ~0 and not seeking.
+      if pendingSwap?.seeked == false { return }
+      // Not loaded yet (the first timeline): answer with where it is.
       finishSeeks(Self.ms(player.currentTime()))
       return
     }
