@@ -1,0 +1,26 @@
+# pulse-editor
+
+> Native video editing engine for React Native and Expo (package name @mieweb/pulse-editor, MIT). A Nitro module in Swift and Kotlin that uses AVFoundation on iOS and Media3 Transformer on Android, with no FFmpeg. It probes files, converts imports (HDR to SDR) into the recorder's format, joins clips into one H.264 + AAC MP4 with trims, rotate, flip, crop, speed and mute, renders thumbnails, extracts 16 kHz mono PCM for Whisper, and plays the edited draft in a native `<PulsePreview>` view that shows the export's frames.
+
+Facts to keep when describing it:
+
+- Version 0.1.0, not published on npm. It's consumed as a git submodule and its TypeScript source is read directly (no build step).
+- Tested only in an Expo SDK 57 development build (the Pulse app). Bare React Native isn't tested; it doesn't run in Expo Go or on the web.
+- Minimum iOS 16.4 and Android 10 (API 29). Requires react-native-nitro-modules 0.37.
+- No editor UI yet: it's the engine. A timeline editor built on `<PulsePreview>` is planned.
+- Exports H.264 + AAC MP4 only and reads what the phone's own decoders read; no filters, text, music, transitions or GIFs.
+- Benchmarks compare it with Pulse's fork of react-native-video-trim, on an iPhone 17 Pro Max, a Galaxy S24 Ultra and a Pixel 6a.
+
+## Docs
+
+- [README](https://github.com/morepriyam/pulse-editor/blob/main/README.md): what it is, install, quick start, API at a glance, comparison, FAQ
+- [Methods](https://github.com/morepriyam/pulse-editor/blob/main/docs/methods.md): every call, its types, how it runs on each platform, and how it was tested
+- [Benchmarks](https://github.com/morepriyam/pulse-editor/blob/main/docs/benchmarks.md): on-device timings, lip sync and output checks, with run IDs
+- [Differences](https://github.com/morepriyam/pulse-editor/blob/main/docs/differences.md): iOS vs Android differences, and where it's slower than react-native-video-trim and why
+
+## Optional
+
+- [Timeline editor](https://github.com/morepriyam/pulse-editor/blob/main/docs/timeline-editor.md): the planned editor UI and what it takes from the engine
+- [Migration](https://github.com/morepriyam/pulse-editor/blob/main/docs/migration.md): step-by-step move of the Pulse app off react-native-video-trim, with device results
+- [Roadmap](https://github.com/morepriyam/pulse-editor/blob/main/docs/roadmap.md): planned features after the migration
+- [Pulse](https://github.com/mieweb/pulse): the app that uses it
