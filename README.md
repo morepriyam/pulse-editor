@@ -1,8 +1,10 @@
 <div align="center">
 
+<!-- logo: docs/assets/logo.svg (alt="pulse-editor logo", width="120") -->
+
 # @mieweb/pulse-editor
 
-**The native video engine behind [Pulse](https://github.com/mieweb/pulse): fast, simple, and built only on each platform's own media stack.**
+**Native video editing for React Native and Expo: trim, join, crop, rotate and speed up clips, with a live preview that matches the export. No FFmpeg.**
 
 ![iOS 16.4+](https://img.shields.io/badge/iOS-16.4%2B-000000?logo=apple&logoColor=white)
 ![Android API 29+](https://img.shields.io/badge/Android-API%2029%2B-3DDC84?logo=android&logoColor=white)
@@ -16,6 +18,43 @@
 
 </div>
 
+pulse-editor is a video editing engine for React Native and Expo apps, written as a [Nitro module](https://nitro.margelo.com/) in Swift and Kotlin. It edits on the phone with each platform's own media stack, AVFoundation on iOS and Media3 Transformer on Android, so there is no FFmpeg binary to ship. It joins clips into one MP4 with trims, rotate, flip, crop, speed and mute; converts imports (HDR included) into the recorder's format; renders thumbnails; extracts audio for Whisper; and plays the edited draft in a native `<PulsePreview>` view that shows the frames the export will have. It is the engine behind [Pulse](https://github.com/mieweb/pulse), an Expo app for recording and editing short videos on the device.
+
+<!-- demo: docs/assets/demo.gif (alt="A draft of several clips played in PulsePreview, trimmed and sped up, then exported with merge"; ≤ 5 MB, 320 px wide) -->
+
+## Why pulse-editor
+
+- 🚫 **No FFmpeg.** FFmpegKit (`ffmpeg-kit-react-native`) is retired and its repo archived; pulse-editor uses only the system frameworks: AVFoundation (Core Media, Core Video, VideoToolbox) on iOS, Media3 (Transformer, Effect, Inspector) on Android.
+- 🎯 **The preview matches the export.** `<PulsePreview>` and `merge` take the same clips and options. A seek showed the export's frame 80 of 80 times on a Galaxy S24 Ultra and 77 of 80 on an iPhone 17 Pro Max (Release); every miss was in a 2× clip.
+- 🔊 **In sync everywhere.** Audio − video within 0.1 ms on every merge path, read the way browsers (FFmpeg) and Apple players (AVFoundation) read it; a 2× clip is under a frame.
+- ⚡ **Fast on the phone.** A 2-minute, 20-clip join takes 1.6 s on the iPhone (Debug) and 5.8 s on the S24 (release APK).
+- 🧩 **Typed and cancellable.** Nitro specs with TypeScript types, progress that never goes backwards, and `AbortController` cancel that deletes partial output.
+
+## When to use it, and when not
+
+**Use it** when your React Native or Expo app records or imports phone video and needs to cut, join and export it on the device, show the edited draft before exporting, or feed the audio to Whisper.
+
+**Look elsewhere (for now)** if you need:
+- **`npm install`:** it isn't on npm yet (0.1.0). Today you add it as a git submodule.
+- **A ready-made editor screen:** pulse-editor has no editor UI yet; a [timeline editor](docs/timeline-editor.md) is planned.
+- **Any codec or container:** it reads what the phone's own decoders read and exports H.264 + AAC MP4. Filters, text, music, transitions and GIFs aren't in the API.
+- **Bare React Native, Expo Go, web, or older phones:** it's tested only in Pulse's Expo SDK 57 development build (native code doesn't run in Expo Go), on iOS 16.4+ and Android 10+.
+
+## Compared with the alternatives
+
+Checked 2026-10-14 against each project's own README, docs and npm page.
+
+| | pulse-editor | [react-native-video-trim](https://github.com/maitrungduc1410/react-native-video-trim) | [ffmpeg-kit-react-native](https://github.com/arthenica/ffmpeg-kit) |
+|---|---|---|---|
+| Media engine | AVFoundation (iOS), Media3 (Android) | depends on FFmpegKit (the `min` package by default, per its install guide) | FFmpeg |
+| Status | 0.1.0, not on npm | 8.2.4 on npm (2026-10-05) | retired (binaries removed in 2025); repo archived 2026-07-02; npm package deprecated |
+| Editor UI | not yet ([planned](docs/timeline-editor.md)) | native trimmer screen with a thumbnail timeline | none |
+| Join clips | `merge`, with per-clip trims and edits | `merge`, among its headless APIs | through FFmpeg commands |
+| Live preview of the edited, multi-clip draft | `<PulsePreview>` | not listed in its README | none |
+| Head-to-head numbers | against Pulse's fork of react-native-video-trim ([Benchmarks](docs/benchmarks.md), [Differences](docs/differences.md)) | — | — |
+
+Other packages people find: [react-native-video-processing](https://github.com/shahen94/react-native-video-processing) (last npm release 2022-09-08), FFmpegKitNext (ffmpeg-kit's README names it a source-only continuation), and [react-native-compressor](https://github.com/numandev1/react-native-compressor) (compression, a different job). Where pulse-editor is slower than Pulse's react-native-video-trim fork, and why: [Differences](docs/differences.md).
+
 ## ✨ Features
 
 | | |
@@ -23,11 +62,6 @@
 | 🔎 **[`probe`](docs/methods.md#probe)**: a file's metadata without decoding it (codec, rotation, mirror, fps, bitrate, HDR transfer, the audio track Pulse reads) | 🎬 **[`merge`](docs/methods.md#merge)**: clips into one faststart MP4 with trims, rotate, flip, crop, speed (natural pitch) and mute; copies what it can, renders only what it must; cancellable |
 | 🔄 **[`conform`](docs/methods.md#conform)**: one import into the recorder's format, HDR tone-mapped to SDR, mirrors fixed; a file whose sound can't be decoded is rejected, never imported silent | 🖼️ **[`thumbnail`](docs/methods.md#thumbnail)**: the exact frame at a time, with the clip's edit drawn by merge's own geometry |
 | 🎙️ **[`extractAudio`](docs/methods.md#extractaudio)**: 16 kHz mono PCM for Whisper, decoded in memory, no file | ▶️ **[`<PulsePreview>`](docs/methods.md#pulsepreview)**: a native view that plays the draft as `merge` will export it; seeks and edits resolve when the frame is on screen |
-
-- 🚫 **No FFmpeg** on either platform: AVFoundation (Core Media, Core Video, VideoToolbox) on iOS, Media3 (Transformer, Effect, Inspector, Inspector frame) on Android.
-- ⚡ **A [Nitro module](https://nitro.margelo.com/):** Swift and Kotlin, typed specs, no Objective-C++ shim.
-- 📦 **Expo autolinking:** Pulse (Expo SDK 57) links it from its `modules/` folder; bare React Native isn't tested.
-- 🎯 **In sync everywhere:** audio − video within 0.1 ms on every merge path (under a frame with a 2× clip), read the way browsers (FFmpeg) and Apple players (AVFoundation) read it ([Benchmarks](docs/benchmarks.md#lip-sync-and-output-checks)).
 
 ## 📱 Platforms
 
@@ -93,15 +127,15 @@ const { uri, durationMs, encoded } = await merge(clips, options, {
 | `probe(uri)` | Reads metadata without decoding | `{ durationMs, video?, audio? }` |
 | `merge(clips, options, { onProgress, signal })` | Joins clips in order, each with its edit | `{ uri, durationMs, encoded, bitrate }` |
 | `conform(uri, options, { onProgress, signal })` | One import into the recorder's format (`copyVideo: true` converts only the audio) | `{ uri, durationMs, encoded, bitrate }` |
-| `thumbnail(uri, { timeMs, maxWidth, maxHeight, quality, rotation?, flipped?, crop? })` | A JPEG cover of the exact frame, edit applied | `{ uri, width, height, timeMs }` |
-| `extractAudio(uri, sampleRate = 16000)` | 16-bit mono PCM in memory, for whisper.rn's `transcribeData` | `{ data: ArrayBuffer, sampleRate, durationMs }` |
-| `<PulsePreview clips options onStatus onTime onReady />` | Plays the draft with every edit, as merge would export it | a ref: `play()`, `pause()`, `seek(ms)` (resolves when the frame is on screen), `setScrubbing(bool)` |
+| `thumbnail(uri, { timeMs?, maxWidth?, maxHeight?, quality?, rotation?, flipped?, crop? })` | A JPEG cover of the exact frame, edit applied (defaults: first frame, no size limit, quality 0.8) | `{ uri, width, height, timeMs }` |
+| `extractAudio(uri, { sampleRate })` | 16-bit mono PCM in memory (`sampleRate` defaults to 16000), for whisper.rn's `transcribeData` | `{ data: ArrayBuffer, sampleRate, durationMs }` |
+| `<PulsePreview clips options onStatus onTime onReady />` | Plays the draft with every edit, as merge would export it | a ref: `play()`, `pause()`, `seek(ms)` (resolves with the frame's time once it's on screen), `setScrubbing(bool)` |
 
 Every type, path and test log: [Methods](docs/methods.md).
 
 ## 📊 Benchmarks
 
-Headline numbers, Debug builds unless marked, from Pulse's on-device bench. Full tables, methods and run IDs: [Benchmarks](docs/benchmarks.md); where RNVT is faster or the platforms differ, and why: [Differences](docs/differences.md).
+Headline numbers, Debug builds unless marked, from Pulse's on-device bench; RNVT is Pulse's react-native-video-trim fork. Full tables, methods and run IDs: [Benchmarks](docs/benchmarks.md); where RNVT is faster or the platforms differ, and why: [Differences](docs/differences.md).
 
 | | iPhone 17 Pro Max | Galaxy S24 Ultra | Pixel 6a |
 |---|---|---|---|
@@ -122,7 +156,7 @@ Dates are 2026. The S24 hasn't run the 2026-10-14 changes (#12, #14) yet.
 
 ## 🗺️ Status & roadmap
 
-Pulse is moving every native video method it uses from its react-native-video-trim (RNVT) fork into pulse-editor, **one method at a time**: added here, switched over in the app, tested on the phones. Full status, with every device result per step: [Migration](docs/migration.md).
+Pulse is moving every native video method it uses from its react-native-video-trim (RNVT) fork into pulse-editor, **one method at a time**: added here, switched over in the app, tested on the phones. Every device result per step: [Migration](docs/migration.md).
 
 | # | Step | Replaces (RNVT) | iOS | Android |
 |---|---|---|---|---|
@@ -144,6 +178,26 @@ Pulse is moving every native video method it uses from its react-native-video-tr
 - **Open:** #13 (draft) keeps Android preview drawing at full rate while playing; it waits for an S24 run.
 - **After the migration:** per-clip audio (waveform and captions), a cover selector, Whisper tuning ([Roadmap](docs/roadmap.md)).
 
+## ❓ FAQ
+
+**How do I trim and merge videos in React Native without FFmpeg?**
+Pass the clips, each with its trim and edit, to `merge`: it uses AVFoundation on iOS and Media3 Transformer on Android, copies what it can and re-encodes only what it must.
+
+**What should I use now that FFmpegKit is retired?**
+If your app trims, joins, crops, rotates or changes the speed of phone recordings, pulse-editor covers that with the platform frameworks, as long as a git submodule works for you until it's on npm. If you need FFmpeg's filters or codecs the phone can't decode, you still need an FFmpeg build.
+
+**Does it work with Expo?**
+Yes, in a development build: Pulse uses it on Expo SDK 57 through Expo's autolinking. It doesn't run in Expo Go, and bare React Native isn't tested.
+
+**Can I install it from npm?**
+Not yet. Version 0.1.0 is consumed as a git submodule (see [Install](#-install)).
+
+**Does the preview really match the export?**
+It's tested screenshot by screenshot against the export of the same draft on the same device: 80 of 80 seeks on the S24, 77 of 80 on the iPhone (Release), every miss in a 2× clip.
+
+**Is there an editor UI?**
+Not yet. pulse-editor is the engine; a timeline editor built on `<PulsePreview>` is next ([plan](docs/timeline-editor.md)).
+
 ## 🔬 How it's tested
 
 - **On the phones:** a bench screen in Pulse's debug build (kept out of the repo) runs the same drafts through pulse-editor and RNVT, with recorder-shaped clips that carry each frame's number and flash/click sync clips; outputs are pulled to a Mac and checked for lip sync, duration, faststart and FFmpeg decode errors ([how it's measured](docs/benchmarks.md)).
@@ -158,6 +212,10 @@ Pulse consumes this repo as a git submodule at `modules/pulse-editor` and reads 
 - **When the spec changes:** after editing `src/PulseEditor.nitro.ts`, run `yarn install` and `yarn nitrogen`. Commit the regenerated `nitrogen/generated/` files, because Pulse builds from source and needs them.
 - **Updating Pulse:** in Pulse, `git add modules/pulse-editor` to record the new commit.
 - **Minimum OS versions:** they follow the app's (iOS 16.4, Android 10 / API 29). API 29 is the lowest where Media3 tone-maps HDR (OpenGL); newer APIs are used behind per-method version checks.
+
+## 🤝 Contributing
+
+Issues and pull requests are welcome, especially device results from phones not listed above. ⭐ Star the repo to follow it to its first npm release.
 
 ## 📄 License
 

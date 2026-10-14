@@ -1,7 +1,7 @@
 {
   "name": "@mieweb/pulse-editor",
   "version": "0.1.0",
-  "description": "Fast native video editing engine and composition preview for React Native and Expo",
+  "description": "Native video editing for React Native and Expo: trim, join, crop, rotate and speed up clips with AVFoundation and Media3, plus a preview that matches the export. No FFmpeg.",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
   "exports": {
@@ -43,6 +43,21 @@
   },
   "keywords": [
     "react-native",
+    "expo",
+    "video",
+    "video-editor",
+    "video-editing",
+    "video-trim",
+    "trim-video",
+    "merge-videos",
+    "crop-video",
+    "video-thumbnail",
+    "hdr",
+    "avfoundation",
+    "media3",
+    "media3-transformer",
+    "nitro-modules",
+    "ffmpeg-alternative",
     "ios",
     "android"
   ],
