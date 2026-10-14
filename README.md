@@ -37,7 +37,7 @@ pulse-editor is a video editing engine for React Native and Expo apps, written a
 **Look elsewhere (for now)** if you need:
 - **`npm install`:** it isn't on npm yet (0.1.0). Today you add it as a git submodule.
 - **A ready-made editor screen:** pulse-editor has no editor UI yet; a [timeline editor](docs/timeline-editor.md) is planned.
-- **Any codec or container:** it reads what the phone's own decoders read and exports H.264 + AAC MP4. Filters, text, music, transitions and GIFs aren't in the API.
+- **Any codec or container:** it reads what the phone's own decoders read and exports H.264 + AAC MP4 (`conform` with `copyVideo: true` keeps the source's video codec). Filters, text, music, transitions and GIFs aren't in the API.
 - **Bare React Native, Expo Go, web, or older phones:** it's tested only in Pulse's Expo SDK 57 development build (native code doesn't run in Expo Go), on iOS 16.4+ and Android 10+.
 
 ## Compared with the alternatives

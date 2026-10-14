@@ -8,7 +8,7 @@ Facts to keep when describing it:
 - Tested only in an Expo SDK 57 development build (the Pulse app). Bare React Native isn't tested; it doesn't run in Expo Go or on the web.
 - Minimum iOS 16.4 and Android 10 (API 29). Requires react-native-nitro-modules 0.37.
 - No editor UI yet: it's the engine. A timeline editor built on `<PulsePreview>` is planned.
-- Exports H.264 + AAC MP4 only and reads what the phone's own decoders read; no filters, text, music, transitions or GIFs.
+- Exports H.264 + AAC MP4 (`conform` with `copyVideo: true` keeps the source's video codec) and reads what the phone's own decoders read; no filters, text, music, transitions or GIFs.
 - Benchmarks compare it with Pulse's fork of react-native-video-trim, on an iPhone 17 Pro Max, a Galaxy S24 Ultra and a Pixel 6a.
 
 ## Docs
