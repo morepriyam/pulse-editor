@@ -9,6 +9,7 @@ import com.margelo.nitro.pulseeditor.MergeOptions
 import com.margelo.nitro.pulseeditor.ProbeResult
 import com.margelo.nitro.pulseeditor.Transfer
 import kotlin.math.abs
+import kotlin.math.floor
 import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
@@ -34,22 +35,40 @@ object MergePlan {
     (clip.rotation.roundToInt() % 360) != 0 || clip.flipped || clip.crop != null || abs(clip.speed - 1) > 0.0001
 
   /**
-   * A trimmed clip's window in its source, µs (null when untrimmed): whole source frames, both
-   * ends at the nearest frame on the clip's average rate, as on iOS. Merge and the preview both
-   * clip with it, so a clip's first frame starts at its slot's start (a cut inside a frame left
-   * a gap that showed the previous clip's last frame).
+   * A clip's window in its source, µs (null when that's the whole file). Both trim ends go to the
+   * nearest source frame on the clip's average rate, as on iOS (a cut inside a frame left a gap
+   * that showed the previous clip's last frame); a trim inside one frame is that frame. Then the
+   * end moves earlier, by under 1 ms of timeline, so the clip's timeline length is whole ms: every
+   * clip starts on a whole ms, which a ms seek can land on. Merge (video and audio) and the
+   * preview all clip with it.
    */
-  fun windowUs(clip: MergeClip, media: ProbeResult): Pair<Long, Long>? {
-    if (clip.endMs <= clip.startMs) return null
-    val fps = media.video?.fps ?: 0.0
-    fun at(ms: Double): Long = if (fps > 0) ((ms * fps / 1000).roundToLong() * 1_000_000 / fps).toLong() else (ms * 1000).toLong()
-    return at(clip.startMs) to minOf(at(clip.endMs), (media.durationMs * 1000).toLong())
-  }
+  fun windowUs(clip: MergeClip, media: ProbeResult): Pair<Long, Long>? =
+    window(clip, media).takeIf { it.clipped }?.let { it.startUs to it.endUs }
 
-  /** What a clip contributes to the timeline, ms: its window at its speed. */
-  fun timelineMs(clip: MergeClip, media: ProbeResult): Double {
-    val window = windowUs(clip, media)?.let { (startUs, endUs) -> (endUs - startUs) / 1000.0 } ?: media.durationMs
-    return window / clip.speed
+  /** What a clip contributes to the timeline, ms (whole): its window at its speed. */
+  fun timelineMs(clip: MergeClip, media: ProbeResult): Double = window(clip, media).lengthUs / 1000.0
+
+  private class Window(val startUs: Long, val endUs: Long, val lengthUs: Long, val clipped: Boolean)
+
+  private fun window(clip: MergeClip, media: ProbeResult): Window {
+    val durUs = (media.durationMs * 1000).roundToLong()
+    val trimmed = clip.endMs > clip.startMs
+    var startUs = 0L
+    var endUs = durUs
+    if (trimmed) {
+      val fps = media.video?.fps?.takeIf { it > 0 }
+      fun index(ms: Double): Long = if (fps != null) (ms * fps / 1000).roundToLong() else (ms * 1000).roundToLong()
+      fun at(i: Long): Long = if (fps != null) (i * 1_000_000 / fps).toLong() else i
+      val first = index(clip.startMs)
+      startUs = at(first)
+      if (startUs >= durUs) {
+        throw MergeException("The trim starts at ${clip.startMs.toInt()} ms, past the end of the video (${media.durationMs.toInt()} ms).")
+      }
+      endUs = minOf(at(maxOf(index(clip.endMs), first + 1)), durUs)
+    }
+    val lengthUs = floor((endUs - startUs) / clip.speed / 1000 + 1e-6).toLong() * 1000
+    endUs = startUs + (lengthUs * clip.speed).roundToLong()
+    return Window(startUs, endUs, lengthUs, trimmed || endUs != durUs)
   }
 
   fun isTrimmed(clip: MergeClip, media: ProbeResult): Boolean =

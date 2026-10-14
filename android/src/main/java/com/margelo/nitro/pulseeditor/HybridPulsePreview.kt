@@ -402,8 +402,11 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
    * Where the frame showing at `timeMs` starts on the timeline. What plays (and what merge
    * exports) at a time is the frame that started at or before it; Media3's exact seek shows the
    * first frame starting at or after the seek position, so seeks go to that start. Source frames
-   * are taken to be on the clip's average frame rate, and a trimmed clip's window starts on one
-   * (MergePlan.windowUs), so a seek to a clip's start shows its first frame.
+   * are taken to be on the clip's average frame rate. A clip's window starts on a frame and its
+   * timeline length is whole ms (MergePlan.windowUs), so every clip starts on a whole ms with its
+   * first frame there: the seek to that start resolves to the clip itself, at its first sample,
+   * and shows it. (A start inside a ms can't be hit: a seek below it shows the previous clip's
+   * last frame, one above it skips the first frame as decode-only.)
    */
   private fun frameStartMs(timeMs: Double): Double {
     val slot = slots.lastOrNull { it.startMs <= timeMs + 0.001 } ?: return timeMs

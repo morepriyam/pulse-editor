@@ -32,7 +32,8 @@ enum Timeline {
       guard let sourceVideo = media.videoTrack else { throw MergeError.failed("A clip has no video.") }
       let (sourceSize, sourceTransform, sourceRange, frame) = try await sourceVideo.load(
         .naturalSize, .preferredTransform, .timeRange, .minFrameDuration)
-      let range = try Join.trimRange(startMs: clip.startMs, endMs: clip.endMs, in: sourceRange, frame: frame)
+      let range = try Join.trimRange(
+        startMs: clip.startMs, endMs: clip.endMs, in: sourceRange, frame: frame, speed: clip.speed)
 
       // The clip's slot: trimmed in at the cursor, then retimed in place.
       try video.insertTimeRange(range, of: sourceVideo, at: cursor)
@@ -44,7 +45,8 @@ enum Timeline {
       }
       var slot = range.duration
       if abs(clip.speed - 1) > 0.0001 {
-        let scaled = CMTimeMultiplyByFloat64(slot, multiplier: 1 / clip.speed)
+        // Whole ms (trimRange made it so; this drops the µs rounding of the window).
+        let scaled = CMTime(value: CMTimeValue((slot.seconds * 1000 / clip.speed).rounded()), timescale: 1000)
         composition.scaleTimeRange(CMTimeRange(start: cursor, duration: slot), toDuration: scaled)
         slot = scaled
       }
