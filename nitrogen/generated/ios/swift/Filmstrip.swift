@@ -18,13 +18,29 @@ public extension Filmstrip {
   /**
    * Create a new instance of `Filmstrip`.
    */
-  init(uri: String, frameWidth: Double, frameHeight: Double, columns: Double, count: Double, intervalMs: Double) {
-    self.init(std.string(uri), frameWidth, frameHeight, columns, count, intervalMs)
+  init(uris: [String], framesPerImage: Double, count: Double, frameWidth: Double, frameHeight: Double, intervalMs: Double) {
+    self.init({ () -> bridge.std__vector_std__string_ in
+      var __vector = bridge.create_std__vector_std__string_(uris.count)
+      for __item in uris {
+        __vector.push_back(std.string(__item))
+      }
+      return __vector
+    }(), framesPerImage, count, frameWidth, frameHeight, intervalMs)
   }
 
   @inline(__always)
-  var uri: String {
-    return String(self.__uri)
+  var uris: [String] {
+    return self.__uris.map({ __item in String(__item) })
+  }
+  
+  @inline(__always)
+  var framesPerImage: Double {
+    return self.__framesPerImage
+  }
+  
+  @inline(__always)
+  var count: Double {
+    return self.__count
   }
   
   @inline(__always)
@@ -35,16 +51,6 @@ public extension Filmstrip {
   @inline(__always)
   var frameHeight: Double {
     return self.__frameHeight
-  }
-  
-  @inline(__always)
-  var columns: Double {
-    return self.__columns
-  }
-  
-  @inline(__always)
-  var count: Double {
-    return self.__count
   }
   
   @inline(__always)

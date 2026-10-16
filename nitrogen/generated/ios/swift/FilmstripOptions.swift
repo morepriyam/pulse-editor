@@ -18,8 +18,8 @@ public extension FilmstripOptions {
   /**
    * Create a new instance of `FilmstripOptions`.
    */
-  init(intervalMs: Double, maxWidth: Double, maxHeight: Double, quality: Double, rotation: Double, flipped: Bool, crop: MergeCrop?) {
-    self.init(intervalMs, maxWidth, maxHeight, quality, rotation, flipped, { () -> bridge.std__optional_MergeCrop_ in
+  init(intervalMs: Double, frameWidth: Double, frameHeight: Double, maxImageWidth: Double, quality: Double, rotation: Double, flipped: Bool, crop: MergeCrop?) {
+    self.init(intervalMs, frameWidth, frameHeight, maxImageWidth, quality, rotation, flipped, { () -> bridge.std__optional_MergeCrop_ in
       if let __unwrappedValue = crop {
         return bridge.create_std__optional_MergeCrop_(__unwrappedValue)
       } else {
@@ -34,13 +34,18 @@ public extension FilmstripOptions {
   }
   
   @inline(__always)
-  var maxWidth: Double {
-    return self.__maxWidth
+  var frameWidth: Double {
+    return self.__frameWidth
   }
   
   @inline(__always)
-  var maxHeight: Double {
-    return self.__maxHeight
+  var frameHeight: Double {
+    return self.__frameHeight
+  }
+  
+  @inline(__always)
+  var maxImageWidth: Double {
+    return self.__maxImageWidth
   }
   
   @inline(__always)

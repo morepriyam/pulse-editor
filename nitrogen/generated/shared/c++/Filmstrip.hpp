@@ -31,6 +31,7 @@
 
 
 #include <string>
+#include <vector>
 
 namespace margelo::nitro::pulseeditor {
 
@@ -39,16 +40,16 @@ namespace margelo::nitro::pulseeditor {
    */
   struct Filmstrip final {
   public:
-    std::string uri     SWIFT_PRIVATE;
+    std::vector<std::string> uris     SWIFT_PRIVATE;
+    double framesPerImage     SWIFT_PRIVATE;
+    double count     SWIFT_PRIVATE;
     double frameWidth     SWIFT_PRIVATE;
     double frameHeight     SWIFT_PRIVATE;
-    double columns     SWIFT_PRIVATE;
-    double count     SWIFT_PRIVATE;
     double intervalMs     SWIFT_PRIVATE;
 
   public:
     Filmstrip() = default;
-    explicit Filmstrip(std::string uri, double frameWidth, double frameHeight, double columns, double count, double intervalMs): uri(uri), frameWidth(frameWidth), frameHeight(frameHeight), columns(columns), count(count), intervalMs(intervalMs) {}
+    explicit Filmstrip(std::vector<std::string> uris, double framesPerImage, double count, double frameWidth, double frameHeight, double intervalMs): uris(uris), framesPerImage(framesPerImage), count(count), frameWidth(frameWidth), frameHeight(frameHeight), intervalMs(intervalMs) {}
 
   public:
     friend bool operator==(const Filmstrip& lhs, const Filmstrip& rhs) = default;
@@ -64,21 +65,21 @@ namespace margelo::nitro {
     static inline margelo::nitro::pulseeditor::Filmstrip fromJSI(jsi::Runtime& runtime, const jsi::Value& arg) {
       jsi::Object obj = arg.asObject(runtime);
       return margelo::nitro::pulseeditor::Filmstrip(
-        JSIConverter<std::string>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "uri"))),
+        JSIConverter<std::vector<std::string>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "uris"))),
+        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "framesPerImage"))),
+        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "count"))),
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "frameWidth"))),
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "frameHeight"))),
-        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "columns"))),
-        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "count"))),
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "intervalMs")))
       );
     }
     static inline jsi::Value toJSI(jsi::Runtime& runtime, const margelo::nitro::pulseeditor::Filmstrip& arg) {
       jsi::Object obj(runtime);
-      obj.setProperty(runtime, PropNameIDCache::get(runtime, "uri"), JSIConverter<std::string>::toJSI(runtime, arg.uri));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "uris"), JSIConverter<std::vector<std::string>>::toJSI(runtime, arg.uris));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "framesPerImage"), JSIConverter<double>::toJSI(runtime, arg.framesPerImage));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "count"), JSIConverter<double>::toJSI(runtime, arg.count));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "frameWidth"), JSIConverter<double>::toJSI(runtime, arg.frameWidth));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "frameHeight"), JSIConverter<double>::toJSI(runtime, arg.frameHeight));
-      obj.setProperty(runtime, PropNameIDCache::get(runtime, "columns"), JSIConverter<double>::toJSI(runtime, arg.columns));
-      obj.setProperty(runtime, PropNameIDCache::get(runtime, "count"), JSIConverter<double>::toJSI(runtime, arg.count));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "intervalMs"), JSIConverter<double>::toJSI(runtime, arg.intervalMs));
       return obj;
     }
@@ -90,11 +91,11 @@ namespace margelo::nitro {
       if (!nitro::isPlainObject(runtime, obj)) {
         return false;
       }
-      if (!JSIConverter<std::string>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "uri")))) return false;
+      if (!JSIConverter<std::vector<std::string>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "uris")))) return false;
+      if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "framesPerImage")))) return false;
+      if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "count")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "frameWidth")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "frameHeight")))) return false;
-      if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "columns")))) return false;
-      if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "count")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "intervalMs")))) return false;
       return true;
     }

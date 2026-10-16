@@ -11,6 +11,7 @@
 #include "Filmstrip.hpp"
 
 #include <string>
+#include <vector>
 
 namespace margelo::nitro::pulseeditor {
 
@@ -31,24 +32,33 @@ namespace margelo::nitro::pulseeditor {
     [[nodiscard]]
     Filmstrip toCpp() const {
       static const auto clazz = javaClassStatic();
-      static const auto fieldUri = clazz->getField<jni::JString>("uri");
-      jni::local_ref<jni::JString> uri = this->getFieldValue(fieldUri);
+      static const auto fieldUris = clazz->getField<jni::JArrayClass<jni::JString>>("uris");
+      jni::local_ref<jni::JArrayClass<jni::JString>> uris = this->getFieldValue(fieldUris);
+      static const auto fieldFramesPerImage = clazz->getField<double>("framesPerImage");
+      double framesPerImage = this->getFieldValue(fieldFramesPerImage);
+      static const auto fieldCount = clazz->getField<double>("count");
+      double count = this->getFieldValue(fieldCount);
       static const auto fieldFrameWidth = clazz->getField<double>("frameWidth");
       double frameWidth = this->getFieldValue(fieldFrameWidth);
       static const auto fieldFrameHeight = clazz->getField<double>("frameHeight");
       double frameHeight = this->getFieldValue(fieldFrameHeight);
-      static const auto fieldColumns = clazz->getField<double>("columns");
-      double columns = this->getFieldValue(fieldColumns);
-      static const auto fieldCount = clazz->getField<double>("count");
-      double count = this->getFieldValue(fieldCount);
       static const auto fieldIntervalMs = clazz->getField<double>("intervalMs");
       double intervalMs = this->getFieldValue(fieldIntervalMs);
       return Filmstrip(
-        uri->toStdString(),
+        [&](auto&& __input) {
+          size_t __size = __input->size();
+          std::vector<std::string> __vector;
+          __vector.reserve(__size);
+          for (size_t __i = 0; __i < __size; __i++) {
+            auto __element = __input->getElement(__i);
+            __vector.push_back(__element->toStdString());
+          }
+          return __vector;
+        }(uris),
+        framesPerImage,
+        count,
         frameWidth,
         frameHeight,
-        columns,
-        count,
         intervalMs
       );
     }
@@ -59,16 +69,25 @@ namespace margelo::nitro::pulseeditor {
      */
     [[maybe_unused]]
     static jni::local_ref<JFilmstrip::javaobject> fromCpp(const Filmstrip& value) {
-      using JSignature = JFilmstrip(jni::alias_ref<jni::JString>, double, double, double, double, double);
+      using JSignature = JFilmstrip(jni::alias_ref<jni::JArrayClass<jni::JString>>, double, double, double, double, double);
       static const auto clazz = javaClassStatic();
       static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
       return create(
         clazz,
-        jni::make_jstring(value.uri),
+        [&](auto&& __input) {
+          size_t __size = __input.size();
+          jni::local_ref<jni::JArrayClass<jni::JString>> __array = jni::JArrayClass<jni::JString>::newArray(__size);
+          for (size_t __i = 0; __i < __size; __i++) {
+            const auto& __element = __input[__i];
+            auto __elementJni = jni::make_jstring(__element);
+            __array->setElement(__i, *__elementJni);
+          }
+          return __array;
+        }(value.uris),
+        value.framesPerImage,
+        value.count,
         value.frameWidth,
         value.frameHeight,
-        value.columns,
-        value.count,
         value.intervalMs
       );
     }

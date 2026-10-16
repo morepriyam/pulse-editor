@@ -23,10 +23,13 @@ data class FilmstripOptions(
   val intervalMs: Double,
   @DoNotStrip
   @Keep
-  val maxWidth: Double,
+  val frameWidth: Double,
   @DoNotStrip
   @Keep
-  val maxHeight: Double,
+  val frameHeight: Double,
+  @DoNotStrip
+  @Keep
+  val maxImageWidth: Double,
   @DoNotStrip
   @Keep
   val quality: Double,
@@ -46,8 +49,9 @@ data class FilmstripOptions(
     if (this === other) return true
     if (other !is FilmstripOptions) return false
     return Objects.deepEquals(this.intervalMs, other.intervalMs)
-      && Objects.deepEquals(this.maxWidth, other.maxWidth)
-      && Objects.deepEquals(this.maxHeight, other.maxHeight)
+      && Objects.deepEquals(this.frameWidth, other.frameWidth)
+      && Objects.deepEquals(this.frameHeight, other.frameHeight)
+      && Objects.deepEquals(this.maxImageWidth, other.maxImageWidth)
       && Objects.deepEquals(this.quality, other.quality)
       && Objects.deepEquals(this.rotation, other.rotation)
       && Objects.deepEquals(this.flipped, other.flipped)
@@ -57,8 +61,9 @@ data class FilmstripOptions(
   override fun hashCode(): Int {
     return arrayOf<Any?>(
       intervalMs,
-      maxWidth,
-      maxHeight,
+      frameWidth,
+      frameHeight,
+      maxImageWidth,
       quality,
       rotation,
       flipped,
@@ -74,8 +79,8 @@ data class FilmstripOptions(
     @Keep
     @Suppress("unused")
     @JvmStatic
-    private fun fromCpp(intervalMs: Double, maxWidth: Double, maxHeight: Double, quality: Double, rotation: Double, flipped: Boolean, crop: MergeCrop?): FilmstripOptions {
-      return FilmstripOptions(intervalMs, maxWidth, maxHeight, quality, rotation, flipped, crop)
+    private fun fromCpp(intervalMs: Double, frameWidth: Double, frameHeight: Double, maxImageWidth: Double, quality: Double, rotation: Double, flipped: Boolean, crop: MergeCrop?): FilmstripOptions {
+      return FilmstripOptions(intervalMs, frameWidth, frameHeight, maxImageWidth, quality, rotation, flipped, crop)
     }
   }
 }

@@ -20,19 +20,19 @@ import java.util.Objects
 data class Filmstrip(
   @DoNotStrip
   @Keep
-  val uri: String,
+  val uris: Array<String>,
+  @DoNotStrip
+  @Keep
+  val framesPerImage: Double,
+  @DoNotStrip
+  @Keep
+  val count: Double,
   @DoNotStrip
   @Keep
   val frameWidth: Double,
   @DoNotStrip
   @Keep
   val frameHeight: Double,
-  @DoNotStrip
-  @Keep
-  val columns: Double,
-  @DoNotStrip
-  @Keep
-  val count: Double,
   @DoNotStrip
   @Keep
   val intervalMs: Double
@@ -42,21 +42,21 @@ data class Filmstrip(
   override fun equals(other: Any?): Boolean {
     if (this === other) return true
     if (other !is Filmstrip) return false
-    return Objects.deepEquals(this.uri, other.uri)
+    return Objects.deepEquals(this.uris, other.uris)
+      && Objects.deepEquals(this.framesPerImage, other.framesPerImage)
+      && Objects.deepEquals(this.count, other.count)
       && Objects.deepEquals(this.frameWidth, other.frameWidth)
       && Objects.deepEquals(this.frameHeight, other.frameHeight)
-      && Objects.deepEquals(this.columns, other.columns)
-      && Objects.deepEquals(this.count, other.count)
       && Objects.deepEquals(this.intervalMs, other.intervalMs)
   }
 
   override fun hashCode(): Int {
     return arrayOf<Any?>(
-      uri,
+      uris,
+      framesPerImage,
+      count,
       frameWidth,
       frameHeight,
-      columns,
-      count,
       intervalMs
     ).contentDeepHashCode()
   }
@@ -69,8 +69,8 @@ data class Filmstrip(
     @Keep
     @Suppress("unused")
     @JvmStatic
-    private fun fromCpp(uri: String, frameWidth: Double, frameHeight: Double, columns: Double, count: Double, intervalMs: Double): Filmstrip {
-      return Filmstrip(uri, frameWidth, frameHeight, columns, count, intervalMs)
+    private fun fromCpp(uris: Array<String>, framesPerImage: Double, count: Double, frameWidth: Double, frameHeight: Double, intervalMs: Double): Filmstrip {
+      return Filmstrip(uris, framesPerImage, count, frameWidth, frameHeight, intervalMs)
     }
   }
 }

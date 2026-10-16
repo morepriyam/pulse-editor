@@ -117,16 +117,17 @@ export function thumbnail(
   });
 }
 
-/** The source's frames as one grid image (iOS; rejects on Android for now). Defaults: one per
- * second, no edit. */
+/** The source's frames as a row of JPEGs, ready to lay out at a timeline's scale (iOS; rejects on
+ * Android for now). Defaults: one frame per second, 96 × 92 px, images up to 2048 px wide. */
 export function filmstrip(
   uri: string,
   options: Partial<FilmstripOptions> = {}
 ): Promise<Filmstrip> {
   const full: FilmstripOptions = {
     intervalMs: 1000,
-    maxWidth: 0,
-    maxHeight: 0,
+    frameWidth: 96,
+    frameHeight: 92,
+    maxImageWidth: 2048,
     quality: 0.7,
     rotation: 0,
     flipped: false,

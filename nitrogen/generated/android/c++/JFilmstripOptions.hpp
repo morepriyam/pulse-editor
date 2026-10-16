@@ -35,10 +35,12 @@ namespace margelo::nitro::pulseeditor {
       static const auto clazz = javaClassStatic();
       static const auto fieldIntervalMs = clazz->getField<double>("intervalMs");
       double intervalMs = this->getFieldValue(fieldIntervalMs);
-      static const auto fieldMaxWidth = clazz->getField<double>("maxWidth");
-      double maxWidth = this->getFieldValue(fieldMaxWidth);
-      static const auto fieldMaxHeight = clazz->getField<double>("maxHeight");
-      double maxHeight = this->getFieldValue(fieldMaxHeight);
+      static const auto fieldFrameWidth = clazz->getField<double>("frameWidth");
+      double frameWidth = this->getFieldValue(fieldFrameWidth);
+      static const auto fieldFrameHeight = clazz->getField<double>("frameHeight");
+      double frameHeight = this->getFieldValue(fieldFrameHeight);
+      static const auto fieldMaxImageWidth = clazz->getField<double>("maxImageWidth");
+      double maxImageWidth = this->getFieldValue(fieldMaxImageWidth);
       static const auto fieldQuality = clazz->getField<double>("quality");
       double quality = this->getFieldValue(fieldQuality);
       static const auto fieldRotation = clazz->getField<double>("rotation");
@@ -49,8 +51,9 @@ namespace margelo::nitro::pulseeditor {
       jni::local_ref<JMergeCrop> crop = this->getFieldValue(fieldCrop);
       return FilmstripOptions(
         intervalMs,
-        maxWidth,
-        maxHeight,
+        frameWidth,
+        frameHeight,
+        maxImageWidth,
         quality,
         rotation,
         static_cast<bool>(flipped),
@@ -64,14 +67,15 @@ namespace margelo::nitro::pulseeditor {
      */
     [[maybe_unused]]
     static jni::local_ref<JFilmstripOptions::javaobject> fromCpp(const FilmstripOptions& value) {
-      using JSignature = JFilmstripOptions(double, double, double, double, double, jboolean, jni::alias_ref<JMergeCrop>);
+      using JSignature = JFilmstripOptions(double, double, double, double, double, double, jboolean, jni::alias_ref<JMergeCrop>);
       static const auto clazz = javaClassStatic();
       static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
       return create(
         clazz,
         value.intervalMs,
-        value.maxWidth,
-        value.maxHeight,
+        value.frameWidth,
+        value.frameHeight,
+        value.maxImageWidth,
         value.quality,
         value.rotation,
         value.flipped,

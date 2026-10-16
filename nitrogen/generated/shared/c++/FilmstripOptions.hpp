@@ -42,8 +42,9 @@ namespace margelo::nitro::pulseeditor {
   struct FilmstripOptions final {
   public:
     double intervalMs     SWIFT_PRIVATE;
-    double maxWidth     SWIFT_PRIVATE;
-    double maxHeight     SWIFT_PRIVATE;
+    double frameWidth     SWIFT_PRIVATE;
+    double frameHeight     SWIFT_PRIVATE;
+    double maxImageWidth     SWIFT_PRIVATE;
     double quality     SWIFT_PRIVATE;
     double rotation     SWIFT_PRIVATE;
     bool flipped     SWIFT_PRIVATE;
@@ -51,7 +52,7 @@ namespace margelo::nitro::pulseeditor {
 
   public:
     FilmstripOptions() = default;
-    explicit FilmstripOptions(double intervalMs, double maxWidth, double maxHeight, double quality, double rotation, bool flipped, std::optional<MergeCrop> crop): intervalMs(intervalMs), maxWidth(maxWidth), maxHeight(maxHeight), quality(quality), rotation(rotation), flipped(flipped), crop(crop) {}
+    explicit FilmstripOptions(double intervalMs, double frameWidth, double frameHeight, double maxImageWidth, double quality, double rotation, bool flipped, std::optional<MergeCrop> crop): intervalMs(intervalMs), frameWidth(frameWidth), frameHeight(frameHeight), maxImageWidth(maxImageWidth), quality(quality), rotation(rotation), flipped(flipped), crop(crop) {}
 
   public:
     friend bool operator==(const FilmstripOptions& lhs, const FilmstripOptions& rhs) = default;
@@ -68,8 +69,9 @@ namespace margelo::nitro {
       jsi::Object obj = arg.asObject(runtime);
       return margelo::nitro::pulseeditor::FilmstripOptions(
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "intervalMs"))),
-        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "maxWidth"))),
-        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "maxHeight"))),
+        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "frameWidth"))),
+        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "frameHeight"))),
+        JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "maxImageWidth"))),
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "quality"))),
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "rotation"))),
         JSIConverter<bool>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "flipped"))),
@@ -79,8 +81,9 @@ namespace margelo::nitro {
     static inline jsi::Value toJSI(jsi::Runtime& runtime, const margelo::nitro::pulseeditor::FilmstripOptions& arg) {
       jsi::Object obj(runtime);
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "intervalMs"), JSIConverter<double>::toJSI(runtime, arg.intervalMs));
-      obj.setProperty(runtime, PropNameIDCache::get(runtime, "maxWidth"), JSIConverter<double>::toJSI(runtime, arg.maxWidth));
-      obj.setProperty(runtime, PropNameIDCache::get(runtime, "maxHeight"), JSIConverter<double>::toJSI(runtime, arg.maxHeight));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "frameWidth"), JSIConverter<double>::toJSI(runtime, arg.frameWidth));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "frameHeight"), JSIConverter<double>::toJSI(runtime, arg.frameHeight));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "maxImageWidth"), JSIConverter<double>::toJSI(runtime, arg.maxImageWidth));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "quality"), JSIConverter<double>::toJSI(runtime, arg.quality));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "rotation"), JSIConverter<double>::toJSI(runtime, arg.rotation));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "flipped"), JSIConverter<bool>::toJSI(runtime, arg.flipped));
@@ -96,8 +99,9 @@ namespace margelo::nitro {
         return false;
       }
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "intervalMs")))) return false;
-      if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "maxWidth")))) return false;
-      if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "maxHeight")))) return false;
+      if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "frameWidth")))) return false;
+      if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "frameHeight")))) return false;
+      if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "maxImageWidth")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "quality")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "rotation")))) return false;
       if (!JSIConverter<bool>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "flipped")))) return false;

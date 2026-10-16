@@ -130,7 +130,7 @@ const { uri, durationMs, encoded } = await merge(clips, options, {
 | `thumbnail(uri, { timeMs?, maxWidth?, maxHeight?, quality?, rotation?, flipped?, crop? })` | A JPEG cover of the exact frame, edit applied (defaults: first frame, no size limit, quality 0.8) | `{ uri, width, height, timeMs }` |
 | `extractAudio(uri, { sampleRate })` | 16-bit mono PCM in memory (`sampleRate` defaults to 16000), for whisper.rn's `transcribeData` | `{ data: ArrayBuffer, sampleRate, durationMs }` |
 | `waveform(uri, peakMs)` | The audio's loudness per `peakMs`: two bytes each, the peak then the RMS, 0–255 over −48…0 dBFS (iOS; rejects on Android for now) | `ArrayBuffer` |
-| `filmstrip(uri, { intervalMs?, maxWidth?, maxHeight?, quality?, rotation?, flipped?, crop? })` | The whole source's frames, one per `intervalMs` (default 1000), edit geometry applied, as one grid JPEG (iOS; rejects on Android for now) | `{ uri, frameWidth, frameHeight, columns, count, intervalMs }` |
+| `filmstrip(uri, { intervalMs?, frameWidth?, frameHeight?, maxImageWidth?, quality?, rotation?, flipped?, crop? })` | The whole source's frames, one per `intervalMs` (default 1000), edit geometry applied, each cropped to a `frameWidth` × `frameHeight` cell, side by side in JPEG rows (iOS; rejects on Android for now) | `{ uris, framesPerImage, count, frameWidth, frameHeight, intervalMs }` |
 | `<PulsePreview clips options onStatus onTime onReady />` | Plays the draft with every edit, as merge would export it | a ref: `play()`, `pause()`, `seek(ms)` (resolves with the frame's time once it's on screen), `setScrubbing(bool)` |
 
 Every type, path and test log: [Methods](docs/methods.md).

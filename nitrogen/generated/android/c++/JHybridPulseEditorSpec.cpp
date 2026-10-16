@@ -69,12 +69,12 @@ namespace margelo::nitro::pulseeditor { struct FilmstripOptions; }
 #include "JHybridSeekBenchSpec.hpp"
 #include "Filmstrip.hpp"
 #include "JFilmstrip.hpp"
+#include <vector>
 #include "ThumbnailOptions.hpp"
 #include "JThumbnailOptions.hpp"
 #include "MergeCrop.hpp"
 #include "JMergeCrop.hpp"
 #include "MergeClip.hpp"
-#include <vector>
 #include "JMergeClip.hpp"
 #include "MergeOptions.hpp"
 #include "JMergeOptions.hpp"

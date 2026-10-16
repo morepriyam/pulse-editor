@@ -152,26 +152,28 @@ export interface Thumbnail {
 }
 
 /** A file's audio as 16-bit signed little-endian mono PCM. */
-/** What `filmstrip` grabs: one frame per `intervalMs` of the source, with the clip's
- * geometry edit drawn as merge renders it, each scaled to fit `maxWidth` × `maxHeight`. */
+/** What `filmstrip` grabs: one frame per `intervalMs` of the source, drawn with the clip's
+ * geometry edit as merge renders it, each scaled to cover `frameWidth` × `frameHeight` pixels and
+ * cropped to it (centred). The frames sit side by side, at most `maxImageWidth` pixels per image. */
 export interface FilmstripOptions {
   intervalMs: number;
-  maxWidth: number;
-  maxHeight: number;
+  frameWidth: number;
+  frameHeight: number;
+  maxImageWidth: number;
   quality: number;
   rotation: number;
   flipped: boolean;
   crop?: MergeCrop;
 }
 
-/** One JPEG holding the frames in a grid, row by row: frame `i` (source time
- * `i * intervalMs`) at column `i % columns`, row `floor(i / columns)`. */
+/** A source's frames as JPEG rows: image `k` holds frames `k * framesPerImage` onward, left to
+ * right, `frameWidth` pixels each (frame `i` is the source at `i * intervalMs`). */
 export interface Filmstrip {
-  uri: string;
+  uris: string[];
+  framesPerImage: number;
+  count: number;
   frameWidth: number;
   frameHeight: number;
-  columns: number;
-  count: number;
   intervalMs: number;
 }
 
@@ -368,6 +370,6 @@ export interface PulseEditor extends HybridObject<{
   /** A file's loudness per `peakMs` ms: two bytes each, the peak then the RMS, 0–255 on a
    * dB scale from -48 dBFS to full scale. Empty when it has no audio. */
   waveform(uri: string, peakMs: number): Promise<ArrayBuffer>;
-  /** The source's frames as one grid image (see `Filmstrip`). iOS; rejects on Android for now. */
+  /** The source's frames as a row of JPEGs (see `Filmstrip`). iOS; rejects on Android for now. */
   filmstrip(uri: string, options: FilmstripOptions): Promise<Filmstrip>;
 }
