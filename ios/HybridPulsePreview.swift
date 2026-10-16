@@ -20,7 +20,49 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
   var view: UIView { playerView }
 
   private let player = AVPlayer()
-  private var media: [String: Probe.Media] = [:]
+  /// Probed files, shared by every preview (each editor open makes a new one), keyed by path,
+  /// size and modification time so a file replaced in place is probed again. Main thread only.
+  @MainActor private static var probed: [String: Probe.Media] = [:]
+  private static let probedLimit = 256
+
+  /// The clips probed (once each, shared) and composed.
+  @MainActor private static func compose(_ list: [MergeClip], _ options: MergeOptions, _ size: CGSize) async throws -> Timeline.Composed {
+    let keys = list.map { probeKey($0.uri) }
+    var missing: [String: String] = [:]
+    for (clip, key) in zip(list, keys) where probed[key] == nil { missing[key] = clip.uri }
+    var fresh: [String: Probe.Media] = [:]
+    if !missing.isEmpty {
+      if probed.count + missing.count > probedLimit { probed.removeAll() }
+      let loaded = try await withThrowingTaskGroup(of: (String, Probe.Media).self) { group in
+        for (key, uri) in missing {
+          group.addTask { (key, try await Probe.load(fileURL(uri))) }
+        }
+        var out: [(String, Probe.Media)] = []
+        for try await pair in group { out.append(pair) }
+        return out
+      }
+      for (key, m) in loaded {
+        fresh[key] = m
+        probed[key] = m
+      }
+    }
+    var items: [(clip: MergeClip, media: Probe.Media)] = []
+    for (clip, key) in zip(list, keys) {
+      guard let m = fresh[key] ?? probed[key] else { throw CancellationError() }
+      items.append((clip, m))
+    }
+    try Task.checkCancellation()
+    let target = RenderTarget(
+      size: size, transform: .identity, canvas: size, fps: options.fps, bitrate: 0, audio: options.audio)
+    return try await Timeline.compose(items, target: target)
+  }
+
+  private static func probeKey(_ uri: String) -> String {
+    let attrs = try? FileManager.default.attributesOfItem(atPath: fileURL(uri).path)
+    let size = (attrs?[.size] as? NSNumber)?.int64Value ?? -1
+    let mtime = (attrs?[.modificationDate] as? Date)?.timeIntervalSince1970 ?? 0
+    return "\(uri)|\(size)|\(mtime)"
+  }
   private var build: Task<Void, Never>?
   private var changed = false
   private var durationMs = 0.0
@@ -111,19 +153,7 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
       guard let self else { return }
       let started = CACurrentMediaTime()
       do {
-        var items: [(clip: MergeClip, media: Probe.Media)] = []
-        for clip in list {
-          let m: Probe.Media
-          if let cached = self.media[clip.uri] { m = cached } else {
-            m = try await Probe.load(fileURL(clip.uri))
-            self.media[clip.uri] = m
-          }
-          items.append((clip, m))
-        }
-        try Task.checkCancellation()
-        let target = RenderTarget(
-          size: size, transform: .identity, canvas: size, fps: options.fps, bitrate: 0, audio: options.audio)
-        let composed = try await Timeline.compose(items, target: target)
+        let composed = try await Self.compose(list, options, size)
         try Task.checkCancellation()
         let item = AVPlayerItem(asset: composed.composition.copy() as! AVComposition)
         item.videoComposition = composed.videoComposition.copy() as? AVVideoComposition
