@@ -174,7 +174,7 @@ Pulse is moving every native video method it uses from its react-native-video-tr
 
 ✅ done · ⏳ left to do · 📋 not started.
 
-- **Next: the [timeline editor](docs/timeline-editor.md)**, one screen replacing the clip preview and RNVT's per-clip editor, played by `<PulsePreview>`. Its first engine PR adds per-clip slot starts to the preview's status; its first commit films lip sync during preview playback.
+- **Next: the [timeline editor](docs/timeline-editor.md)**, one screen replacing the clip preview and RNVT's per-clip editor, played by `<PulsePreview>`. The preview's status already reports each clip's start (`clipStartsMs`); its first commit films lip sync during preview playback.
 - **Open:** #13 (draft) keeps Android preview drawing at full rate while playing; it waits for an S24 run.
 - **After the migration:** per-clip audio (waveform and captions), a cover selector, Whisper tuning ([Roadmap](docs/roadmap.md)).
 
@@ -209,7 +209,7 @@ Not yet. pulse-editor is the engine; a timeline editor built on `<PulsePreview>`
 Pulse consumes this repo as a git submodule at `modules/pulse-editor` and reads its TypeScript source directly, so there's no build step.
 
 - **Where to edit:** make changes in the submodule inside Pulse, then commit and push here.
-- **When the spec changes:** after editing `src/PulseEditor.nitro.ts`, run `yarn install` and `yarn nitrogen`. Commit the regenerated `nitrogen/generated/` files, because Pulse builds from source and needs them.
+- **When the spec changes:** after editing `src/PulseEditor.nitro.ts` or `src/PulsePreview.nitro.ts`, run `yarn install` and `yarn nitrogen`. Commit the regenerated `nitrogen/generated/` files, because Pulse builds from source and needs them.
 - **Updating Pulse:** in Pulse, `git add modules/pulse-editor` to record the new commit.
 - **Minimum OS versions:** they follow the app's (iOS 16.4, Android 10 / API 29). API 29 is the lowest where Media3 tone-maps HDR (OpenGL); newer APIs are used behind per-method version checks.
 
