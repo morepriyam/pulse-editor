@@ -14,6 +14,8 @@ namespace NitroModules { class ArrayBufferHolder; }
 namespace margelo::nitro::pulseeditor { struct AudioPCM; }
 // Forward declaration of `ConformResult` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ConformResult; }
+// Forward declaration of `Filmstrip` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct Filmstrip; }
 // Forward declaration of `HybridConformJobSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridConformJobSpec; }
 // Forward declaration of `HybridMergeJobSpec` to properly resolve imports.
@@ -72,6 +74,7 @@ namespace PulseEditor { class HybridSeekBenchSpec_cxx; }
 // Include C++ defined types
 #include "AudioPCM.hpp"
 #include "ConformResult.hpp"
+#include "Filmstrip.hpp"
 #include "HybridConformJobSpec.hpp"
 #include "HybridMergeJobSpec.hpp"
 #include "HybridPulseEditorSpec.hpp"
@@ -542,6 +545,74 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
     return vector;
   }
   
+  // pragma MARK: std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>`.
+   */
+  using std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer___ = std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>;
+  inline std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> create_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer___() noexcept {
+    return Promise<std::shared_ptr<ArrayBuffer>>::create();
+  }
+  inline PromiseHolder<std::shared_ptr<ArrayBuffer>> wrap_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer___(std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> promise) noexcept {
+    return PromiseHolder<std::shared_ptr<ArrayBuffer>>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const std::shared_ptr<ArrayBuffer>& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const std::shared_ptr<ArrayBuffer>&)>`.
+   */
+  using Func_void_std__shared_ptr_ArrayBuffer_ = std::function<void(const std::shared_ptr<ArrayBuffer>& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const std::shared_ptr<ArrayBuffer>& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_std__shared_ptr_ArrayBuffer__Wrapper final {
+  public:
+    explicit Func_void_std__shared_ptr_ArrayBuffer__Wrapper(std::function<void(const std::shared_ptr<ArrayBuffer>& /* result */)>&& func): _function(std::make_unique<std::function<void(const std::shared_ptr<ArrayBuffer>& /* result */)>>(std::move(func))) {}
+    inline void call(ArrayBufferHolder result) const noexcept {
+      _function->operator()(result.getArrayBuffer());
+    }
+  private:
+    std::unique_ptr<std::function<void(const std::shared_ptr<ArrayBuffer>& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_std__shared_ptr_ArrayBuffer_ create_Func_void_std__shared_ptr_ArrayBuffer_(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_std__shared_ptr_ArrayBuffer__Wrapper wrap_Func_void_std__shared_ptr_ArrayBuffer_(Func_void_std__shared_ptr_ArrayBuffer_ value) noexcept {
+    return Func_void_std__shared_ptr_ArrayBuffer__Wrapper(std::move(value));
+  }
+  
+  // pragma MARK: std::shared_ptr<Promise<Filmstrip>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<Filmstrip>>`.
+   */
+  using std__shared_ptr_Promise_Filmstrip__ = std::shared_ptr<Promise<Filmstrip>>;
+  inline std::shared_ptr<Promise<Filmstrip>> create_std__shared_ptr_Promise_Filmstrip__() noexcept {
+    return Promise<Filmstrip>::create();
+  }
+  inline PromiseHolder<Filmstrip> wrap_std__shared_ptr_Promise_Filmstrip__(std::shared_ptr<Promise<Filmstrip>> promise) noexcept {
+    return PromiseHolder<Filmstrip>(std::move(promise));
+  }
+  
+  // pragma MARK: std::function<void(const Filmstrip& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const Filmstrip&)>`.
+   */
+  using Func_void_Filmstrip = std::function<void(const Filmstrip& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const Filmstrip& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_Filmstrip_Wrapper final {
+  public:
+    explicit Func_void_Filmstrip_Wrapper(std::function<void(const Filmstrip& /* result */)>&& func): _function(std::make_unique<std::function<void(const Filmstrip& /* result */)>>(std::move(func))) {}
+    inline void call(Filmstrip result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const Filmstrip& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_Filmstrip create_Func_void_Filmstrip(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_Filmstrip_Wrapper wrap_Func_void_Filmstrip(Func_void_Filmstrip value) noexcept {
+    return Func_void_Filmstrip_Wrapper(std::move(value));
+  }
+  
   // pragma MARK: std::shared_ptr<HybridPulseEditorSpec>
   /**
    * Specialized version of `std::shared_ptr<HybridPulseEditorSpec>`.
@@ -606,6 +677,24 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
   }
   inline Result_std__shared_ptr_HybridSeekBenchSpec__ create_Result_std__shared_ptr_HybridSeekBenchSpec__(const std::exception_ptr& error) noexcept {
     return Result<std::shared_ptr<HybridSeekBenchSpec>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>
+  using Result_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer____ = Result<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>;
+  inline Result_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer____ create_Result_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer____(const std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer____ create_Result_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer____(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>>>::withError(error);
+  }
+  
+  // pragma MARK: Result<std::shared_ptr<Promise<Filmstrip>>>
+  using Result_std__shared_ptr_Promise_Filmstrip___ = Result<std::shared_ptr<Promise<Filmstrip>>>;
+  inline Result_std__shared_ptr_Promise_Filmstrip___ create_Result_std__shared_ptr_Promise_Filmstrip___(const std::shared_ptr<Promise<Filmstrip>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<Filmstrip>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_Filmstrip___ create_Result_std__shared_ptr_Promise_Filmstrip___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<Filmstrip>>>::withError(error);
   }
   
   // pragma MARK: std::function<void(double /* timeMs */, bool /* playing */)>

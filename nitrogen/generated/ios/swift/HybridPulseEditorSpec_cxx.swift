@@ -225,4 +225,42 @@ open class HybridPulseEditorSpec_cxx {
       return bridge.create_Result_std__shared_ptr_HybridSeekBenchSpec__(__exceptionPtr)
     }
   }
+  
+  @inline(__always)
+  public final func waveform(uri: std.string, peakMs: Double) -> bridge.Result_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer____ {
+    do {
+      let __result = try self.__implementation.waveform(uri: String(uri), peakMs: peakMs)
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer___ in
+        let __promise = bridge.create_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer___()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer___(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result.getArrayBuffer()) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer____(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_std__shared_ptr_ArrayBuffer____(__exceptionPtr)
+    }
+  }
+  
+  @inline(__always)
+  public final func filmstrip(uri: std.string, options: FilmstripOptions) -> bridge.Result_std__shared_ptr_Promise_Filmstrip___ {
+    do {
+      let __result = try self.__implementation.filmstrip(uri: String(uri), options: options)
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_Filmstrip__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_Filmstrip__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_Filmstrip__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_Filmstrip___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_Filmstrip___(__exceptionPtr)
+    }
+  }
 }

@@ -40,6 +40,50 @@ class PulseEditor: HybridPulseEditorSpec {
   public func createSeekBench() throws -> (any HybridSeekBenchSpec) {
     return SeekBench()
   }
+
+  /// See `FilmstripGrab`.
+  public func filmstrip(uri: String, options: FilmstripOptions) throws -> Promise<Filmstrip> {
+    return Promise.async(.utility) {
+      try await withJSError { try await FilmstripGrab.run(uri, options) }
+    }
+  }
+
+  /// Peaks and RMS per `peakMs`, worked out here from an 8 kHz decode (no samples cross to JS).
+  public func waveform(uri: String, peakMs: Double) throws -> Promise<ArrayBuffer> {
+    return Promise.async(.utility) {
+      let pcm = try await withJSError { try await ExtractAudio.read(fileURL(uri), sampleRate: 8000) }
+      guard let raw = pcm.data, pcm.byteCount >= 2 else {
+        if let raw = pcm.data { free(raw) }
+        return ArrayBuffer.allocate(size: 0)
+      }
+      defer { free(raw) }
+      let count = pcm.byteCount / 2
+      let samples = raw.assumingMemoryBound(to: Int16.self)
+      let per = max(1, Int((8000 * peakMs / 1000).rounded()))
+      let buckets = (count + per - 1) / per
+      let out = UnsafeMutablePointer<UInt8>.allocate(capacity: buckets * 2)
+      func level(_ amplitude: Double) -> UInt8 {
+        guard amplitude > 0 else { return 0 }
+        let db = 20 * log10(amplitude / 32768)
+        return UInt8((min(1, max(0, (db + 48) / 48)) * 255).rounded())
+      }
+      for b in 0..<buckets {
+        let start = b * per
+        let end = min(count, start + per)
+        var peak: Int32 = 0
+        var sum: Double = 0
+        for i in start..<end {
+          let v = Int32(samples[i])
+          let a = v < 0 ? -v : v
+          if a > peak { peak = a }
+          sum += Double(v * v)
+        }
+        out[b * 2] = level(Double(peak))
+        out[b * 2 + 1] = level((sum / Double(max(1, end - start))).squareRoot())
+      }
+      return ArrayBuffer.wrap(dataWithoutCopy: out, size: buckets * 2, onDelete: { out.deallocate() })
+    }
+  }
 }
 
 /// Runs `work`, turning any error into the message JS sees: Nitro describes other errors with

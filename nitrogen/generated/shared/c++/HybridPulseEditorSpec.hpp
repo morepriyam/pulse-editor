@@ -33,6 +33,10 @@ namespace margelo::nitro::pulseeditor { class HybridConformJobSpec; }
 namespace margelo::nitro::pulseeditor { struct ConformOptions; }
 // Forward declaration of `HybridSeekBenchSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridSeekBenchSpec; }
+// Forward declaration of `Filmstrip` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct Filmstrip; }
+// Forward declaration of `FilmstripOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct FilmstripOptions; }
 
 #include "ProbeResult.hpp"
 #include <NitroModules/Promise.hpp>
@@ -48,6 +52,9 @@ namespace margelo::nitro::pulseeditor { class HybridSeekBenchSpec; }
 #include "HybridConformJobSpec.hpp"
 #include "ConformOptions.hpp"
 #include "HybridSeekBenchSpec.hpp"
+#include <NitroModules/ArrayBuffer.hpp>
+#include "Filmstrip.hpp"
+#include "FilmstripOptions.hpp"
 
 namespace margelo::nitro::pulseeditor {
 
@@ -86,6 +93,8 @@ namespace margelo::nitro::pulseeditor {
       virtual std::shared_ptr<HybridMergeJobSpec> createMerge(const std::vector<MergeClip>& clips, const MergeOptions& options) = 0;
       virtual std::shared_ptr<HybridConformJobSpec> createConform(const std::string& uri, const ConformOptions& options) = 0;
       virtual std::shared_ptr<HybridSeekBenchSpec> createSeekBench() = 0;
+      virtual std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> waveform(const std::string& uri, double peakMs) = 0;
+      virtual std::shared_ptr<Promise<Filmstrip>> filmstrip(const std::string& uri, const FilmstripOptions& options) = 0;
 
     protected:
       // Hybrid Setup

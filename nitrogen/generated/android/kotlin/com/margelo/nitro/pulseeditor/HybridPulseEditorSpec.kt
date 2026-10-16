@@ -12,6 +12,7 @@ import com.facebook.jni.HybridData
 import com.facebook.proguard.annotations.DoNotStrip
 import dalvik.annotation.optimization.FastNative
 import com.margelo.nitro.core.Promise
+import com.margelo.nitro.core.ArrayBuffer
 import com.margelo.nitro.core.HybridObject
 
 /**
@@ -53,6 +54,14 @@ abstract class HybridPulseEditorSpec: HybridObject() {
   @DoNotStrip
   @Keep
   abstract fun createSeekBench(): HybridSeekBenchSpec
+  
+  @DoNotStrip
+  @Keep
+  abstract fun waveform(uri: String, peakMs: Double): Promise<ArrayBuffer>
+  
+  @DoNotStrip
+  @Keep
+  abstract fun filmstrip(uri: String, options: FilmstripOptions): Promise<Filmstrip>
 
   // Default implementation of `HybridObject.toString()`
   override fun toString(): String {

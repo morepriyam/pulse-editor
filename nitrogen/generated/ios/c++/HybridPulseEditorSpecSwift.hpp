@@ -44,6 +44,10 @@ namespace margelo::nitro::pulseeditor { class HybridConformJobSpec; }
 namespace margelo::nitro::pulseeditor { struct ConformOptions; }
 // Forward declaration of `HybridSeekBenchSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridSeekBenchSpec; }
+// Forward declaration of `Filmstrip` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct Filmstrip; }
+// Forward declaration of `FilmstripOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct FilmstripOptions; }
 
 #include "ProbeResult.hpp"
 #include <NitroModules/Promise.hpp>
@@ -67,6 +71,8 @@ namespace margelo::nitro::pulseeditor { class HybridSeekBenchSpec; }
 #include "HybridConformJobSpec.hpp"
 #include "ConformOptions.hpp"
 #include "HybridSeekBenchSpec.hpp"
+#include "Filmstrip.hpp"
+#include "FilmstripOptions.hpp"
 
 #include "PulseEditor-Swift-Cxx-Umbrella.hpp"
 
@@ -160,6 +166,22 @@ namespace margelo::nitro::pulseeditor {
     }
     inline std::shared_ptr<HybridSeekBenchSpec> createSeekBench() override {
       auto __result = _swiftPart.createSeekBench();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> waveform(const std::string& uri, double peakMs) override {
+      auto __result = _swiftPart.waveform(uri, std::forward<decltype(peakMs)>(peakMs));
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<Filmstrip>> filmstrip(const std::string& uri, const FilmstripOptions& options) override {
+      auto __result = _swiftPart.filmstrip(uri, std::forward<decltype(options)>(options));
       if (__result.hasError()) [[unlikely]] {
         std::rethrow_exception(__result.error());
       }

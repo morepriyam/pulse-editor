@@ -14,6 +14,10 @@ namespace margelo::nitro::pulseeditor { struct AudioPCM; }
 namespace margelo::nitro::pulseeditor { struct ConformOptions; }
 // Forward declaration of `ConformResult` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ConformResult; }
+// Forward declaration of `FilmstripOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct FilmstripOptions; }
+// Forward declaration of `Filmstrip` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct Filmstrip; }
 // Forward declaration of `HybridConformJobSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridConformJobSpec; }
 // Forward declaration of `HybridMergeJobSpec` to properly resolve imports.
@@ -69,6 +73,8 @@ namespace margelo::nitro::pulseeditor { enum class Transfer; }
 #include "AudioPCM.hpp"
 #include "ConformOptions.hpp"
 #include "ConformResult.hpp"
+#include "Filmstrip.hpp"
+#include "FilmstripOptions.hpp"
 #include "HybridConformJobSpec.hpp"
 #include "HybridMergeJobSpec.hpp"
 #include "HybridPulseEditorSpec.hpp"

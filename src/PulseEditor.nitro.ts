@@ -152,6 +152,29 @@ export interface Thumbnail {
 }
 
 /** A file's audio as 16-bit signed little-endian mono PCM. */
+/** What `filmstrip` grabs: one frame per `intervalMs` of the source, with the clip's
+ * geometry edit drawn as merge renders it, each scaled to fit `maxWidth` × `maxHeight`. */
+export interface FilmstripOptions {
+  intervalMs: number;
+  maxWidth: number;
+  maxHeight: number;
+  quality: number;
+  rotation: number;
+  flipped: boolean;
+  crop?: MergeCrop;
+}
+
+/** One JPEG holding the frames in a grid, row by row: frame `i` (source time
+ * `i * intervalMs`) at column `i % columns`, row `floor(i / columns)`. */
+export interface Filmstrip {
+  uri: string;
+  frameWidth: number;
+  frameHeight: number;
+  columns: number;
+  count: number;
+  intervalMs: number;
+}
+
 export interface AudioPCM {
   /** The samples; empty when the file has no audio track. */
   data: ArrayBuffer;
@@ -342,4 +365,9 @@ export interface PulseEditor extends HybridObject<{
 
   /** Bench only: a plain-ExoPlayer seek bench (Android; rejects on iOS). */
   createSeekBench(): SeekBench;
+  /** A file's loudness per `peakMs` ms: two bytes each, the peak then the RMS, 0–255 on a
+   * dB scale from -48 dBFS to full scale. Empty when it has no audio. */
+  waveform(uri: string, peakMs: number): Promise<ArrayBuffer>;
+  /** The source's frames as one grid image (see `Filmstrip`). iOS; rejects on Android for now. */
+  filmstrip(uri: string, options: FilmstripOptions): Promise<Filmstrip>;
 }

@@ -19,6 +19,8 @@ public protocol HybridPulseEditorSpec_protocol: HybridObject {
   func createMerge(clips: [MergeClip], options: MergeOptions) throws -> (any HybridMergeJobSpec)
   func createConform(uri: String, options: ConformOptions) throws -> (any HybridConformJobSpec)
   func createSeekBench() throws -> (any HybridSeekBenchSpec)
+  func waveform(uri: String, peakMs: Double) throws -> Promise<ArrayBuffer>
+  func filmstrip(uri: String, options: FilmstripOptions) throws -> Promise<Filmstrip>
 }
 
 public extension HybridPulseEditorSpec_protocol {

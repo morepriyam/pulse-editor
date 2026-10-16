@@ -130,6 +130,22 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
     };
   }
   
+  // pragma MARK: std::function<void(const std::shared_ptr<ArrayBuffer>& /* result */)>
+  Func_void_std__shared_ptr_ArrayBuffer_ create_Func_void_std__shared_ptr_ArrayBuffer_(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PulseEditor::Func_void_std__shared_ptr_ArrayBuffer_::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const std::shared_ptr<ArrayBuffer>& result) mutable -> void {
+      swiftClosure.call(ArrayBufferHolder(result));
+    };
+  }
+  
+  // pragma MARK: std::function<void(const Filmstrip& /* result */)>
+  Func_void_Filmstrip create_Func_void_Filmstrip(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PulseEditor::Func_void_Filmstrip::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const Filmstrip& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+  
   // pragma MARK: std::shared_ptr<HybridPulseEditorSpec>
   std::shared_ptr<HybridPulseEditorSpec> create_std__shared_ptr_HybridPulseEditorSpec_(void* NON_NULL swiftUnsafePointer) noexcept {
     PulseEditor::HybridPulseEditorSpec_cxx swiftPart = PulseEditor::HybridPulseEditorSpec_cxx::fromUnsafe(swiftUnsafePointer);

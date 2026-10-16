@@ -25,6 +25,8 @@ namespace margelo::nitro::pulseeditor { class HybridMergeJobSpec; }
 namespace margelo::nitro::pulseeditor { class HybridConformJobSpec; }
 // Forward declaration of `HybridSeekBenchSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridSeekBenchSpec; }
+// Forward declaration of `Filmstrip` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct Filmstrip; }
 // Forward declaration of `ThumbnailOptions` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ThumbnailOptions; }
 // Forward declaration of `MergeCrop` to properly resolve imports.
@@ -37,6 +39,8 @@ namespace margelo::nitro::pulseeditor { struct MergeOptions; }
 namespace margelo::nitro::pulseeditor { struct MergeAudio; }
 // Forward declaration of `ConformOptions` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ConformOptions; }
+// Forward declaration of `FilmstripOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct FilmstripOptions; }
 
 #include "ProbeResult.hpp"
 #include <NitroModules/Promise.hpp>
@@ -63,6 +67,8 @@ namespace margelo::nitro::pulseeditor { struct ConformOptions; }
 #include "JHybridConformJobSpec.hpp"
 #include "HybridSeekBenchSpec.hpp"
 #include "JHybridSeekBenchSpec.hpp"
+#include "Filmstrip.hpp"
+#include "JFilmstrip.hpp"
 #include "ThumbnailOptions.hpp"
 #include "JThumbnailOptions.hpp"
 #include "MergeCrop.hpp"
@@ -76,6 +82,8 @@ namespace margelo::nitro::pulseeditor { struct ConformOptions; }
 #include "JMergeAudio.hpp"
 #include "ConformOptions.hpp"
 #include "JConformOptions.hpp"
+#include "FilmstripOptions.hpp"
+#include "JFilmstripOptions.hpp"
 
 namespace margelo::nitro::pulseeditor {
 
@@ -181,6 +189,38 @@ namespace margelo::nitro::pulseeditor {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JHybridSeekBenchSpec::JavaPart>()>("createSeekBench");
     auto __result = method(_javaPart);
     return __result->getJHybridSeekBenchSpec();
+  }
+  std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> JHybridPulseEditorSpec::waveform(const std::string& uri, double peakMs) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* uri */, double /* peakMs */)>("waveform");
+    auto __result = method(_javaPart, jni::make_jstring(uri), peakMs);
+    return [&]() {
+      auto __promise = Promise<std::shared_ptr<ArrayBuffer>>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JArrayBuffer::javaobject>(__boxedResult);
+        __promise->resolve(__result->cthis()->getArrayBuffer());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<Filmstrip>> JHybridPulseEditorSpec::filmstrip(const std::string& uri, const FilmstripOptions& options) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>(jni::alias_ref<jni::JString> /* uri */, jni::alias_ref<JFilmstripOptions> /* options */)>("filmstrip");
+    auto __result = method(_javaPart, jni::make_jstring(uri), JFilmstripOptions::fromCpp(options));
+    return [&]() {
+      auto __promise = Promise<Filmstrip>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JFilmstrip>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
   }
 
 } // namespace margelo::nitro::pulseeditor

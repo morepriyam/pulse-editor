@@ -34,6 +34,13 @@ class PulseEditor : HybridPulseEditorSpec() {
   /** Bench only: see [SeekBench]. */
   override fun createSeekBench(): HybridSeekBenchSpec = SeekBench()
 
+  // iOS only so far: the app draws its own waveform and no filmstrip on Android.
+  override fun filmstrip(uri: String, options: FilmstripOptions): Promise<Filmstrip> =
+    Promise.rejected(UnsupportedOperationException("filmstrip isn't on Android yet"))
+
+  override fun waveform(uri: String, peakMs: Double): Promise<ArrayBuffer> =
+    Promise.rejected(UnsupportedOperationException("waveform isn't on Android yet"))
+
   private fun context() =
     NitroModules.applicationContext ?: throw IllegalStateException("React context not ready")
 }

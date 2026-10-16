@@ -60,6 +60,8 @@ namespace margelo::nitro::pulseeditor {
     std::shared_ptr<HybridMergeJobSpec> createMerge(const std::vector<MergeClip>& clips, const MergeOptions& options) override;
     std::shared_ptr<HybridConformJobSpec> createConform(const std::string& uri, const ConformOptions& options) override;
     std::shared_ptr<HybridSeekBenchSpec> createSeekBench() override;
+    std::shared_ptr<Promise<std::shared_ptr<ArrayBuffer>>> waveform(const std::string& uri, double peakMs) override;
+    std::shared_ptr<Promise<Filmstrip>> filmstrip(const std::string& uri, const FilmstripOptions& options) override;
 
   private:
     jni::global_ref<JHybridPulseEditorSpec::JavaPart> _javaPart;

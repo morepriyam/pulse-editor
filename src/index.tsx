@@ -3,6 +3,8 @@ import type {
   AudioPCM,
   ConformOptions,
   ConformResult,
+  Filmstrip,
+  FilmstripOptions,
   MergeClip,
   MergeOptions,
   MergeResult,
@@ -15,6 +17,8 @@ import type {
 
 export type {
   AudioPCM,
+  Filmstrip,
+  FilmstripOptions,
   ConformOptions,
   ConformResult,
   MergeAudio,
@@ -109,6 +113,34 @@ export function thumbnail(
     ...options,
   };
   return editor.thumbnail(uri, full).catch((e) => {
+    throw nativeError(e);
+  });
+}
+
+/** The source's frames as one grid image (iOS; rejects on Android for now). Defaults: one per
+ * second, no edit. */
+export function filmstrip(
+  uri: string,
+  options: Partial<FilmstripOptions> = {}
+): Promise<Filmstrip> {
+  const full: FilmstripOptions = {
+    intervalMs: 1000,
+    maxWidth: 0,
+    maxHeight: 0,
+    quality: 0.7,
+    rotation: 0,
+    flipped: false,
+    ...options,
+  };
+  return editor.filmstrip(uri, full).catch((e) => {
+    throw nativeError(e);
+  });
+}
+
+/** A file's loudness per `peakMs` (peak, then RMS; 0–255 over -48…0 dBFS), worked out
+ * natively. Rejects where it isn't available (Android). */
+export function waveform(uri: string, peakMs: number): Promise<ArrayBuffer> {
+  return editor.waveform(uri, peakMs).catch((e) => {
     throw nativeError(e);
   });
 }
