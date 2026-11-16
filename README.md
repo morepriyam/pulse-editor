@@ -7,7 +7,7 @@
 **Native video editing for React Native and Expo: trim, join, crop, rotate and speed up clips, with a live preview that matches the export. No FFmpeg.**
 
 ![iOS 16.4+](https://img.shields.io/badge/iOS-16.4%2B-000000?logo=apple&logoColor=white)
-![Android API 29+](https://img.shields.io/badge/Android-API%2029%2B-3DDC84?logo=android&logoColor=white)
+![Android API 24+](https://img.shields.io/badge/Android-API%2024%2B-3DDC84?logo=android&logoColor=white)
 ![Nitro Modules 0.37](https://img.shields.io/badge/Nitro%20Modules-0.37-8A2BE2)
 ![AVFoundation](https://img.shields.io/badge/iOS-AVFoundation-147EFB)
 ![Media3 1.11.1](https://img.shields.io/badge/Android-Media3%201.11.1-4285F4)
@@ -38,7 +38,7 @@ pulse-editor is a video editing engine for React Native and Expo apps, written a
 - **`npm install`:** it isn't on npm yet (0.1.0). Today you add it as a git submodule.
 - **A ready-made editor screen:** pulse-editor has no editor UI yet; a [timeline editor](docs/timeline-editor.md) is planned.
 - **Any codec or container:** it reads what the phone's own decoders read and exports H.264 + AAC MP4 (`conform` with `copyVideo: true` keeps the source's video codec). Filters, text, music, transitions and GIFs aren't in the API.
-- **Bare React Native, Expo Go, web, or older phones:** it's tested only in Pulse's Expo SDK 57 development build (native code doesn't run in Expo Go), on iOS 16.4+ and Android 10+.
+- **Bare React Native, Expo Go, web, or older phones:** it's tested only in Pulse's Expo SDK 57 development build (native code doesn't run in Expo Go), on iOS 16.4+ and Android 10+. Android 7–9 (API 24–28) is supported for SDR video but not yet tested on a phone.
 
 ## Compared with the alternatives
 
@@ -67,7 +67,7 @@ Other packages people find: [react-native-video-processing](https://github.com/s
 
 | | iOS | Android |
 |---|---|---|
-| Minimum | iOS 16.4 | Android 10 (API 29), the lowest where Media3 tone-maps HDR |
+| Minimum | iOS 16.4 | Android 7 (API 24). HDR video needs Android 10 (API 29), the lowest where Media3 reads HDR; below that an HDR clip is refused with a plain message |
 | Media stack | AVFoundation | Media3 1.11.1 |
 | Native code | Swift | Kotlin |
 | Run on | iPhone 17 Pro Max (iOS 26.5.1), iOS Simulator, macOS | Galaxy S24 Ultra (Android 16), Pixel 6a (Android 17 beta), Android 17 emulator |
@@ -211,7 +211,7 @@ Pulse consumes this repo as a git submodule at `modules/pulse-editor` and reads 
 - **Where to edit:** make changes in the submodule inside Pulse, then commit and push here.
 - **When the spec changes:** after editing `src/PulseEditor.nitro.ts`, run `yarn install` and `yarn nitrogen`. Commit the regenerated `nitrogen/generated/` files, because Pulse builds from source and needs them.
 - **Updating Pulse:** in Pulse, `git add modules/pulse-editor` to record the new commit.
-- **Minimum OS versions:** they follow the app's (iOS 16.4, Android 10 / API 29). API 29 is the lowest where Media3 tone-maps HDR (OpenGL); newer APIs are used behind per-method version checks.
+- **Minimum OS versions:** iOS 16.4 (Expo SDK 57's floor) and Android 7 / API 24 (React Native's). HDR video needs Android 10 / API 29, the lowest where Media3 reads HDR: below that, conform and merge refuse an HDR clip ("This video is HDR, which needs Android 10 or newer to edit.") and SDR clips work as usual. Newer APIs are used behind per-method version checks.
 
 ## 🤝 Contributing
 
