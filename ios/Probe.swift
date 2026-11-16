@@ -8,8 +8,10 @@ enum Probe {
   struct Media {
     let asset: AVURLAsset
     let videoTrack: AVAssetTrack?
-    let audioTrack: AVAssetTrack?
+    /// The sound, mixed from these tracks (see `audioTracks(of:)`); the probe reports the first.
+    let audioTracks: [AVAssetTrack]
     let result: ProbeResult
+    var audioTrack: AVAssetTrack? { audioTracks.first }
   }
 
   static func read(_ url: URL) async throws -> ProbeResult {
@@ -24,17 +26,17 @@ enum Probe {
     }
 
     let videoTrack = tracks.first(where: { $0.mediaType == .video })
-    let audioTrack = try await primaryAudioTrack(of: asset)
+    let audioTracks = try await audioTracks(of: asset)
     var video: ProbeVideo? = nil
     if let videoTrack {
       video = try await readVideo(videoTrack)
     }
     var audio: ProbeAudio? = nil
-    if let audioTrack {
+    if let audioTrack = audioTracks.first {
       audio = try await readAudio(audioTrack)
     }
     return Media(
-      asset: asset, videoTrack: videoTrack, audioTrack: audioTrack,
+      asset: asset, videoTrack: videoTrack, audioTracks: audioTracks,
       result: ProbeResult(durationMs: ms(duration), video: video, audio: audio))
   }
 
@@ -85,11 +87,12 @@ enum Probe {
   }
 
   /**
-   * The audio track to read: never Apple's spatial-audio APAC track (iPhone videos carry it next
-   * to the stereo AAC one, and it can't be decoded everywhere), preferring the enabled AAC track,
-   * then any enabled one, then any playable one.
+   * The audio tracks to read, mixed: every enabled one, as players play them together (a ReplayKit
+   * screen recording has two mono tracks, app audio and microphone), the AAC ones first; with none
+   * enabled, the first playable one. Never Apple's spatial-audio APAC track (iPhone videos carry it
+   * next to the stereo AAC one, and it can't be decoded everywhere).
    */
-  static func primaryAudioTrack(of asset: AVAsset) async throws -> AVAssetTrack? {
+  static func audioTracks(of asset: AVAsset) async throws -> [AVAssetTrack] {
     var candidates: [(track: AVAssetTrack, enabled: Bool, aac: Bool)] = []
     for track in try await asset.loadTracks(withMediaType: .audio) {
       let (formats, enabled, playable) = try await track.load(.formatDescriptions, .isEnabled, .isPlayable)
@@ -97,7 +100,14 @@ enum Probe {
       guard playable, subtype != kAudioFormatAPAC else { continue }
       candidates.append((track, enabled, subtype == kAudioFormatMPEG4AAC))
     }
-    return (candidates.first { $0.enabled && $0.aac } ?? candidates.first { $0.enabled } ?? candidates.first)?.track
+    let enabled = candidates.filter(\.enabled)
+    if enabled.isEmpty { return candidates.prefix(1).map(\.track) }
+    return (enabled.filter(\.aac) + enabled.filter { !$0.aac }).map(\.track)
+  }
+
+  /// The one audio track to read where the sound isn't mixed: the first of `audioTracks(of:)`.
+  static func primaryAudioTrack(of asset: AVAsset) async throws -> AVAssetTrack? {
+    try await audioTracks(of: asset).first
   }
 
   /// The display matrix mirrors the frame (a negative determinant).

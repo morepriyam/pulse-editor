@@ -15,6 +15,7 @@ Each is described where it happens, in [Methods](methods.md).
 | Covers larger than 1920 px, or tight crops of 4K (`thumbnail`) | full size | come out smaller than asked (the bound is applied before the edit) ([thumbnail](methods.md#thumbnail)) |
 | Opus audio (`extractAudio`) | — | about 300 ms short at the start (Pulse converts Opus imports to AAC first) ([extractAudio](methods.md#extractaudio)) |
 | Spatial-audio (APAC) tracks | the stereo AAC track is read, never the APAC one | Media3 doesn't expose APAC tracks ([probe](methods.md#probe)) |
+| Several enabled audio tracks (an iOS screen recording's app audio and microphone) | all mixed into one (`conform`, `merge`, the preview) | one is read; Android screen recordings have a single track ([conform](methods.md#conform)) |
 
 ## Where pulse-editor is slower than RNVT, or differs, and why
 
@@ -40,7 +41,7 @@ Each choice above is one small, local change. Where it lives, and what changes i
 
 | Choice | Where | To switch | What you'd trade |
 |---|---|---|---|
-| iOS joins re-encode multi-clip audio | `ios/Merge/Join.swift`, `if let audioOut, audioPieces > 1 \|\| audioGap` | Re-encode only on a gap (`audioGap`) to copy audio again | ~2× faster iOS joins; browsers drift ~10 ms per clip again |
+| iOS joins re-encode multi-clip audio | `ios/Merge/Join.swift`, `audioPieces > 1 \|\| audioGap` | Re-encode only on a gap (`audioGap`) or when a clip has more than one source track (`audioOut.count > 1`) to copy audio again | ~2× faster iOS joins; browsers drift ~10 ms per clip again |
 | iOS trims snap to frames | `ios/Merge/Join.swift`, `trimRange(…, frame: frame)` (the join and `Timeline.compose`) | Pass no `frame` | Exact-ms cuts; FFmpeg-based players start the picture up to a frame late, and iOS stops cutting on Android's frames |
 | iOS merges render clips trimmed at their start | `ios/Merge/MergePlan.swift`, `init`: `clips[$0].startMs > 0` in `render` | Drop that condition | Start-trimmed drafts join without rendering (3-clip draft 1.5 → 0.3 s); Firefox plays them behind the sound, and FFmpeg drops the frames before each such join again ([trac #6584](https://trac.ffmpeg.org/ticket/6584)) |
 | AAC encoder quality (iOS) | `ios/Merge/SampleTransfer.swift`, `EncodeSettings.aac` | Add `AVEncoderAudioQualityKey: AVAudioQuality.low` | ~2× faster audio encode (joins); ~6 dB lower signal-to-distortion |

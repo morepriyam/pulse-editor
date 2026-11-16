@@ -36,7 +36,7 @@ enum Render {
     try? FileManager.default.removeItem(at: output)
     let composed = try await Timeline.compose(items, target: target)
     let (composition, video, audio, videoComposition, duration) = (
-      composed.composition, composed.videoTrack, composed.audioTrack, composed.videoComposition, composed.duration)
+      composed.composition, composed.videoTrack, composed.audioTracks, composed.videoComposition, composed.duration)
 
     let reader = try AVAssetReader(asset: composition)
     reader.timeRange = CMTimeRange(start: .zero, duration: duration)
@@ -56,8 +56,8 @@ enum Render {
     writer.add(videoInput)
     var pairs: [(output: AVAssetReaderOutput, input: AVAssetWriterInput)] = [(videoOutput, videoInput)]
 
-    if let audio {
-      let audioOutput = AVAssetReaderAudioMixOutput(audioTracks: [audio], audioSettings: EncodeSettings.pcm(target.audio))
+    if !audio.isEmpty {
+      let audioOutput = AVAssetReaderAudioMixOutput(audioTracks: audio, audioSettings: EncodeSettings.pcm(target.audio))
       audioOutput.audioTimePitchAlgorithm = .spectral  // sped-up / slowed audio keeps its natural pitch
       audioOutput.alwaysCopiesSampleData = false
       reader.add(audioOutput)

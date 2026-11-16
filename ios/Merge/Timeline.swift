@@ -1,15 +1,16 @@
 import AVFoundation
 
 /// A timeline of clips with their edits as an AVFoundation composition: each clip trimmed into
-/// its slot on one video track (and one audio track), retimed in place for speed, with a video
+/// its slot on one video track (and its sound on the audio tracks), retimed in place for speed, with a video
 /// composition carrying each clip's geometry. `Render` encodes it for merge and conform; the
 /// preview plays the very same composition, so what plays is what exports.
 enum Timeline {
   struct Composed {
     let composition: AVMutableComposition
     let videoTrack: AVMutableCompositionTrack
-    /// Absent when no clip has sound (or every clip with sound is muted).
-    let audioTrack: AVMutableCompositionTrack?
+    /// Empty when no clip has sound (or every clip with sound is muted); more than one when a clip's
+    /// sound is mixed from more than one source track.
+    let audioTracks: [AVMutableCompositionTrack]
     let videoComposition: AVMutableVideoComposition
     let duration: CMTime
     /// Where each clip's slot starts, in the items' order.
@@ -24,9 +25,9 @@ enum Timeline {
       throw MergeError.failed("Couldn't create the video track.")
     }
     let hasAudio = items.contains { !$0.clip.muted && $0.media.audioTrack != nil }
-    let audio = hasAudio
-      ? composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
-      : nil
+    var audio = hasAudio
+      ? [composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)].compactMap { $0 }
+      : []
 
     var instructions: [AVVideoCompositionInstruction] = []
     var cursor = CMTime.zero
@@ -41,11 +42,8 @@ enum Timeline {
 
       // The clip's slot: trimmed in at the cursor, then retimed in place.
       try video.insertTimeRange(range, of: sourceVideo, at: cursor)
-      if let audio, !clip.muted, let sourceAudio = media.audioTrack {
-        let overlap = range.intersection(try await sourceAudio.load(.timeRange))
-        if overlap.duration > .zero {
-          try audio.insertTimeRange(overlap, of: sourceAudio, at: cursor + (overlap.start - range.start))
-        }
+      if !audio.isEmpty, !clip.muted {
+        try await insertAudio(media.audioTracks, range: range, at: cursor, into: &audio, of: composition)
       }
       var slot = range.duration
       if abs(clip.speed - 1) > 0.0001 {
@@ -82,7 +80,35 @@ enum Timeline {
     videoComposition.colorYCbCrMatrix = AVVideoYCbCrMatrix_ITU_R_709_2
 
     return Composed(
-      composition: composition, videoTrack: video, audioTrack: audio,
+      composition: composition, videoTrack: video, audioTracks: audio,
       videoComposition: videoComposition, duration: duration, starts: starts)
+  }
+
+  /// Insert a clip's sound, the part of each source track inside `range`, at `cursor`: the k-th
+  /// source track with sound there goes on the k-th composition audio track (added when missing),
+  /// so tracks that play together are mixed by the reader or player. A track with no sound in
+  /// `range` (an empty microphone track) is skipped. Returns the longest stretch any track covers
+  /// and how many pieces went in.
+  @discardableResult
+  static func insertAudio(
+    _ sources: [AVAssetTrack], range: CMTimeRange, at cursor: CMTime,
+    into tracks: inout [AVMutableCompositionTrack], of composition: AVMutableComposition
+  ) async throws -> (covered: CMTime, pieces: Int) {
+    var covered = CMTime.zero
+    var pieces = 0
+    for source in sources {
+      let overlap = range.intersection(try await source.load(.timeRange))
+      guard overlap.duration > .zero else { continue }
+      if pieces == tracks.count {
+        guard let track = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
+          throw MergeError.failed("Couldn't create the audio track.")
+        }
+        tracks.append(track)
+      }
+      try tracks[pieces].insertTimeRange(overlap, of: source, at: cursor + (overlap.start - range.start))
+      covered = CMTimeMaximum(covered, overlap.duration)
+      pieces += 1
+    }
+    return (covered, pieces)
   }
 }

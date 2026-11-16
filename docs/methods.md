@@ -44,7 +44,7 @@ type ProbeResult = {
 };
 ```
 
-`video` and `audio` are missing when the file has no such track. `audio` describes the track Pulse reads: never Apple's spatial-audio APAC track (iPhone videos carry one next to the stereo AAC track), preferring an enabled AAC track. On Android, Media3 doesn't expose APAC tracks at all. `extractAudio` reads the same track.
+`video` and `audio` are missing when the file has no such track. `audio` describes the track Pulse reads: never Apple's spatial-audio APAC track (iPhone videos carry one next to the stereo AAC track), preferring an enabled AAC track. On iOS, `conform`, `merge` and the preview mix every enabled audio track (see [conform](#conform)); `audio` describes the first. On Android, Media3 doesn't expose APAC tracks at all. `extractAudio` reads only that first track.
 
 - **iOS:** AVFoundation's async loaders, requesting several properties per `load(...)` call as Apple recommends. About **3 ms per clip** on a Mac.
 - **Android:** Media3 Inspector's `MetadataRetriever`, one per file, closed after use, with its results awaited inside `Promise.async`; Dolby Vision reports its base-layer codec, and the video duration comes from the track header through `MediaExtractorCompat`.
@@ -235,7 +235,7 @@ One imported file into the recorder's format, so it can join the camera's own re
 - **Output:** H.264 High 8-bit SDR BT.709, the canvas at the given rotation tag, a constant frame rate on iOS, AAC in the given layout, faststart.
 - **HDR** (HLG, PQ, Dolby Vision) is tone-mapped to SDR, not just re-tagged.
 - **Mirrored** sources are flipped back into the pixels.
-- **Sound:** the track the platform plays, never Apple's spatial-audio (APAC) track. A file whose sound the device can't decode is **rejected**; it is never conformed silently.
+- **Sound:** what the platform plays, never Apple's spatial-audio (APAC) track. On iOS every enabled audio track is mixed into the one output track, whatever its codec: a ReplayKit screen recording writes app audio and microphone as two mono tracks, and a track with no sound adds nothing. Tracks are summed at full level, as AVPlayer plays them, so two loud tracks can clip in the output. Android reads one audio track. A file whose sound the device can't decode is **rejected**; it is never conformed silently.
 - **Checked before it's returned:** the output is probed (codec, layout, rotation, sound) and must be as long as the source's picture; a decoder that gives up early fails the conform instead of hiding behind a held frame. On Android an output with fewer than 80 % of the frames a clean decode gives (the source's samples from time 0 on, put through the frame drop's own rule) is rejected too: the platform decoder skips what it can't decode and carries on. Leftover conform files in the caches folder are deleted after a day.
 
 ### How a conform runs
@@ -266,6 +266,7 @@ What RNVT's `compress` did differently: an AVFoundation engine on iOS with FFmpe
 - **Found and changed on the emulator:**
   - Media3 encodes an SDR source in the source's own colour description, so full-range sources (screen recordings, some messaging apps) came out full range. Every Android encode (merge and conform) now asks for BT.709 limited range, what the cameras and iOS write.
   - Still open: on the emulator a full-range source's picture comes out 9–10 levels darker (full range read as limited), with or without that change; limited-range sources keep their levels exactly (180.9 → 180.4). It doesn't happen on the S24 (2026-10-13, below).
+- **Several sound tracks (iOS code on macOS, 2026-11-10):** a 1320×2868 60 fps HEVC clip with two enabled mono AAC tracks (440 Hz and 1000 Hz tones), full and audio-only, mono and stereo targets: one AAC track carrying both tones at the source's level. With the second track silent, 0.05 s long, or starting 2 s in, the conform passes at the full length. A single-track clip, a clip whose second track is disabled, and the two APAC test clips come out with the same decoded picture and sound as before.
 - **iPhone videos' second sound track:** every iPhone video carries a spatial-audio (APAC) track next to its stereo AAC, which Android can't decode. Test clips with a normal picture and a real iPhone video's two tracks (APAC second, as iPhones write it, and APAC first and default) keep the AAC sound on macOS, the iOS Simulator and the Android emulator, full and audio-only (output vs the source's AAC: correlation 0.999 at 0 ms).
 - **Next to RNVT's `compress`, in Pulse:** on the iOS Simulator both convert to contract, and pulse-editor's cancel settles in 233–353 ms with nothing left behind. On the Android emulator RNVT's full conversion fails by its own bug (its FFmpeg command picks the `mpeg4` encoder and combines options FFmpeg rejects as contradictory); its audio-only one works.
 - **Known differences between the platforms:** iOS fills frames to a constant 30 fps; Android drops frames down to 30 but doesn't add any, so a 24 fps or variable source stays variable (a 58 fps screen recording averaged 29.95 fps) and 29.97 fps stays 29.97. Both pass the import contract and the recorder match.

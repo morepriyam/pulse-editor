@@ -7,7 +7,8 @@ import AVFoundation
 /// - otherwise the whole clip is rendered (`Render`): decoded in hardware, tone-mapped to SDR
 ///   BT.709 (HLG, PQ, Dolby Vision), mirrored sources baked upright, letterboxed onto the canvas,
 ///   constant frame rate, coded in the orientation the rotation tag turns upright.
-/// The sound is the track the platform plays (never Apple's spatial-audio APAC track). A file whose
+/// The sound is what the platform plays: every enabled audio track mixed into one (a screen
+/// recording's app audio and microphone), never Apple's spatial-audio APAC track. A file whose
 /// sound can't be decoded here is rejected rather than conformed silent, and so is a source that
 /// decodes short (a decoder that gives up early without an error).
 enum Conform {

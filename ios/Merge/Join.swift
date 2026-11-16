@@ -2,11 +2,11 @@ import AVFoundation
 
 /// Joins clips that share one format by copying their video samples (AVMutableComposition + a
 /// passthrough export), with trims as edit lists on frame boundaries; video is never decoded or
-/// encoded. Audio from more than one piece (or with a gap) is re-encoded once over the whole
-/// timeline (see AudioEncode), gaps as real silence: copied AAC would need one edit-list entry per
-/// clip to drop each clip's priming and end padding, which Apple players honour but FFmpeg-based
-/// ones (Chrome, servers) don't — they play every clip's padding and fall ~10 ms further behind per
-/// clip. A single piece has no seams, so its audio is copied.
+/// encoded. Audio from more than one piece or track (or with a gap) is re-encoded once over the
+/// whole timeline (see AudioEncode), tracks mixed and gaps as real silence: copied AAC would need
+/// one edit-list entry per clip to drop each clip's priming and end padding, which Apple players
+/// honour but FFmpeg-based ones (Chrome, servers) don't — they play every clip's padding and fall
+/// ~10 ms further behind per clip. A single piece has no seams, so its audio is copied.
 enum Join {
   /// One piece of the timeline: a source file, cut to a window (the whole file when unset).
   struct Segment {
@@ -26,9 +26,9 @@ enum Join {
       throw MergeError.failed("Couldn't create the video track.")
     }
     let hasAudio = segments.contains { !$0.muted && $0.media.audioTrack != nil }
-    let audioOut = hasAudio
-      ? composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)
-      : nil
+    var audioOut = hasAudio
+      ? [composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)].compactMap { $0 }
+      : []
 
     // Every segment is in the draft's format (MergePlan checked; renders are verified), so one
     // track transform shows them all upright.
@@ -45,15 +45,13 @@ enum Join {
 
       // A muted segment (or one without sound, or sound shorter than its picture) leaves a gap,
       // which the audio encode fills with silence.
-      if let audioOut {
+      if !audioOut.isEmpty {
         var covered = CMTime.zero
-        if !segment.muted, let audio = segment.media.audioTrack {
-          let overlap = range.intersection(try await audio.load(.timeRange))
-          if overlap.duration > .zero {
-            try audioOut.insertTimeRange(overlap, of: audio, at: cursor + (overlap.start - range.start))
-            covered = overlap.duration
-            audioPieces += 1
-          }
+        if !segment.muted {
+          let inserted = try await Timeline.insertAudio(
+            segment.media.audioTracks, range: range, at: cursor, into: &audioOut, of: composition)
+          covered = inserted.covered
+          audioPieces += inserted.pieces
         }
         if range.duration - covered > CMTime(value: 1, timescale: 10) { audioGap = true }
       }
@@ -69,11 +67,11 @@ enum Join {
       // The composition reads the encoded audio through this asset; a track doesn't keep its
       // asset alive, so hold it until the export is done.
       var encodedAsset: AVAsset?
-      if let audioOut, encodeAudio || audioPieces > 1 || audioGap {
+      if !audioOut.isEmpty, encodeAudio || audioPieces > 1 || audioGap {
         let url = output.deletingPathExtension().appendingPathExtension("audio.mp4")
         encodedAudio = url
         try await AudioEncode.run(composition, audio: options.audio, to: url) { progress($0 * 0.3) }
-        encodedAsset = try await replaceAudio(of: composition, track: audioOut, with: url)
+        encodedAsset = try await replaceAudio(of: composition, tracks: audioOut, with: url)
         exportProgress = { progress(0.3 + $0 * 0.7) }
       }
       try Task.checkCancellation()
@@ -118,14 +116,14 @@ enum Join {
     return CMTimeRange(start: start, duration: CMTime(value: CMTimeValue((lengthMs * speed * 1000).rounded()), timescale: 1_000_000))
   }
 
-  /// Replace the composition's audio track with one encoded audio file; returns that file's asset.
-  private static func replaceAudio(of composition: AVMutableComposition, track: AVMutableCompositionTrack, with url: URL) async throws -> AVAsset {
+  /// Replace the composition's audio tracks with one encoded audio file; returns that file's asset.
+  private static func replaceAudio(of composition: AVMutableComposition, tracks: [AVMutableCompositionTrack], with url: URL) async throws -> AVAsset {
     let asset = AVURLAsset(url: url)
     guard let encoded = try await asset.loadTracks(withMediaType: .audio).first else {
       throw MergeError.failed("The encoded audio has no track.")
     }
     let range = try await encoded.load(.timeRange)
-    composition.removeTrack(track)
+    tracks.forEach(composition.removeTrack)
     guard let audioOut = composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid) else {
       throw MergeError.failed("Couldn't create the audio track.")
     }
