@@ -2,12 +2,14 @@ package com.margelo.nitro.pulseeditor
 
 import android.graphics.SurfaceTexture
 import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.Surface
 import android.view.TextureView
 import android.view.View
+import androidx.annotation.RequiresApi
 import android.view.PixelCopy
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -650,7 +652,9 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
   override fun snapshot(): Promise<String> {
     val promise = Promise<String>()
     main.post {
-      if (drag.shown) {
+      // PixelCopy (API 26) copies the screen with the drag layer on top; below that the snapshot
+      // is the composition's own frame, without the layer.
+      if (drag.shown && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
         snapshotScreen(promise)
         return@post
       }
@@ -672,6 +676,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
 
   /** What the preview shows on screen (the drag layer is a view on top: TextureView.getBitmap
    * of the composition wouldn't have it). */
+  @RequiresApi(Build.VERSION_CODES.O)
   private fun snapshotScreen(promise: Promise<String>) {
     val window = context.currentActivity?.window
     if (window == null || root.width <= 0 || root.height <= 0) {

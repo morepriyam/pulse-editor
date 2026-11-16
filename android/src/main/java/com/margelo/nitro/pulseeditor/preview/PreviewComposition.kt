@@ -45,7 +45,10 @@ internal object PreviewComposition {
       sequences += audio.build()
     }
     return Composition.Builder(sequences).apply {
-      if (media.any { it.video?.transfer != null && it.video?.transfer != Transfer.SDR }) setHdrMode(MergeExport.hdrMode)
+      // Below Android 10 an HDR clip can't be read (conform refuses it on import); don't ask for HDR.
+      if (MergeExport.hdrSupported && media.any { it.video?.transfer != null && it.video?.transfer != Transfer.SDR }) {
+        setHdrMode(MergeExport.hdrMode)
+      }
     }.build()
   }
 
