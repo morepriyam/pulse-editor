@@ -162,7 +162,7 @@ enum Join {
     let media = try await Probe.load(output)
     let gotMs = media.result.durationMs
     let tolerance = max(500, expectedMs * 0.01)
-    guard abs(gotMs - expectedMs) <= tolerance else {
+    guard Swift.abs(gotMs - expectedMs) <= tolerance else {
       throw MergeError.failed("Joined video is \(Int(gotMs)) ms, expected \(Int(expectedMs)) ms.")
     }
     return MergeResult(
