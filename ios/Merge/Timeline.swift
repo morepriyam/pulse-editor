@@ -46,7 +46,7 @@ enum Timeline {
         try await insertAudio(media.audioTracks, range: range, at: cursor, into: &audio, of: composition)
       }
       var slot = range.duration
-      if abs(clip.speed - 1) > 0.0001 {
+      if Swift.abs(clip.speed - 1) > 0.0001 {
         // Whole ms (trimRange made it so; this drops the µs rounding of the window).
         let scaled = CMTime(value: CMTimeValue((slot.seconds * 1000 / clip.speed).rounded()), timescale: 1000)
         composition.scaleTimeRange(CMTimeRange(start: cursor, duration: slot), toDuration: scaled)
