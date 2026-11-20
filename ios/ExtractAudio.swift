@@ -76,7 +76,7 @@ enum ExtractAudio {
     // Float → Int16 in place (each write lands at or before its read), turned down as a whole
     // only when the downmix went past full scale, never up.
     var peak: Float = 0
-    for i in 0..<count { peak = max(peak, abs(data.load(fromByteOffset: i * floatSize, as: Float.self))) }
+    for i in 0..<count { peak = max(peak, Swift.abs(data.load(fromByteOffset: i * floatSize, as: Float.self))) }
     let gain = Float(Int16.max) / max(peak, 1)
     for i in 0..<count {
       let value = data.load(fromByteOffset: i * floatSize, as: Float.self)

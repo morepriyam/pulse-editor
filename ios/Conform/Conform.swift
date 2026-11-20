@@ -105,7 +105,7 @@ enum Conform {
       }
     }
     let want = source.result.video?.durationMs ?? source.result.durationMs
-    if want > 0, abs(out.durationMs - want) > max(500, want * 0.01) {
+    if want > 0, Swift.abs(out.durationMs - want) > max(500, want * 0.01) {
       throw MergeError.failed("The conformed video is \(Int(out.durationMs)) ms, expected \(Int(want)) ms.")
     }
     return out
