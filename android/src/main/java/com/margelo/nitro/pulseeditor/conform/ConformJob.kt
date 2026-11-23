@@ -1,5 +1,6 @@
 package com.margelo.nitro.pulseeditor.conform
 
+import android.content.Context
 import com.facebook.proguard.annotations.DoNotStrip
 import com.margelo.nitro.NitroModules
 import com.margelo.nitro.core.Promise
@@ -16,12 +17,16 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
 
 /** One conform run, like MergeJob: `start` runs it once in a coroutine; `cancel` cancels that
- * coroutine, which cancels the export in flight and deletes its partial output. */
+ * coroutine, which cancels the export in flight and deletes its partial output. Image clips use it
+ * too (`name` "Image clip"), so callers get the same progress, cancel and result. */
 @DoNotStrip
 class ConformJob(
-  private val uri: String,
-  private val options: ConformOptions,
+  private val name: String,
+  private val work: suspend (Context, MergeProgress) -> ConformResult,
 ) : HybridConformJobSpec() {
+  constructor(uri: String, options: ConformOptions) :
+    this("Conform", { context, progress -> Conform.run(context, uri, options, progress) })
+
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
   private var job: Deferred<ConformResult>? = null
   private var cancelled = false
@@ -30,8 +35,8 @@ class ConformJob(
     val context = NitroModules.applicationContext
       ?: return Promise.rejected(IllegalStateException("React context not ready"))
     val job = synchronized(this) {
-      if (job != null) return Promise.rejected(IllegalStateException("This conform was already started."))
-      scope.async { Conform.run(context, uri, options, MergeProgress(onProgress)) }.also {
+      if (job != null) return Promise.rejected(IllegalStateException("This ${name.lowercase()} was already started."))
+      scope.async { work(context, MergeProgress(onProgress)) }.also {
         job = it
         if (cancelled) it.cancel()
       }
@@ -40,7 +45,7 @@ class ConformJob(
       try {
         job.await()
       } catch (e: CancellationException) {
-        throw MergeException("Conform cancelled")
+        throw MergeException("$name cancelled")
       }
     }
   }

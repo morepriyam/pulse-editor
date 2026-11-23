@@ -35,6 +35,11 @@ class PulseEditor : HybridPulseEditorSpec() {
   override fun createConform(uri: String, options: ConformOptions): HybridConformJobSpec =
     com.margelo.nitro.pulseeditor.conform.ConformJob(uri, options)
 
+  override fun createImageClip(uri: String, options: ImageClipOptions): HybridConformJobSpec =
+    com.margelo.nitro.pulseeditor.conform.ConformJob("Image clip") { context, progress ->
+      com.margelo.nitro.pulseeditor.conform.ImageClip.run(context, uri, options, progress)
+    }
+
   /** Bench only: see [SeekBench]. */
   override fun createSeekBench(): HybridSeekBenchSpec = SeekBench()
 

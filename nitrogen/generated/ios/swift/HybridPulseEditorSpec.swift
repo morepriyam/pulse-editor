@@ -19,6 +19,7 @@ public protocol HybridPulseEditorSpec_protocol: HybridObject {
   func frames(uri: String, options: FramesOptions) throws -> Promise<[Frame]>
   func createMerge(clips: [MergeClip], options: MergeOptions) throws -> (any HybridMergeJobSpec)
   func createConform(uri: String, options: ConformOptions) throws -> (any HybridConformJobSpec)
+  func createImageClip(uri: String, options: ImageClipOptions) throws -> (any HybridConformJobSpec)
   func createSeekBench() throws -> (any HybridSeekBenchSpec)
 }
 

@@ -7,6 +7,7 @@ import android.os.Looper
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.util.BitmapLoader
 import androidx.media3.common.util.Clock
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.muxer.Muxer
@@ -51,10 +52,12 @@ internal object Transcode {
    * `rotationTag`: write the video with this orientation tag (clockwise degrees) instead of the
    * one Transformer picks; the frames must already be in the matching coded orientation.
    * `oneFile`: the export reads a single file (conform), which errors then name instead of a clip.
+   * `bitmapLoader`: what loads an image item's picture (an image clip's, already drawn), instead
+   * of Media3's own loader.
    */
   class Settings(
     val bitrate: Int, val durationMs: Double, val portrait: Boolean = false, val copyVideo: Boolean = false,
-    val rotationTag: Int? = null, val oneFile: Boolean = false,
+    val rotationTag: Int? = null, val oneFile: Boolean = false, val bitmapLoader: BitmapLoader? = null,
   )
 
   class Outcome(val result: ExportResult, val fallbacks: List<String>)
@@ -154,7 +157,10 @@ internal object Transcode {
       .setLooper(Looper.getMainLooper())
       .setVideoMimeType(MimeTypes.VIDEO_H264)
       .setAudioMimeType(MimeTypes.AUDIO_AAC)
-      .setAssetLoaderFactory(DefaultAssetLoaderFactory(context, decoders, Clock.DEFAULT, /* logSessionId= */ null))
+      .setAssetLoaderFactory(
+        settings.bitmapLoader?.let { DefaultAssetLoaderFactory(context, decoders, Clock.DEFAULT, /* mediaSourceFactory= */ null, it) }
+          ?: DefaultAssetLoaderFactory(context, decoders, Clock.DEFAULT, /* logSessionId= */ null),
+      )
       .setEncoderFactory(encoders)
       .setMuxerFactory(muxers(settings))
       .setPortraitEncodingEnabled(settings.portrait)

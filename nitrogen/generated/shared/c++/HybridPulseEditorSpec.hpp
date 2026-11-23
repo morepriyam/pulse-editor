@@ -35,6 +35,8 @@ namespace margelo::nitro::pulseeditor { struct MergeOptions; }
 namespace margelo::nitro::pulseeditor { class HybridConformJobSpec; }
 // Forward declaration of `ConformOptions` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ConformOptions; }
+// Forward declaration of `ImageClipOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ImageClipOptions; }
 // Forward declaration of `HybridSeekBenchSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridSeekBenchSpec; }
 
@@ -53,6 +55,7 @@ namespace margelo::nitro::pulseeditor { class HybridSeekBenchSpec; }
 #include "MergeOptions.hpp"
 #include "HybridConformJobSpec.hpp"
 #include "ConformOptions.hpp"
+#include "ImageClipOptions.hpp"
 #include "HybridSeekBenchSpec.hpp"
 
 namespace margelo::nitro::pulseeditor {
@@ -92,6 +95,7 @@ namespace margelo::nitro::pulseeditor {
       virtual std::shared_ptr<Promise<std::vector<Frame>>> frames(const std::string& uri, const FramesOptions& options) = 0;
       virtual std::shared_ptr<HybridMergeJobSpec> createMerge(const std::vector<MergeClip>& clips, const MergeOptions& options) = 0;
       virtual std::shared_ptr<HybridConformJobSpec> createConform(const std::string& uri, const ConformOptions& options) = 0;
+      virtual std::shared_ptr<HybridConformJobSpec> createImageClip(const std::string& uri, const ImageClipOptions& options) = 0;
       virtual std::shared_ptr<HybridSeekBenchSpec> createSeekBench() = 0;
 
     protected:

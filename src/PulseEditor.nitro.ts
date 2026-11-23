@@ -125,6 +125,26 @@ export interface ConformResult {
   bitrate: number;
 }
 
+/** What `createImageClip` writes: a still image as one clip in the recorder's format. */
+export interface ImageClipOptions {
+  /** Display canvas the image is fitted onto, letterboxed and centered, e.g. 1080×1920. */
+  width: number;
+  height: number;
+  /** Clockwise rotation the output is tagged with: 0, 90, 180 or 270. At 90 or 270 the frames
+   * are coded sideways (1920×1080 for a 1080×1920 canvas), as in `ConformOptions`. */
+  rotation: number;
+  /** Constant frame rate of the output: every frame is written (90 frames for 3 s at 30). */
+  fps: number;
+  /** Video bitrate in bits per second. */
+  bitrate: number;
+  /** Layout of the output's silent sound track (the recorder's). */
+  audio: MergeAudio;
+  /** How long the clip lasts, ms; rounded to whole frames. */
+  durationMs: number;
+  /** Colour around the image and behind its transparent parts, `#RRGGBB`. */
+  background: string;
+}
+
 /** Which frame `thumbnail` takes, how big, and the clip's edit. */
 export interface ThumbnailOptions {
   /** Source time in ms: the frame shown at that moment (clamped to the video). */
@@ -376,6 +396,14 @@ export interface PulseEditor extends HybridObject<{
 
   /** Prepare a conform of one file into `options`' format. Call `start` to run it. */
   createConform(uri: string, options: ConformOptions): ConformJob;
+
+  /**
+   * Prepare a clip of a still image (JPEG, PNG, HEIC, …) in `options`' format: the image upright
+   * (EXIF orientation applied), decoded at most canvas-sized, converted to SDR sRGB, fitted onto
+   * the canvas filled with `background`, held for `durationMs` at a constant frame rate, with a
+   * silent AAC track. Call `start` to run it; it rejects when the image can't be decoded here.
+   */
+  createImageClip(uri: string, options: ImageClipOptions): ConformJob;
 
   /** Bench only: a plain-ExoPlayer seek bench (Android; rejects on iOS). */
   createSeekBench(): SeekBench;

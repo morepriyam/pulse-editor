@@ -56,6 +56,10 @@ abstract class HybridPulseEditorSpec: HybridObject() {
   
   @DoNotStrip
   @Keep
+  abstract fun createImageClip(uri: String, options: ImageClipOptions): HybridConformJobSpec
+  
+  @DoNotStrip
+  @Keep
   abstract fun createSeekBench(): HybridSeekBenchSpec
 
   // Default implementation of `HybridObject.toString()`

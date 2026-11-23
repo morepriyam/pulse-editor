@@ -42,6 +42,10 @@ class PulseEditor: HybridPulseEditorSpec {
     return ConformJob(uri: uri, options: options)
   }
 
+  public func createImageClip(uri: String, options: ImageClipOptions) throws -> (any HybridConformJobSpec) {
+    return ConformJob(name: "Image clip") { try await ImageClip.run(uri, options, progress: $0) }
+  }
+
   /// Bench only: the plain-player seek bench is Android's (see `SeekBench`).
   public func createSeekBench() throws -> (any HybridSeekBenchSpec) {
     return SeekBench()

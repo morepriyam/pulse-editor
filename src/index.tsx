@@ -3,6 +3,7 @@ import type {
   AudioPCM,
   ConformOptions,
   ConformResult,
+  ImageClipOptions,
   MergeClip,
   MergeOptions,
   MergeResult,
@@ -19,6 +20,7 @@ export type {
   AudioPCM,
   ConformOptions,
   ConformResult,
+  ImageClipOptions,
   MergeAudio,
   MergeClip,
   MergeCrop,
@@ -204,6 +206,66 @@ export async function conform(
     throw new Error('Conform cancelled');
   }
   const job = editor.createConform(uri, options);
+  const cancel = () => job.cancel();
+  signal?.addEventListener('abort', cancel);
+  try {
+    return await job.start(onProgress ?? (() => {}));
+  } catch (e) {
+    throw nativeError(e);
+  } finally {
+    signal?.removeEventListener('abort', cancel);
+  }
+}
+
+/** `#RGB` or `#RRGGBB` (with or without the `#`) → `#rrggbb`; null for anything else. */
+function hexColor(value: string): string | null {
+  const match = /^#?([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(value.trim());
+  if (!match) return null;
+  const digits = match[1]!.toLowerCase();
+  return `#${digits.length === 3 ? [...digits].map((d) => d + d).join('') : digits}`;
+}
+
+/**
+ * Make a clip of a still image (JPEG, PNG, HEIC, a screenshot) in the recorder's format
+ * (`options`, as for `conform`): H.264 8-bit SDR at the canvas, rotation tag, frame rate and
+ * bitrate asked for, every frame present (90 for 3 s at 30 fps), a silent AAC track in the given
+ * layout, faststart. The image is turned upright (EXIF orientation), decoded at most canvas-sized,
+ * converted to SDR sRGB, and fitted (letterboxed, centered) onto the canvas filled with
+ * `background`, which also shows through transparent parts. Defaults: `durationMs` 3000,
+ * `background` '#000000'. Rejects when the image can't be decoded on this device ("This image
+ * can't be read on this device.") and with "Image clip cancelled" when `signal` aborts.
+ */
+export async function imageClip(
+  uri: string,
+  options: Omit<ImageClipOptions, 'durationMs' | 'background'> &
+    Partial<Pick<ImageClipOptions, 'durationMs' | 'background'>>,
+  { onProgress, signal }: JobControls = {}
+): Promise<ConformResult> {
+  if (!uri?.trim().length) {
+    throw new Error('File path cannot be empty.');
+  }
+  const durationMs = options.durationMs ?? 3000;
+  if (!Number.isFinite(durationMs) || durationMs <= 0) {
+    throw new Error("The image clip's duration must be more than 0 ms.");
+  }
+  const background = hexColor(options.background ?? '#000000');
+  if (background === null) {
+    throw new Error('The background must be a colour like #000000.');
+  }
+  if (signal?.aborted) {
+    throw new Error('Image clip cancelled');
+  }
+  const { width, height, rotation, fps, bitrate, audio } = options;
+  const job = editor.createImageClip(uri, {
+    width,
+    height,
+    rotation,
+    fps,
+    bitrate,
+    audio,
+    durationMs,
+    background,
+  });
   const cancel = () => job.cancel();
   signal?.addEventListener('abort', cancel);
   try {
