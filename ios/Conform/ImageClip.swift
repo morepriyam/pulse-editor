@@ -18,15 +18,10 @@ enum ImageClip {
   static func run(_ uri: String, _ options: ImageClipOptions, progress: MergeProgress) async throws -> ConformResult {
     Merge.removeStaleOutputs()
     progress(0)
+    try validate(options)
     let degrees = (Int(options.rotation.rounded()) % 360 + 360) % 360
     guard degrees % 90 == 0 else { throw MergeError.invalid("The rotation must be 0, 90, 180 or 270.") }
     let fps = Int32(options.fps.rounded())
-    guard options.width >= 2, options.height >= 2, fps > 0, options.bitrate > 0 else {
-      throw MergeError.invalid("The canvas size, frame rate and bitrate must be positive.")
-    }
-    guard options.durationMs.isFinite, options.durationMs > 0 else {
-      throw MergeError.invalid("The image clip's duration must be more than 0 ms.")
-    }
     let background = try color(options.background)
     let frames = max(1, Int((options.durationMs / 1000 * Double(fps)).rounded()))
     let canvas = CGSize(width: options.width.rounded(), height: options.height.rounded())
@@ -52,11 +47,36 @@ enum ImageClip {
     }
   }
 
+  /// The longest image clip, ms.
+  static let maxDurationMs = 60_000.0
+
+  /// Every number finite and in range before any is converted to an integer (a NaN or huge value
+  /// would trap in the conversion).
+  private static func validate(_ options: ImageClipOptions) throws {
+    func within(_ value: Double, _ range: ClosedRange<Double>) -> Bool { value.isFinite && range.contains(value) }
+    guard within(options.width, 2...8192), within(options.height, 2...8192) else {
+      throw MergeError.invalid("The canvas must be 2–8192 pixels wide and high.")
+    }
+    guard within(options.rotation, -360...360) else { throw MergeError.invalid("The rotation must be 0, 90, 180 or 270.") }
+    guard within(options.fps, 1...240) else { throw MergeError.invalid("The frame rate must be 1–240 fps.") }
+    guard within(options.bitrate, 1...1_000_000_000) else { throw MergeError.invalid("The bitrate must be positive.") }
+    guard within(options.audio.sampleRate, 8000...192_000), within(options.audio.channels, 1...8) else {
+      throw MergeError.invalid("The audio layout must be 8–192 kHz with 1–8 channels.")
+    }
+    guard options.durationMs.isFinite, options.durationMs > 0, options.durationMs <= maxDurationMs else {
+      throw MergeError.invalid("The image clip's duration must be more than 0 and at most \(Int(maxDurationMs)) ms.")
+    }
+  }
+
   private static let unreadable = MergeError.failed("This image can't be read on this device.")
 
   /// The image upright and at most `maxPixelSize` on its long side (never scaled up here), as SDR.
   private static func decode(_ url: URL, maxPixelSize: CGFloat) throws -> CGImage {
-    if url.isFileURL, !FileManager.default.fileExists(atPath: url.path) {
+    // A photo-library (ph://, assets-library://) or remote URI must be copied to a file first.
+    guard url.isFileURL else {
+      throw MergeError.invalid("The image must be a local file (a file:// URI or a path), not \(url.scheme ?? "this URI").")
+    }
+    if !FileManager.default.fileExists(atPath: url.path) {
       throw MergeError.invalid("The image's file is missing.")
     }
     guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
@@ -149,7 +169,8 @@ enum ImageClip {
 
   /// Writes `frames` copies of the picture at 1/fps steps and silence as long, interleaved by
   /// time: each turn appends to whichever input is behind, or to the other when that one isn't
-  /// ready, and waits briefly when neither is. Cancelling stops and deletes the partial file.
+  /// ready, and waits briefly when neither is. Each input is marked finished as soon as its last
+  /// sample is in. Cancelling stops and deletes the partial file.
   private static func write(
     _ picture: CVPixelBuffer, frames: Int, fps: Int32, coded: CGSize, transform: CGAffineTransform,
     options: ImageClipOptions, to output: URL, progress: (Double) -> Void
@@ -186,11 +207,16 @@ enum ImageClip {
             guard adaptor.append(picture, withPresentationTime: CMTime(value: CMTimeValue(frame), timescale: fps)) else { break }
             frame += 1
             progress(Double(frame) / Double(frames))
+            // Finished at once: the writer would otherwise hold the remaining silence back to
+            // interleave it with frames that never come (at 1–2 fps the last frame starts a
+            // second or more before the sound ends).
+            if frame == frames { videoInput.markAsFinished() }
             appended = true
             break
           }
           if !video, !silence.done, audioInput.isReadyForMoreMediaData {
             guard let sample = try silence.next(), audioInput.append(sample) else { break }
+            if silence.done { audioInput.markAsFinished() }
             appended = true
             break
           }
@@ -200,8 +226,6 @@ enum ImageClip {
       if writer.status != .writing {
         throw writer.error ?? MergeError.failed("Writing the image clip failed.")
       }
-      videoInput.markAsFinished()
-      audioInput.markAsFinished()
       writer.endSession(atSourceTime: duration)
       await writer.finishWriting()
       guard writer.status == .completed else {

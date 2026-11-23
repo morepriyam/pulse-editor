@@ -13,6 +13,8 @@ import android.graphics.Rect
 import android.media.ExifInterface
 import android.net.Uri
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
@@ -75,17 +77,12 @@ object ImageClip {
   suspend fun run(context: Context, uri: String, options: ImageClipOptions, progress: MergeProgress): ConformResult {
     Merge.removeStaleOutputs(context)
     progress(0.0)
+    validate(options)
     val degrees = ((options.rotation.roundToInt() % 360) + 360) % 360
     if (degrees % 90 != 0) throw MergeException("The rotation must be 0, 90, 180 or 270.")
     val width = options.width.roundToInt()
     val height = options.height.roundToInt()
     val fps = options.fps.roundToInt()
-    if (width < 2 || height < 2 || fps <= 0 || options.bitrate <= 0) {
-      throw MergeException("The canvas size, frame rate and bitrate must be positive.")
-    }
-    if (!options.durationMs.isFinite() || options.durationMs <= 0) {
-      throw MergeException("The image clip's duration must be more than 0 ms.")
-    }
     val background = color(options.background)
     val frames = max(1, (options.durationMs / 1000 * fps).roundToInt())
     // Whole ms that Media3's ConstantRateTimestampIterator turns back into exactly `frames` frames.
@@ -105,8 +102,14 @@ object ImageClip {
         bitrate = options.bitrate.toInt(), durationMs = durationMs.toDouble(), portrait = true,
         rotationTag = degrees, oneFile = true, bitmapLoader = PictureLoader(picture),
       )
-      val outcome = Transcode.run(context, composition(uri, options, degrees, durationMs, fps), output, settings) {
-        progress(it * 0.98)
+      val outcome = try {
+        Transcode.run(context, composition(uri, options, degrees, durationMs, fps), output, settings) {
+          progress(it * 0.98)
+        }
+      } finally {
+        // Freed on the main looper, after Transformer is done with it there: a cancel is posted
+        // there before this, and Transformer.cancel() returns once the export is released.
+        Handler(Looper.getMainLooper()).post { picture.recycle() }
       }
       return withContext(Dispatchers.IO) {
         moveMoovToFront(output)
@@ -128,6 +131,26 @@ object ImageClip {
     } catch (e: Throwable) {
       output.delete()
       throw e
+    }
+  }
+
+  /** The longest image clip, ms. */
+  const val MAX_DURATION_MS = 60_000.0
+
+  /** Every number finite and in range before any is rounded. */
+  private fun validate(options: ImageClipOptions) {
+    fun within(value: Double, min: Double, max: Double) = value.isFinite() && value in min..max
+    if (!within(options.width, 2.0, 8192.0) || !within(options.height, 2.0, 8192.0)) {
+      throw MergeException("The canvas must be 2–8192 pixels wide and high.")
+    }
+    if (!within(options.rotation, -360.0, 360.0)) throw MergeException("The rotation must be 0, 90, 180 or 270.")
+    if (!within(options.fps, 1.0, 240.0)) throw MergeException("The frame rate must be 1–240 fps.")
+    if (!within(options.bitrate, 1.0, 1_000_000_000.0)) throw MergeException("The bitrate must be positive.")
+    if (!within(options.audio.sampleRate, 8000.0, 192_000.0) || !within(options.audio.channels, 1.0, 8.0)) {
+      throw MergeException("The audio layout must be 8–192 kHz with 1–8 channels.")
+    }
+    if (!options.durationMs.isFinite() || options.durationMs <= 0 || options.durationMs > MAX_DURATION_MS) {
+      throw MergeException("The image clip's duration must be more than 0 and at most ${MAX_DURATION_MS.toInt()} ms.")
     }
   }
 

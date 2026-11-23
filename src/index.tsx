@@ -225,6 +225,9 @@ function hexColor(value: string): string | null {
   return `#${digits.length === 3 ? [...digits].map((d) => d + d).join('') : digits}`;
 }
 
+/** The longest clip `imageClip` makes, ms. */
+export const IMAGE_CLIP_MAX_DURATION_MS = 60_000;
+
 /**
  * Make a clip of a still image (JPEG, PNG, HEIC, a screenshot) in the recorder's format
  * (`options`, as for `conform`): H.264 8-bit SDR at the canvas, rotation tag, frame rate and
@@ -232,8 +235,10 @@ function hexColor(value: string): string | null {
  * layout, faststart. The image is turned upright (EXIF orientation), decoded at most canvas-sized,
  * converted to SDR sRGB, and fitted (letterboxed, centered) onto the canvas filled with
  * `background`, which also shows through transparent parts. Defaults: `durationMs` 3000,
- * `background` '#000000'. Rejects when the image can't be decoded on this device ("This image
- * can't be read on this device.") and with "Image clip cancelled" when `signal` aborts.
+ * `background` '#000000'; `durationMs` at most 60 000. On iOS `uri` must be a local file (`file://`
+ * or a path): copy a photo-library asset to a file first; Android also takes `content://` URIs. Rejects on out-of-range options, when the
+ * image can't be decoded on this device ("This image can't be read on this device.") and with
+ * "Image clip cancelled" when `signal` aborts.
  */
 export async function imageClip(
   uri: string,
@@ -245,8 +250,35 @@ export async function imageClip(
     throw new Error('File path cannot be empty.');
   }
   const durationMs = options.durationMs ?? 3000;
-  if (!Number.isFinite(durationMs) || durationMs <= 0) {
-    throw new Error("The image clip's duration must be more than 0 ms.");
+  if (
+    !Number.isFinite(durationMs) ||
+    durationMs <= 0 ||
+    durationMs > IMAGE_CLIP_MAX_DURATION_MS
+  ) {
+    throw new Error(
+      `The image clip's duration must be more than 0 and at most ${IMAGE_CLIP_MAX_DURATION_MS} ms.`
+    );
+  }
+  const { width, height, rotation, fps, bitrate, audio } = options;
+  const within = (value: number, min: number, max: number) =>
+    Number.isFinite(value) && value >= min && value <= max;
+  if (!within(width, 2, 8192) || !within(height, 2, 8192)) {
+    throw new Error('The canvas must be 2–8192 pixels wide and high.');
+  }
+  if (!within(rotation, -360, 360) || Math.round(rotation) % 90 !== 0) {
+    throw new Error('The rotation must be 0, 90, 180 or 270.');
+  }
+  if (!within(fps, 1, 240)) {
+    throw new Error('The frame rate must be 1–240 fps.');
+  }
+  if (!within(bitrate, 1, 1_000_000_000)) {
+    throw new Error('The bitrate must be positive.');
+  }
+  if (
+    !within(audio?.sampleRate, 8000, 192_000) ||
+    !within(audio?.channels, 1, 8)
+  ) {
+    throw new Error('The audio layout must be 8–192 kHz with 1–8 channels.');
   }
   const background = hexColor(options.background ?? '#000000');
   if (background === null) {
@@ -255,7 +287,6 @@ export async function imageClip(
   if (signal?.aborted) {
     throw new Error('Image clip cancelled');
   }
-  const { width, height, rotation, fps, bitrate, audio } = options;
   const job = editor.createImageClip(uri, {
     width,
     height,

@@ -285,17 +285,17 @@ const result = await imageClip(uri, {
   rotation: 90,                      // clockwise tag; at 90/270 frames are coded 1920×1080, like the camera's
   fps: 30, bitrate: 5_000_000,
   audio: { sampleRate: 48000, channels: 1 },  // the silent track's layout (the recorder's)
-  durationMs: 3000,                  // default 3000; rounded to whole frames
+  durationMs: 3000,                  // default 3000, at most 60 000; rounded to whole frames
   background: '#000000',             // default; `#RGB` or `#RRGGBB`, also behind transparent parts
 }, { onProgress, signal });          // abort = cancel: stops, deletes partial output, rejects "Image clip cancelled"
 // → { uri, durationMs, encoded: true, bitrate }: a faststart MP4 in the caches folder
 ```
 
-A still image (JPEG, PNG, HEIC, a screenshot) as one clip in the recorder's format, the same options as `conform` without `copyVideo`. Natively it's `createImageClip(uri, options)`, which returns a `ConformJob`, so progress, cancel and the result work as for `conform`.
+A still image (JPEG, PNG, HEIC, a screenshot) as one clip in the recorder's format, the same options as `conform` without `copyVideo`. On iOS `uri` must be a local file (`file://` or a path): copy a photo-library asset (`ph://`) to a file first. Android also takes `content://` URIs. Natively it's `createImageClip(uri, options)`, which returns a `ConformJob`, so progress, cancel and the result work as for `conform`.
 
 - **Output:** H.264 High 8-bit SDR BT.709, the canvas at the given rotation tag, a constant frame rate with every frame written (90 for 3 s at 30 fps), a silent AAC track in the given layout, faststart.
 - **The picture:** upright (EXIF orientation applied); decoded at most canvas-sized on its long side, never at full size; converted to 8-bit sRGB (Display P3 and HDR photos included; an HDR gain map is left out); fitted onto the canvas filled with `background`, transparency composited onto it.
-- **Rejected:** an image the device can't decode ("This image can't be read on this device.", e.g. HEIC on an Android phone without a HEIF decoder), a missing file ("The image's file is missing."), a `background` that isn't a hex colour, a duration of 0 or less.
+- **Rejected:** options out of range (canvas 2–8192, fps 1–240, a duration over 60 s, a non-finite number), a URI that isn't a local file on iOS, an image the device can't decode ("This image can't be read on this device.", e.g. HEIC on an Android phone without a HEIF decoder), a missing file ("The image's file is missing."), a `background` that isn't a hex colour, a duration of 0 or less.
 - **Checked before it's returned:** the output is probed (codec, layout, rotation, frame rate, sound, length); on Android the frames Transformer wrote must be the frames asked for, within one. Leftover image clip files in the caches folder are deleted after a day.
 
 ### How an image clip runs
