@@ -1,6 +1,7 @@
 package com.margelo.nitro.pulseeditor.merge
 
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.C
@@ -51,6 +52,21 @@ internal object MergeExport {
    * "Video frame processing error". There the HDR picture is read as SDR instead: it finishes, with
    * flatter colours. Checked once per process.
    */
+  /**
+   * Whether this phone can read HDR video at all. Media3 decodes HDR (and tone-maps or reinterprets
+   * it) only on Android 10 (API 29) and newer, so below that an HDR clip is refused with a plain
+   * message instead of a decoder failure. SDR clips are unaffected, and Android 10+ is unchanged.
+   */
+  internal val hdrSupported: Boolean
+    get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+
+  /** Refuse an HDR clip on a phone that can't read HDR (see [hdrSupported]). */
+  internal fun requireHdrSupport(isHdr: Boolean) {
+    if (isHdr && !hdrSupported) throw MergeException(HDR_UNSUPPORTED)
+  }
+
+  internal const val HDR_UNSUPPORTED = "This video is HDR, which needs Android 10 or newer to edit."
+
   internal val hdrMode: Int by lazy {
     if (GlUtil.isYuvTargetExtensionSupported()) {
       Composition.HDR_MODE_TONE_MAP_HDR_TO_SDR_USING_OPEN_GL
@@ -94,7 +110,10 @@ internal object MergeExport {
         .build()
       Composition.Builder(listOfNotNull(video, if (hasAudio) audioSequence(pairs, options) else null)).apply {
         // HDR sources are tone-mapped to SDR (inputs are normally conformed to SDR already).
-        if (media.any { it.video?.transfer != null && it.video?.transfer != Transfer.SDR }) setHdrMode(hdrMode)
+        if (media.any { it.video?.transfer != null && it.video?.transfer != Transfer.SDR }) {
+          requireHdrSupport(true)
+          setHdrMode(hdrMode)
+        }
       }
     }
     return builder.build()

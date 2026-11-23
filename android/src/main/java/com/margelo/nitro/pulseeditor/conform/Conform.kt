@@ -60,6 +60,7 @@ object Conform {
     progress(0.0)
     val source = Probe.read(context, uri)
     val video = source.video ?: throw MergeException("The file has no video.")
+    MergeExport.requireHdrSupport(video.transfer != Transfer.SDR)
     val degrees = ((options.rotation.roundToInt() % 360) + 360) % 360
     if (degrees % 90 != 0) throw MergeException("The rotation must be 0, 90, 180 or 270.")
     val durationMs = if (video.durationMs > 0) video.durationMs else source.durationMs
