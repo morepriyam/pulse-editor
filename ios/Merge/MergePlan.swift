@@ -39,7 +39,7 @@ struct MergePlan {
   /// Edits that change pixels or timing, so the clip can't be copied.
   static func needsRender(_ clip: MergeClip) -> Bool {
     clip.rotation.truncatingRemainder(dividingBy: 360) != 0 || clip.flipped || clip.crop != nil
-      || abs(clip.speed - 1) > 0.0001
+      || Swift.abs(clip.speed - 1) > 0.0001
   }
 
   /// Why these clips can't be joined without re-encoding (empty when they can).
