@@ -85,7 +85,8 @@ enum ImageClip {
     if #available(iOS 17.0, macOS 14.0, *) {
       options[kCGImageSourceDecodeRequest] = kCGImageSourceDecodeToSDR
     }
-    guard let image = CGImageSourceCreateThumbnailAtIndex(source, 0, options as CFDictionary),
+    // The primary image: a HEIC can hold several, and the one shown isn't always the first.
+    guard let image = CGImageSourceCreateThumbnailAtIndex(source, CGImageSourceGetPrimaryImageIndex(source), options as CFDictionary),
           image.width > 0, image.height > 0 else { throw unreadable }
     return image
   }
