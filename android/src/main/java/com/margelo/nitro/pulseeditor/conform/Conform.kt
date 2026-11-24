@@ -36,6 +36,7 @@ import com.margelo.nitro.pulseeditor.transcode.moveMoovToFront
 import java.io.File
 import kotlin.math.abs
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.roundToInt
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -77,8 +78,10 @@ object Conform {
         if (source.audio != null && !addAacRollGroup(output)) {
           Log.w("PulseEditor", "Couldn't add the AAC roll group: Apple players may play the audio 44 ms early")
         }
-        if (!options.copyVideo) checkFrameCount(context, uri, video, options, outcome.result.videoFrameCount, outcome.fallbacks)
-        val out = verify(context, output, source, options, degrees, durationMs, outcome.fallbacks)
+        val pictureEndMs =
+          if (options.copyVideo) null
+          else checkFrameCount(context, uri, video, options, outcome.result.videoFrameCount, outcome.fallbacks)
+        val out = verify(context, output, source, options, degrees, durationMs, pictureEndMs ?: durationMs, outcome.fallbacks)
         ConformResult(
           uri = Uri.fromFile(output).toString(),
           durationMs = out.durationMs,
@@ -128,18 +131,27 @@ object Conform {
    * S24; AVFoundation conceals the same errors). The output's frame count is compared with the
    * frames a clean decode of the source would give: its samples from time 0 on, put through the
    * frame drop's own rule when the composition adds it.
+   *
+   * Returns the time (ms) of the last frame the frame drop keeps, when it applies: the drop always
+   * loses the frame held at the end, so the picture ends there rather than at the source's end. A
+   * screen recording only writes a frame when the screen changes, so its last frame can stay up for
+   * a long time (0.6 s on a Pixel 6a stopped from the notification shade) and the output comes out
+   * that much shorter. Null when it doesn't apply or the samples couldn't be read.
    */
   private suspend fun checkFrameCount(
     context: Context, uri: String, video: ProbeVideo, options: ConformOptions, outputFrames: Int, fallbacks: List<String>,
-  ) {
-    if (outputFrames <= 0) return  // not reported (Media3 counts only encoded video)
-    val times = videoSampleTimes(context, uri) ?: return
-    val expected = if (dropsFrames(video, options)) framesKept(times, options.fps.toFloat()) else times.size
+  ): Double? {
+    if (outputFrames <= 0) return null  // not reported (Media3 counts only encoded video)
+    val times = videoSampleTimes(context, uri) ?: return null
+    val drops = dropsFrames(video, options)
+    val kept = if (drops) framesKept(times, options.fps.toFloat()) else null
+    val expected = kept?.count ?: times.size
     Log.i("PulseEditor", "conform frames: $outputFrames written, ${times.size} in the source, $expected expected")
     if (outputFrames < expected * MIN_FRAME_FRACTION) {
       throw MergeException(
         (listOf("This phone couldn't decode all of the video ($outputFrames of $expected frames).") + fallbacks).joinToString("; "))
     }
+    return kept?.let { it.lastUs / 1000.0 }
   }
 
   /**
@@ -180,8 +192,8 @@ object Conform {
    * frame held at the end of the stream is dropped. It keeps whole frames, so the count isn't the
    * ratio of the rates (a constant 47 fps source keeps half its frames at 30).
    */
-  private fun framesKept(times: LongArray, fps: Float): Int {
-    if (times.isEmpty()) return 0
+  private fun framesKept(times: LongArray, fps: Float): FramesKept {
+    if (times.isEmpty()) return FramesKept(0, 0)
     val targetDeltaUs = (C.MICROS_PER_SECOND / fps).toLong()
     var kept = 1
     var last = times[0]
@@ -193,8 +205,11 @@ object Conform {
       }
       previous = times[i]
     }
-    return kept
+    return FramesKept(kept, last)
   }
+
+  /** What the frame drop keeps: how many frames, and the presentation time (µs) of the last. */
+  private data class FramesKept(val count: Int, val lastUs: Long)
 
   /** An output below this share of the expected frames lost them to the decoder (a clean one has them all, ± a frame). */
   private const val MIN_FRAME_FRACTION = 0.8
@@ -202,11 +217,12 @@ object Conform {
   /**
    * The output must be what was asked for: H.264 8-bit SDR in the requested layout, sound kept,
    * as long as the source's picture, faststart. A rejection names any encoder fallback Media3
-   * applied, the likely cause.
+   * applied, the likely cause. `minDurationMs` is where the picture can end instead: the last frame
+   * the frame drop keeps (see [checkFrameCount]), or `durationMs`.
    */
   private suspend fun verify(
     context: Context, output: File, source: ProbeResult, options: ConformOptions, degrees: Int,
-    durationMs: Double, fallbacks: List<String>,
+    durationMs: Double, minDurationMs: Double, fallbacks: List<String>,
   ): ProbeResult {
     fun fail(reason: String) = MergeException((listOf(reason) + fallbacks).joinToString("; "))
     val out = Probe.read(context, Uri.fromFile(output).toString())
@@ -228,7 +244,8 @@ object Conform {
       }
     }
     val got = if (v.durationMs > 0) v.durationMs else out.durationMs
-    if (abs(got - durationMs) > max(500.0, durationMs * 0.01)) {
+    val tolerance = max(500.0, durationMs * 0.01)
+    if (got > durationMs + tolerance || got < min(minDurationMs, durationMs) - tolerance) {
       throw fail("The conformed video is ${got.toInt()} ms, expected ${durationMs.toInt()} ms.")
     }
     if (!isFaststart(output)) throw fail("The conformed video isn't faststart.")
