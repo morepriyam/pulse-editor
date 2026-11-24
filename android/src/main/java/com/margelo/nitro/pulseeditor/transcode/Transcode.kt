@@ -54,10 +54,13 @@ internal object Transcode {
    * `oneFile`: the export reads a single file (conform), which errors then name instead of a clip.
    * `bitmapLoader`: what loads an image item's picture (an image clip's, already drawn), instead
    * of Media3's own loader.
+   * `videoDurationUs`: where the video track ends. The muxer ends the last frame there instead of
+   * giving it the frame before's duration (an image clip's, so it ends exactly at the clip's end).
    */
   class Settings(
     val bitrate: Int, val durationMs: Double, val portrait: Boolean = false, val copyVideo: Boolean = false,
     val rotationTag: Int? = null, val oneFile: Boolean = false, val bitmapLoader: BitmapLoader? = null,
+    val videoDurationUs: Long? = null,
   )
 
   class Outcome(val result: ExportResult, val fallbacks: List<String>)
@@ -170,6 +173,8 @@ internal object Transcode {
 
   private fun muxers(settings: Settings): Muxer.Factory {
     val muxers = InAppMp4Muxer.Factory().setFreeSpaceAfterFileTypeBoxBytes(moovReserveBytes(settings.durationMs))
+    // Written as an end-of-stream sample on close, which sets the last frame's duration.
+    settings.videoDurationUs?.let { muxers.setVideoDurationUs(it) }
     return settings.rotationTag?.let { RotationTagMuxerFactory(muxers, it) } ?: muxers
   }
 

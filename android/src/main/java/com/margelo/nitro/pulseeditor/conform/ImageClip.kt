@@ -101,6 +101,8 @@ object ImageClip {
       val settings = Transcode.Settings(
         bitrate = options.bitrate.toInt(), durationMs = durationMs.toDouble(), portrait = true,
         rotationTag = degrees, oneFile = true, bitmapLoader = PictureLoader(picture),
+        // The last frame lasts 1/fps and the picture ends with the clip, as on iOS.
+        videoDurationUs = (frames * 1_000_000L + fps / 2) / fps,
       )
       val outcome = try {
         Transcode.run(context, composition(uri, options, degrees, durationMs, fps), output, settings) {
