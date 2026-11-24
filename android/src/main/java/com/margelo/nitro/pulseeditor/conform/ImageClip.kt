@@ -84,7 +84,7 @@ object ImageClip {
     val height = options.height.roundToInt()
     val fps = options.fps.roundToInt()
     val background = color(options.background)
-    val frames = max(1, (options.durationMs / 1000 * fps).roundToInt())
+    val frames = (options.durationMs / 1000 * fps).roundToInt()
     // Whole ms that Media3's ConstantRateTimestampIterator turns back into exactly `frames` frames.
     val durationMs = (frames * 1000L + fps / 2) / fps
 
@@ -134,24 +134,19 @@ object ImageClip {
     }
   }
 
-  /** The longest image clip, ms. */
-  const val MAX_DURATION_MS = 60_000.0
-
-  /** Every number finite and in range before any is rounded. */
-  private fun validate(options: ImageClipOptions) {
+  /**
+   * A guard, not the check: `imageClip` in JS checks the options and says what's wrong. This keeps
+   * a direct native call from making a clip JS would refuse (or a huge one); the limits are JS's.
+   */
+  private fun validate(o: ImageClipOptions) {
     fun within(value: Double, min: Double, max: Double) = value.isFinite() && value in min..max
-    if (!within(options.width, 2.0, 8192.0) || !within(options.height, 2.0, 8192.0)) {
-      throw MergeException("The canvas must be 2–8192 pixels wide and high.")
-    }
-    if (!within(options.rotation, -360.0, 360.0)) throw MergeException("The rotation must be 0, 90, 180 or 270.")
-    if (!within(options.fps, 1.0, 240.0)) throw MergeException("The frame rate must be 1–240 fps.")
-    if (!within(options.bitrate, 1.0, 1_000_000_000.0)) throw MergeException("The bitrate must be positive.")
-    if (!within(options.audio.sampleRate, 8000.0, 192_000.0) || !within(options.audio.channels, 1.0, 8.0)) {
-      throw MergeException("The audio layout must be 8–192 kHz with 1–8 channels.")
-    }
-    if (!options.durationMs.isFinite() || options.durationMs <= 0 || options.durationMs > MAX_DURATION_MS) {
-      throw MergeException("The image clip's duration must be more than 0 and at most ${MAX_DURATION_MS.toInt()} ms.")
-    }
+    fun side(value: Double) = within(value, 2.0, 4096.0) && value % 2 == 0.0
+    val valid = side(o.width) && side(o.height) && within(o.rotation, -360.0, 360.0) && within(o.fps, 1.0, 240.0) &&
+      within(o.bitrate, 1.0, 1_000_000_000.0) &&
+      within(o.audio.sampleRate, 8000.0, 192_000.0) && o.audio.sampleRate % 1 == 0.0 &&
+      (o.audio.channels == 1.0 || o.audio.channels == 2.0) &&
+      within(o.durationMs, 0.0, 60_000.0) && (o.durationMs / 1000 * o.fps.roundToInt()).roundToInt() >= 2
+    if (!valid) throw MergeException("The image clip's options are invalid (imageClip() says which).")
   }
 
   private fun composition(uri: String, options: ImageClipOptions, degrees: Int, durationMs: Long, fps: Int): Composition {
@@ -302,7 +297,7 @@ object ImageClip {
     if (v.fps > 0 && v.fps.roundToInt() != fps) throw fail("The image clip came out at ${v.fps.roundToInt()} fps, not $fps.")
     val a = out.audio ?: throw fail("The image clip has no sound track.")
     if (a.codec != "aac" || a.sampleRate.roundToInt() != options.audio.sampleRate.roundToInt() ||
-      a.channels.roundToInt() != options.audio.channels.roundToInt().coerceIn(1, 8)
+      a.channels.roundToInt() != options.audio.channels.roundToInt()
     ) {
       throw fail("The image clip's sound came out ${a.codec} ${a.sampleRate.toInt()} Hz ${a.channels.toInt()} ch.")
     }

@@ -23,7 +23,7 @@ enum ImageClip {
     guard degrees % 90 == 0 else { throw MergeError.invalid("The rotation must be 0, 90, 180 or 270.") }
     let fps = Int32(options.fps.rounded())
     let background = try color(options.background)
-    let frames = max(1, Int((options.durationMs / 1000 * Double(fps)).rounded()))
+    let frames = Int((options.durationMs / 1000 * Double(fps)).rounded())
     let canvas = CGSize(width: options.width.rounded(), height: options.height.rounded())
     let coded = degrees % 180 == 0 ? canvas : CGSize(width: canvas.height, height: canvas.width)
 
@@ -47,24 +47,18 @@ enum ImageClip {
     }
   }
 
-  /// The longest image clip, ms.
-  static let maxDurationMs = 60_000.0
-
-  /// Every number finite and in range before any is converted to an integer (a NaN or huge value
-  /// would trap in the conversion).
-  private static func validate(_ options: ImageClipOptions) throws {
+  /// A guard, not the check: `imageClip` in JS checks the options and says what's wrong. This
+  /// keeps a direct native call from trapping on a NaN or huge number (converting it to an
+  /// integer) or making a clip JS would refuse; the limits are JS's.
+  private static func validate(_ o: ImageClipOptions) throws {
     func within(_ value: Double, _ range: ClosedRange<Double>) -> Bool { value.isFinite && range.contains(value) }
-    guard within(options.width, 2...8192), within(options.height, 2...8192) else {
-      throw MergeError.invalid("The canvas must be 2–8192 pixels wide and high.")
-    }
-    guard within(options.rotation, -360...360) else { throw MergeError.invalid("The rotation must be 0, 90, 180 or 270.") }
-    guard within(options.fps, 1...240) else { throw MergeError.invalid("The frame rate must be 1–240 fps.") }
-    guard within(options.bitrate, 1...1_000_000_000) else { throw MergeError.invalid("The bitrate must be positive.") }
-    guard within(options.audio.sampleRate, 8000...192_000), within(options.audio.channels, 1...8) else {
-      throw MergeError.invalid("The audio layout must be 8–192 kHz with 1–8 channels.")
-    }
-    guard options.durationMs.isFinite, options.durationMs > 0, options.durationMs <= maxDurationMs else {
-      throw MergeError.invalid("The image clip's duration must be more than 0 and at most \(Int(maxDurationMs)) ms.")
+    func side(_ value: Double) -> Bool { within(value, 2...4096) && value.truncatingRemainder(dividingBy: 2) == 0 }
+    guard side(o.width), side(o.height), within(o.rotation, -360...360), within(o.fps, 1...240),
+          within(o.bitrate, 1...1_000_000_000),
+          within(o.audio.sampleRate, 8000...192_000), o.audio.sampleRate.rounded() == o.audio.sampleRate,
+          o.audio.channels == 1 || o.audio.channels == 2,
+          within(o.durationMs, 0...60_000), (o.durationMs / 1000 * o.fps.rounded()).rounded() >= 2 else {
+      throw MergeError.invalid("The image clip's options are invalid (imageClip() says which).")
     }
   }
 
