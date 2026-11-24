@@ -7,6 +7,7 @@ import android.os.Looper
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.util.BitmapLoader
 import androidx.media3.common.util.Clock
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.muxer.Muxer
@@ -50,12 +51,20 @@ internal object Transcode {
    * `copyVideo`: the composition copies its video (a join), so nothing should re-encode it.
    * `rotationTag`: write the video with this orientation tag (clockwise degrees) instead of the
    * one Transformer picks; the frames must already be in the matching coded orientation.
-   * `oneFile`: the export reads a single file (conform), which errors then name instead of a clip.
+   * `input`: what the export reads, which its error messages name.
+   * `bitmapLoader`: what loads an image item's picture (an image clip's, already drawn), instead
+   * of Media3's own loader.
+   * `videoDurationUs`: where the video track ends. The muxer ends the last frame there instead of
+   * giving it the frame before's duration (an image clip's, so it ends exactly at the clip's end).
    */
   class Settings(
     val bitrate: Int, val durationMs: Double, val portrait: Boolean = false, val copyVideo: Boolean = false,
-    val rotationTag: Int? = null, val oneFile: Boolean = false,
+    val rotationTag: Int? = null, val input: Input = Input.CLIPS, val bitmapLoader: BitmapLoader? = null,
+    val videoDurationUs: Long? = null,
   )
+
+  /** What an export reads: clips (merge), one video (conform) or one image (an image clip). */
+  enum class Input { CLIPS, VIDEO, IMAGE }
 
   class Outcome(val result: ExportResult, val fallbacks: List<String>)
 
@@ -94,7 +103,7 @@ internal object Transcode {
             Log.w("PulseEditor", "Export failed: ${exception.errorCodeName}", exception)
             main.removeCallbacks(poll)
             output.delete()
-            if (continuation.isActive) continuation.resumeWithException(IllegalStateException(plainMessage(exception, settings.oneFile), exception))
+            if (continuation.isActive) continuation.resumeWithException(IllegalStateException(plainMessage(exception, settings.input), exception))
           }
 
           override fun onFallbackApplied(
@@ -117,25 +126,33 @@ internal object Transcode {
    * What went wrong, in words a person can act on. Media3's own message can be a whole codec
    * configuration dump; the full exception is logged (above) for diagnosis.
    */
-  private fun plainMessage(e: ExportException, oneFile: Boolean): String = when (e.errorCode) {
-    ExportException.ERROR_CODE_DECODER_INIT_FAILED,
-    ExportException.ERROR_CODE_DECODING_FAILED,
-    ExportException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED ->
-      if (oneFile) "This phone couldn't decode the video." else "This phone couldn't decode one of the clips."
-    ExportException.ERROR_CODE_ENCODER_INIT_FAILED,
-    ExportException.ERROR_CODE_ENCODING_FAILED,
-    ExportException.ERROR_CODE_ENCODING_FORMAT_UNSUPPORTED -> "This phone's encoder couldn't encode the video."
-    ExportException.ERROR_CODE_VIDEO_FRAME_PROCESSING_FAILED -> "Couldn't process the video's frames."
-    ExportException.ERROR_CODE_AUDIO_PROCESSING_FAILED -> "Couldn't process the audio."
-    ExportException.ERROR_CODE_MUXING_FAILED,
-    ExportException.ERROR_CODE_MUXING_TIMEOUT,
-    ExportException.ERROR_CODE_MUXING_APPEND -> "Couldn't write the video file."
-    ExportException.ERROR_CODE_IO_FILE_NOT_FOUND -> if (oneFile) "The video's file is missing." else "A clip's file is missing."
-    ExportException.ERROR_CODE_IO_NO_PERMISSION -> if (oneFile) "The video's file can't be read." else "A clip's file can't be read."
-    else -> when {
-      e.errorCode in 2000..2999 -> if (oneFile) "Couldn't read the video's file." else "Couldn't read a clip's file."
-      oneFile -> "The video couldn't be converted."
-      else -> "The video couldn't be exported."
+  private fun plainMessage(e: ExportException, input: Input): String {
+    // The one file read, or null for clips; and what's made from it.
+    val file = when (input) { Input.VIDEO -> "video"; Input.IMAGE -> "image"; Input.CLIPS -> null }
+    val made = if (input == Input.IMAGE) "image clip" else "video"
+    return when (e.errorCode) {
+      ExportException.ERROR_CODE_DECODER_INIT_FAILED,
+      ExportException.ERROR_CODE_DECODING_FAILED,
+      ExportException.ERROR_CODE_DECODING_FORMAT_UNSUPPORTED ->
+        if (file != null) "This phone couldn't decode the $file." else "This phone couldn't decode one of the clips."
+      ExportException.ERROR_CODE_ENCODER_INIT_FAILED,
+      ExportException.ERROR_CODE_ENCODING_FAILED,
+      ExportException.ERROR_CODE_ENCODING_FORMAT_UNSUPPORTED -> "This phone's encoder couldn't encode the $made."
+      ExportException.ERROR_CODE_VIDEO_FRAME_PROCESSING_FAILED ->
+        if (input == Input.IMAGE) "Couldn't process the image." else "Couldn't process the video's frames."
+      ExportException.ERROR_CODE_AUDIO_PROCESSING_FAILED ->
+        if (input == Input.IMAGE) "Couldn't make the image clip's sound." else "Couldn't process the audio."
+      ExportException.ERROR_CODE_MUXING_FAILED,
+      ExportException.ERROR_CODE_MUXING_TIMEOUT,
+      ExportException.ERROR_CODE_MUXING_APPEND -> "Couldn't write the $made file."
+      ExportException.ERROR_CODE_IO_FILE_NOT_FOUND -> if (file != null) "The $file's file is missing." else "A clip's file is missing."
+      ExportException.ERROR_CODE_IO_NO_PERMISSION -> if (file != null) "The $file's file can't be read." else "A clip's file can't be read."
+      else -> when {
+        e.errorCode in 2000..2999 -> if (file != null) "Couldn't read the $file's file." else "Couldn't read a clip's file."
+        input == Input.IMAGE -> "The image clip couldn't be made."
+        input == Input.VIDEO -> "The video couldn't be converted."
+        else -> "The video couldn't be exported."
+      }
     }
   }
 
@@ -154,7 +171,10 @@ internal object Transcode {
       .setLooper(Looper.getMainLooper())
       .setVideoMimeType(MimeTypes.VIDEO_H264)
       .setAudioMimeType(MimeTypes.AUDIO_AAC)
-      .setAssetLoaderFactory(DefaultAssetLoaderFactory(context, decoders, Clock.DEFAULT, /* logSessionId= */ null))
+      .setAssetLoaderFactory(
+        settings.bitmapLoader?.let { DefaultAssetLoaderFactory(context, decoders, Clock.DEFAULT, /* mediaSourceFactory= */ null, it) }
+          ?: DefaultAssetLoaderFactory(context, decoders, Clock.DEFAULT, /* logSessionId= */ null),
+      )
       .setEncoderFactory(encoders)
       .setMuxerFactory(muxers(settings))
       .setPortraitEncodingEnabled(settings.portrait)
@@ -164,6 +184,8 @@ internal object Transcode {
 
   private fun muxers(settings: Settings): Muxer.Factory {
     val muxers = InAppMp4Muxer.Factory().setFreeSpaceAfterFileTypeBoxBytes(moovReserveBytes(settings.durationMs))
+    // Written as an end-of-stream sample on close, which sets the last frame's duration.
+    settings.videoDurationUs?.let { muxers.setVideoDurationUs(it) }
     return settings.rotationTag?.let { RotationTagMuxerFactory(muxers, it) } ?: muxers
   }
 

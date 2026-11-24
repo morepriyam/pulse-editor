@@ -1,6 +1,6 @@
 # pulse-editor
 
-> Native video editing engine for React Native and Expo (package name @mieweb/pulse-editor, MIT). A Nitro module in Swift and Kotlin that uses AVFoundation on iOS and Media3 Transformer on Android, with no FFmpeg. It probes files, converts imports (HDR to SDR) into the recorder's format, joins clips into one H.264 + AAC MP4 with trims, rotate, flip, crop, speed and mute, renders thumbnails, extracts 16 kHz mono PCM for Whisper, and plays the edited draft in a native `<PulsePreview>` view that shows the export's frames.
+> Native video editing engine for React Native and Expo (package name @mieweb/pulse-editor, MIT). A Nitro module in Swift and Kotlin that uses AVFoundation on iOS and Media3 Transformer on Android, with no FFmpeg. It probes files, converts imports (HDR to SDR) into the recorder's format, turns still images into clips in that format, joins clips into one H.264 + AAC MP4 with trims, rotate, flip, crop, speed and mute, renders thumbnails, extracts 16 kHz mono PCM for Whisper, and plays the edited draft in a native `<PulsePreview>` view that shows the export's frames.
 
 Facts to keep when describing it:
 

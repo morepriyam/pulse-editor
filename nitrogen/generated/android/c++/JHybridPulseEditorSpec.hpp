@@ -60,6 +60,7 @@ namespace margelo::nitro::pulseeditor {
     std::shared_ptr<Promise<std::vector<Frame>>> frames(const std::string& uri, const FramesOptions& options) override;
     std::shared_ptr<HybridMergeJobSpec> createMerge(const std::vector<MergeClip>& clips, const MergeOptions& options) override;
     std::shared_ptr<HybridConformJobSpec> createConform(const std::string& uri, const ConformOptions& options) override;
+    std::shared_ptr<HybridConformJobSpec> createImageClip(const std::string& uri, const ImageClipOptions& options) override;
     std::shared_ptr<HybridSeekBenchSpec> createSeekBench() override;
 
   private:

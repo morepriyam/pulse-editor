@@ -18,7 +18,7 @@
 
 </div>
 
-pulse-editor is a video editing engine for React Native and Expo apps, written as a [Nitro module](https://nitro.margelo.com/) in Swift and Kotlin. It edits on the phone with each platform's own media stack, AVFoundation on iOS and Media3 Transformer on Android, so there is no FFmpeg binary to ship. It joins clips into one MP4 with trims, rotate, flip, crop, speed and mute; converts imports (HDR included) into the recorder's format; renders thumbnails; extracts audio for Whisper; and plays the edited draft in a native `<PulsePreview>` view that shows the frames the export will have. It is the engine behind [Pulse](https://github.com/mieweb/pulse), an Expo app for recording and editing short videos on the device.
+pulse-editor is a video editing engine for React Native and Expo apps, written as a [Nitro module](https://nitro.margelo.com/) in Swift and Kotlin. It edits on the phone with each platform's own media stack, AVFoundation on iOS and Media3 Transformer on Android, so there is no FFmpeg binary to ship. It joins clips into one MP4 with trims, rotate, flip, crop, speed and mute; converts imports (HDR included) into the recorder's format; turns photos and screenshots into clips; renders thumbnails; extracts audio for Whisper; and plays the edited draft in a native `<PulsePreview>` view that shows the frames the export will have. It is the engine behind [Pulse](https://github.com/mieweb/pulse), an Expo app for recording and editing short videos on the device.
 
 <!-- demo: docs/assets/demo.gif (alt="A draft of several clips played in PulsePreview, trimmed and sped up, then exported with merge"; ≤ 5 MB, 320 px wide) -->
 
@@ -62,12 +62,13 @@ Other packages people find: [react-native-video-processing](https://github.com/s
 | 🔎 **[`probe`](docs/methods.md#probe)**: a file's metadata without decoding it (codec, rotation, mirror, fps, bitrate, HDR transfer, the audio track Pulse reads) | 🎬 **[`merge`](docs/methods.md#merge)**: clips into one faststart MP4 with trims, rotate, flip, crop, speed (natural pitch) and mute; copies what it can, renders only what it must; cancellable |
 | 🔄 **[`conform`](docs/methods.md#conform)**: one import into the recorder's format, HDR tone-mapped to SDR, mirrors fixed; a file whose sound can't be decoded is rejected, never imported silent | 🖼️ **[`thumbnail`](docs/methods.md#thumbnail)**: the exact frame at a time, with the clip's edit drawn by merge's own geometry |
 | 🎙️ **[`extractAudio`](docs/methods.md#extractaudio)**: 16 kHz mono PCM for Whisper, decoded in memory, no file | ▶️ **[`<PulsePreview>`](docs/methods.md#pulsepreview)**: a native view that plays the draft as `merge` will export it; seeks and edits resolve when the frame is on screen |
+| 📷 **[`imageClip`](docs/methods.md#imageclip)**: a photo or screenshot as a clip in the recorder's format (upright, letterboxed on a background colour, every frame at a constant rate, a silent AAC track) | |
 
 ## 📱 Platforms
 
 | | iOS | Android |
 |---|---|---|
-| Minimum | iOS 16.4 | Android 7 (API 24). HDR video needs Android 10 (API 29), the lowest where Media3 reads HDR; below that an HDR clip is refused with a plain message |
+| Minimum | iOS 16.4 | Android 7 (API 24). HDR video needs Android 10 (API 29), the lowest where Media3 reads HDR; below that an HDR clip is refused with a plain message. `imageClip` needs Android 9 (API 28) |
 | Media stack | AVFoundation | Media3 1.11.1 |
 | Native code | Swift | Kotlin |
 | Run on | iPhone 17 Pro Max (iOS 26.5.1), iOS Simulator, macOS | Galaxy S24 Ultra (Android 16), Pixel 6a (Android 17 beta), Android 17 emulator |
@@ -127,6 +128,7 @@ const { uri, durationMs, encoded } = await merge(clips, options, {
 | `probe(uri)` | Reads metadata without decoding | `{ durationMs, video?, audio? }` |
 | `merge(clips, options, { onProgress, signal })` | Joins clips in order, each with its edit | `{ uri, durationMs, encoded, bitrate }` |
 | `conform(uri, options, { onProgress, signal })` | One import into the recorder's format (`copyVideo: true` converts only the audio) | `{ uri, durationMs, encoded, bitrate }` |
+| `imageClip(uri, options, { onProgress, signal })` | A still image file (JPEG, PNG, HEIC, screenshot) as a clip in the recorder's format: `conform`'s `width`, `height`, `rotation`, `fps`, `bitrate`, `audio`, plus `durationMs` (default 3000, at least 2 frames, at most 60 000) and `background` (`#RRGGBB`, default `#000000`). The canvas must be even, at most 4096 a side; `audio` a whole sample rate with 1 or 2 channels | `{ uri, durationMs, encoded, bitrate }` |
 | `thumbnail(uri, { timeMs?, maxWidth?, maxHeight?, quality?, rotation?, flipped?, crop? })` | A JPEG cover of the exact frame, edit applied (defaults: first frame, no size limit, quality 0.8) | `{ uri, width, height, timeMs }` |
 | `extractAudio(uri, { sampleRate })` | 16-bit mono PCM in memory (`sampleRate` defaults to 16000), for whisper.rn's `transcribeData` | `{ data: ArrayBuffer, sampleRate, durationMs }` |
 | `<PulsePreview clips options onStatus onTime onReady />` | Plays the draft with every edit, as merge would export it | a ref: `play()`, `pause()`, `seek(ms)` (resolves with the frame's time once it's on screen), `setScrubbing(bool)` |
@@ -211,7 +213,7 @@ Pulse consumes this repo as a git submodule at `modules/pulse-editor` and reads 
 - **Where to edit:** make changes in the submodule inside Pulse, then commit and push here.
 - **When the spec changes:** after editing `src/PulseEditor.nitro.ts` or `src/PulsePreview.nitro.ts`, run `yarn install` and `yarn nitrogen`. Commit the regenerated `nitrogen/generated/` files, because Pulse builds from source and needs them.
 - **Updating Pulse:** in Pulse, `git add modules/pulse-editor` to record the new commit.
-- **Minimum OS versions:** iOS 16.4 (Expo SDK 57's floor) and Android 7 / API 24 (React Native's). HDR video needs Android 10 / API 29, the lowest where Media3 reads HDR: below that, conform and merge refuse an HDR clip ("This video is HDR, which needs Android 10 or newer to edit.") and SDR clips work as usual. Newer APIs are used behind per-method version checks.
+- **Minimum OS versions:** iOS 16.4 (Expo SDK 57's floor) and Android 7 / API 24 (React Native's). HDR video needs Android 10 / API 29, the lowest where Media3 reads HDR: below that, conform and merge refuse an HDR clip ("This video is HDR, which needs Android 10 or newer to edit.") and SDR clips work as usual. `imageClip` needs Android 9 / API 28 (ImageDecoder) and rejects below it ("Making a clip from an image needs Android 9 or later."). Newer APIs are used behind per-method version checks.
 
 ## 🤝 Contributing
 

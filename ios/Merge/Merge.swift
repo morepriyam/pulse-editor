@@ -155,13 +155,13 @@ enum Merge {
     return outputDirectory.appendingPathComponent("\(prefix)-\(UUID().uuidString).\(ext)")
   }
 
-  /// Deletes merge, conform and frame files a killed app left behind (a finished one is moved out
-  /// by its caller).
+  /// Deletes merge, conform, image clip and frame files a killed app left behind (a finished one is
+  /// moved out by its caller).
   static func removeStaleOutputs() {
     let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
     let files = (try? FileManager.default.contentsOfDirectory(
       at: outputDirectory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
-    for file in files where ["merge-", "conform-", "frame-"].contains(where: file.lastPathComponent.hasPrefix) {
+    for file in files where ["merge-", "conform-", "image-", "frame-"].contains(where: file.lastPathComponent.hasPrefix) {
       let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
       if let modified, modified < cutoff { try? FileManager.default.removeItem(at: file) }
     }

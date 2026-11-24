@@ -242,7 +242,7 @@ enum EncodeSettings {
     ]
   }
 
-  private static func layoutTag(_ channels: Int) -> AudioChannelLayoutTag? {
+  static func layoutTag(_ channels: Int) -> AudioChannelLayoutTag? {
     [1: kAudioChannelLayoutTag_Mono, 2: kAudioChannelLayoutTag_Stereo, 6: kAudioChannelLayoutTag_MPEG_5_1_D][channels]
   }
 

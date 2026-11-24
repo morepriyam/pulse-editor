@@ -70,7 +70,7 @@ object Conform {
       val settings = Transcode.Settings(
         bitrate = options.bitrate.toInt(), durationMs = durationMs,
         portrait = true, copyVideo = options.copyVideo, rotationTag = if (options.copyVideo) null else degrees,
-        oneFile = true,
+        input = Transcode.Input.VIDEO,
       )
       val outcome = Transcode.run(context, composition(uri, source, options, degrees), output, settings) { progress(it * 0.98) }
       return withContext(Dispatchers.IO) {

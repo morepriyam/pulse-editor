@@ -41,6 +41,8 @@ namespace margelo::nitro::pulseeditor { struct MergeOptions; }
 namespace margelo::nitro::pulseeditor { struct MergeAudio; }
 // Forward declaration of `ConformOptions` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct ConformOptions; }
+// Forward declaration of `ImageClipOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ImageClipOptions; }
 
 #include "ProbeResult.hpp"
 #include <NitroModules/Promise.hpp>
@@ -84,6 +86,8 @@ namespace margelo::nitro::pulseeditor { struct ConformOptions; }
 #include "JMergeAudio.hpp"
 #include "ConformOptions.hpp"
 #include "JConformOptions.hpp"
+#include "ImageClipOptions.hpp"
+#include "JImageClipOptions.hpp"
 
 namespace margelo::nitro::pulseeditor {
 
@@ -208,6 +212,11 @@ namespace margelo::nitro::pulseeditor {
   std::shared_ptr<HybridConformJobSpec> JHybridPulseEditorSpec::createConform(const std::string& uri, const ConformOptions& options) {
     static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JHybridConformJobSpec::JavaPart>(jni::alias_ref<jni::JString> /* uri */, jni::alias_ref<JConformOptions> /* options */)>("createConform");
     auto __result = method(_javaPart, jni::make_jstring(uri), JConformOptions::fromCpp(options));
+    return __result->getJHybridConformJobSpec();
+  }
+  std::shared_ptr<HybridConformJobSpec> JHybridPulseEditorSpec::createImageClip(const std::string& uri, const ImageClipOptions& options) {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JHybridConformJobSpec::JavaPart>(jni::alias_ref<jni::JString> /* uri */, jni::alias_ref<JImageClipOptions> /* options */)>("createImageClip");
+    auto __result = method(_javaPart, jni::make_jstring(uri), JImageClipOptions::fromCpp(options));
     return __result->getJHybridConformJobSpec();
   }
   std::shared_ptr<HybridSeekBenchSpec> JHybridPulseEditorSpec::createSeekBench() {

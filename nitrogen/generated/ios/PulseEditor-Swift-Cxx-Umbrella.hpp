@@ -28,6 +28,8 @@ namespace margelo::nitro::pulseeditor { class HybridPulseEditorSpec; }
 namespace margelo::nitro::pulseeditor { class HybridPulsePreviewSpec; }
 // Forward declaration of `HybridSeekBenchSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridSeekBenchSpec; }
+// Forward declaration of `ImageClipOptions` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct ImageClipOptions; }
 // Forward declaration of `MergeAudio` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeAudio; }
 // Forward declaration of `MergeClip` to properly resolve imports.
@@ -80,6 +82,7 @@ namespace margelo::nitro::pulseeditor { enum class Transfer; }
 #include "HybridPulseEditorSpec.hpp"
 #include "HybridPulsePreviewSpec.hpp"
 #include "HybridSeekBenchSpec.hpp"
+#include "ImageClipOptions.hpp"
 #include "MergeAudio.hpp"
 #include "MergeClip.hpp"
 #include "MergeCrop.hpp"
