@@ -127,7 +127,8 @@ export interface ConformResult {
 
 /** What `createImageClip` writes: a still image as one clip in the recorder's format. */
 export interface ImageClipOptions {
-  /** Display canvas the image is fitted onto, letterboxed and centered, e.g. 1080×1920. */
+  /** Display canvas the image is fitted onto, letterboxed and centered, e.g. 1080×1920: even,
+   * 2–4096 a side. */
   width: number;
   height: number;
   /** Clockwise rotation the output is tagged with: 0, 90, 180 or 270. At 90 or 270 the frames
@@ -137,9 +138,10 @@ export interface ImageClipOptions {
   fps: number;
   /** Video bitrate in bits per second. */
   bitrate: number;
-  /** Layout of the output's silent sound track (the recorder's). */
+  /** Layout of the output's silent sound track (the recorder's): a whole sample rate, 1 or 2
+   * channels. */
   audio: MergeAudio;
-  /** How long the clip lasts, ms; rounded to whole frames. */
+  /** How long the clip lasts, ms; rounded to whole frames, at least 2, at most 60 000 ms. */
   durationMs: number;
   /** Colour around the image and behind its transparent parts, `#RRGGBB`. */
   background: string;
@@ -399,9 +401,10 @@ export interface PulseEditor extends HybridObject<{
 
   /**
    * Prepare a clip of a still image (JPEG, PNG, HEIC, …) in `options`' format: the image upright
-   * (EXIF orientation applied), decoded at most canvas-sized, converted to SDR sRGB, fitted onto
-   * the canvas filled with `background`, held for `durationMs` at a constant frame rate, with a
-   * silent AAC track. Call `start` to run it; it rejects when the image can't be decoded here.
+   * (EXIF orientation applied), decoded straight to its size fitted on the canvas, converted to
+   * SDR sRGB, placed on the canvas filled with `background`, held for `durationMs` at a constant
+   * frame rate, with a silent AAC track. Call `start` to run it; it rejects when the image can't
+   * be decoded here, and below Android 9. `imageClip` checks the options; this only guards.
    */
   createImageClip(uri: string, options: ImageClipOptions): ConformJob;
 

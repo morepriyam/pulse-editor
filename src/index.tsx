@@ -279,13 +279,14 @@ function imageClipProblem(options: ImageClipOptions): string | null {
  * Make a clip of a still image (JPEG, PNG, HEIC, a screenshot) in the recorder's format
  * (`options`, as for `conform`): H.264 8-bit SDR at the canvas, rotation tag, frame rate and
  * bitrate asked for, every frame present (90 for 3 s at 30 fps), a silent AAC track in the given
- * layout, faststart. The image is turned upright (EXIF orientation), decoded at most canvas-sized,
- * converted to SDR sRGB, and fitted (letterboxed, centered) onto the canvas filled with
- * `background`, which also shows through transparent parts. Defaults: `durationMs` 3000,
+ * layout, faststart. The image is turned upright (EXIF orientation), decoded straight to its size
+ * fitted on the canvas (letterboxed, centered; never scaled up while decoding), converted to SDR
+ * sRGB, and placed onto the canvas filled with `background`, which also shows through transparent
+ * parts. Defaults: `durationMs` 3000,
  * `background` '#000000'. The canvas must be even, at most 4096 a side; `durationMs` at least 2
  * frames and at most 60 000; `audio` a whole sample rate with 1 or 2 channels. On iOS `uri` must
  * be a local file (`file://` or a path): copy a photo-library asset to a file first; Android also
- * takes `content://` URIs. Rejects on invalid options, when the image can't be decoded on this
+ * takes `content://` URIs and needs Android 9 (API 28) or later. Rejects on invalid options, when the image can't be decoded on this
  * device ("This image can't be read on this device.") and with "Image clip cancelled" when
  * `signal` aborts.
  */
