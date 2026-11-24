@@ -4,11 +4,12 @@ import ImageIO
 
 /// A still image as one clip in the recorder's format (see `ImageClipOptions`), so it can join the
 /// camera's recordings without re-encoding them:
-/// - decoded with ImageIO at most canvas-sized (a 48 MP photo is never decoded whole), upright
-///   (EXIF orientation applied), as SDR (an HDR photo's gain map is left out);
+/// - decoded with ImageIO straight to its size fitted on the canvas (never up; a 48 MP photo is
+///   never decoded whole), upright (EXIF orientation applied), as SDR (an HDR photo's gain map is
+///   left out);
 /// - drawn once into an sRGB picture in the coded orientation the rotation tag turns upright
-///   (1920×1080 tagged 90° for a 1080×1920 canvas), fitted and centered on the background colour,
-///   transparency composited onto it;
+///   (1920×1080 tagged 90° for a 1080×1920 canvas), centered on the background colour (scaled
+///   there only when it's smaller than the fit), transparency composited onto it;
 /// - that picture appended at every frame time (90 frames for 3 s at 30 fps, constant rate) to an
 ///   AVAssetWriter with merge's H.264 settings, and zeroed PCM to its AAC encoder in the output's
 ///   layout, as long as the picture;
@@ -27,7 +28,7 @@ enum ImageClip {
     let canvas = CGSize(width: options.width.rounded(), height: options.height.rounded())
     let coded = degrees % 180 == 0 ? canvas : CGSize(width: canvas.height, height: canvas.width)
 
-    let image = try decode(fileURL(uri), maxPixelSize: max(canvas.width, canvas.height))
+    let image = try decode(fileURL(uri), canvas: canvas)
     try Task.checkCancellation()
     let picture = try draw(image, canvas: canvas, coded: coded, degrees: degrees, background: background)
 
@@ -64,8 +65,9 @@ enum ImageClip {
 
   private static let unreadable = MergeError.failed("This image can't be read on this device.")
 
-  /// The image upright and at most `maxPixelSize` on its long side (never scaled up here), as SDR.
-  private static func decode(_ url: URL, maxPixelSize: CGFloat) throws -> CGImage {
+  /// The image upright, as SDR, decoded straight to its size fitted on the canvas when it's larger
+  /// (never scaled up here), so it's resampled once and `draw` places it as it is.
+  private static func decode(_ url: URL, canvas: CGSize) throws -> CGImage {
     // A photo-library (ph://, assets-library://) or remote URI must be copied to a file first.
     guard url.isFileURL else {
       throw MergeError.invalid("The image must be a local file (a file:// URI or a path), not \(url.scheme ?? "this URI").")
@@ -75,20 +77,37 @@ enum ImageClip {
     }
     guard let source = CGImageSourceCreateWithURL(url as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
           CGImageSourceGetCount(source) > 0 else { throw unreadable }
+    // The primary image: a HEIC can hold several, and the one shown isn't always the first.
+    let index = CGImageSourceGetPrimaryImageIndex(source)
     var options: [CFString: Any] = [
       // From the full image, not a small embedded thumbnail; EXIF orientation applied.
       kCGImageSourceCreateThumbnailFromImageAlways: true,
       kCGImageSourceCreateThumbnailWithTransform: true,
-      kCGImageSourceThumbnailMaxPixelSize: Int(maxPixelSize.rounded()),
+      kCGImageSourceThumbnailMaxPixelSize: fittedLongSide(source, index, canvas: canvas),
       kCGImageSourceShouldCacheImmediately: true,
     ]
     if #available(iOS 17.0, macOS 14.0, *) {
       options[kCGImageSourceDecodeRequest] = kCGImageSourceDecodeToSDR
     }
-    // The primary image: a HEIC can hold several, and the one shown isn't always the first.
-    guard let image = CGImageSourceCreateThumbnailAtIndex(source, CGImageSourceGetPrimaryImageIndex(source), options as CFDictionary),
+    guard let image = CGImageSourceCreateThumbnailAtIndex(source, index, options as CFDictionary),
           image.width > 0, image.height > 0 else { throw unreadable }
     return image
+  }
+
+  /// The long side of the image fitted on the canvas (never up), from its header with the EXIF
+  /// orientation applied: `draw`'s fit, so the image is decoded at the size it's drawn at. ImageIO
+  /// works out the short side itself, so in an odd case it can be a pixel off the fit and be
+  /// scaled by that pixel when drawn. The canvas's long side when the header has no size.
+  private static func fittedLongSide(_ source: CGImageSource, _ index: Int, canvas: CGSize) -> Int {
+    guard let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any],
+          let w = (properties[kCGImagePropertyPixelWidth] as? NSNumber)?.doubleValue,
+          let h = (properties[kCGImagePropertyPixelHeight] as? NSNumber)?.doubleValue, w > 0, h > 0
+    else { return Int(max(canvas.width, canvas.height)) }
+    // Orientations 5–8 turn the image a quarter.
+    let orientation = (properties[kCGImagePropertyOrientation] as? NSNumber)?.intValue ?? 1
+    let (width, height) = (5...8).contains(orientation) ? (h, w) : (w, h)
+    let scale = min(Double(canvas.width) / width, Double(canvas.height) / height, 1)
+    return max(1, Int((max(width, height) * scale).rounded()))
   }
 
   /// `#RRGGBB` (or `#RGB`) → an opaque sRGB colour.
@@ -105,7 +124,8 @@ enum ImageClip {
   }
 
   /// The one picture of the clip: the canvas filled with the background, the image fitted and
-  /// centered on it, laid into the coded frame.
+  /// centered on it, laid into the coded frame. A decoded image is already fitted (drawn 1:1)
+  /// unless it's smaller than the fit.
   private static func draw(
     _ image: CGImage, canvas: CGSize, coded: CGSize, degrees: Int, background: CGColor
   ) throws -> CVPixelBuffer {

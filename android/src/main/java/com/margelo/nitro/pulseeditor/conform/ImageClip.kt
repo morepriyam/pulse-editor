@@ -54,10 +54,11 @@ import kotlinx.coroutines.withContext
 /**
  * A still image as one clip in the recorder's format (see `ImageClipOptions`), so it can join the
  * camera's recordings like a conformed import:
- * - decoded at most canvas-sized with ImageDecoder, which applies the EXIF orientation, into 8-bit
- *   sRGB (a wide-gamut or HDR photo is converted, an Ultra HDR gain map left out);
- * - drawn once onto a canvas-sized bitmap filled with the background colour, fitted and centered,
- *   transparency composited onto the background;
+ * - decoded with ImageDecoder, which applies the EXIF orientation, straight to its size fitted on
+ *   the canvas (never up), into 8-bit sRGB (a wide-gamut or HDR photo is converted, an Ultra HDR
+ *   gain map left out);
+ * - placed once, centered, onto a canvas-sized bitmap filled with the background colour (scaled
+ *   there only when it's smaller than the fit), transparency composited onto the background;
  * - that bitmap exported as a Media3 image item at a constant frame rate (every frame present: 90
  *   for 3 s at 30) through conform's chain: the canvas (Presentation), turned into the coded
  *   orientation the rotation tag turns upright, written with exactly that tag, H.264 at the
@@ -85,7 +86,7 @@ object ImageClip {
     val durationMs = (frames * 1000L + fps / 2) / fps
 
     val picture = withContext(Dispatchers.IO) {
-      val image = decode(context, uri, max(width, height))
+      val image = decode(context, uri, width, height)
       try {
         draw(image, width, height, background)
       } finally {
@@ -172,9 +173,13 @@ object ImageClip {
 
   private const val UNREADABLE = "This image can't be read on this device."
 
-  /** The image upright, at most about `maxDimension` on its long side, as a software bitmap. */
+  /**
+   * The image upright, as a software bitmap, decoded straight to its size fitted on the `width` ×
+   * `height` canvas when it's larger, so it's resampled once (a 48 MP photo is never decoded whole)
+   * and [draw] places it as it is.
+   */
   @RequiresApi(28)
-  private fun decode(context: Context, uri: String, maxDimension: Int): Bitmap {
+  private fun decode(context: Context, uri: String, width: Int, height: Int): Bitmap {
     val parsed = mediaUri(uri)
     try {
       val source = if (parsed.scheme == ContentResolver.SCHEME_FILE) ImageDecoder.createSource(File(parsed.path!!))
@@ -182,9 +187,9 @@ object ImageClip {
       return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
         decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
         decoder.setTargetColorSpace(ColorSpace.get(ColorSpace.Named.SRGB))
-        val longSide = max(info.size.width, info.size.height)
-        if (longSide > maxDimension) {
-          val scale = maxDimension.toDouble() / longSide
+        // [draw]'s fit, from the header's size: the binding side comes out exactly the canvas's.
+        val scale = min(width.toDouble() / info.size.width, height.toDouble() / info.size.height)
+        if (scale < 1) {
           decoder.setTargetSize(
             max(1, (info.size.width * scale).roundToInt()), max(1, (info.size.height * scale).roundToInt()))
         }
@@ -213,7 +218,11 @@ object ImageClip {
     return (0xFF000000 or digits.toLong(16)).toInt()
   }
 
-  /** The one picture of the clip: the canvas filled with the background, the image fitted and centered on it. */
+  /**
+   * The one picture of the clip: the canvas filled with the background, the image fitted and
+   * centered on it. A decoded image is already fitted (scale 1, copied as it is) unless it's
+   * smaller than the fit.
+   */
   private fun draw(image: Bitmap, width: Int, height: Int, background: Int): Bitmap {
     val picture = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(picture)
