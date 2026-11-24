@@ -118,11 +118,12 @@ object ImageClip {
         if (!addAacRollGroup(output)) {
           Log.w("PulseEditor", "Couldn't add the AAC roll group: Apple players may play the audio 44 ms early")
         }
+        // Every frame, as iOS appends them (0 = Media3 didn't count them, which fails too).
         val written = outcome.result.videoFrameCount
-        if (written > 0 && abs(written - frames) > 1) {
+        if (written != frames) {
           throw MergeException((listOf("The image clip came out with $written of $frames frames.") + outcome.fallbacks).joinToString("; "))
         }
-        val out = verify(context, output, options, degrees, fps, frames * 1000.0 / fps, outcome.fallbacks)
+        val out = verify(context, output, options, degrees, fps, frames, outcome.fallbacks)
         ConformResult(
           uri = Uri.fromFile(output).toString(),
           durationMs = out.durationMs,
@@ -279,11 +280,12 @@ object ImageClip {
 
   /**
    * The output must be what was asked for: H.264 8-bit SDR on the canvas with the tag, at the
-   * frame rate, the sound in the requested layout, as long as asked, faststart. A rejection names
-   * any encoder fallback Media3 applied, the likely cause.
+   * frame rate, the sound in the requested layout, the picture `frames` / fps long (within half a
+   * frame, as on iOS), faststart. A rejection names any encoder fallback Media3 applied, the
+   * likely cause.
    */
   private suspend fun verify(
-    context: Context, output: File, options: ImageClipOptions, degrees: Int, fps: Int, durationMs: Double,
+    context: Context, output: File, options: ImageClipOptions, degrees: Int, fps: Int, frames: Int,
     fallbacks: List<String>,
   ): ProbeResult {
     fun fail(reason: String) = MergeException((listOf(reason) + fallbacks).joinToString("; "))
@@ -303,9 +305,11 @@ object ImageClip {
     ) {
       throw fail("The image clip's sound came out ${a.codec} ${a.sampleRate.toInt()} Hz ${a.channels.toInt()} ch.")
     }
-    val got = if (v.durationMs > 0) v.durationMs else out.durationMs
-    if (abs(got - durationMs) > max(100.0, 2000.0 / fps)) {
-      throw fail("The image clip is ${got.toInt()} ms, expected ${durationMs.toInt()} ms.")
+    // The video track's own length, never the file's (the sound's): a zero-length last frame
+    // would hide behind it.
+    val want = frames * 1000.0 / fps
+    if (v.durationMs <= 0 || abs(v.durationMs - want) > 500.0 / fps) {
+      throw fail("The image clip's picture is ${v.durationMs.roundToInt()} ms, expected ${want.roundToInt()} ms.")
     }
     if (!isFaststart(output)) throw fail("The image clip isn't faststart.")
     return out

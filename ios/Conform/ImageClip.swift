@@ -220,6 +220,7 @@ enum ImageClip {
       if writer.status != .writing {
         throw writer.error ?? MergeError.failed("Writing the image clip failed.")
       }
+      guard frame == frames else { throw MergeError.failed("The image clip came out with \(frame) of \(frames) frames.") }
       writer.endSession(atSourceTime: duration)
       await writer.finishWriting()
       guard writer.status == .completed else {
@@ -292,7 +293,8 @@ enum ImageClip {
   }
 
   /// The output must be what was asked for: H.264 8-bit SDR on the canvas with the tag, at the
-  /// frame rate, the sound in the requested layout, and every frame there.
+  /// frame rate, the sound in the requested layout, and the picture `frames` / fps long (within
+  /// half a frame, as on Android).
   private static func verify(
     _ output: URL, options: ImageClipOptions, degrees: Int, frames: Int, fps: Int32
   ) async throws -> ProbeResult {
@@ -312,8 +314,9 @@ enum ImageClip {
       throw MergeError.failed("The image clip's sound didn't come out as asked.")
     }
     let want = Double(frames) * 1000 / Double(fps)
-    if Swift.abs(v.durationMs - want) > 1000 / Double(fps) {
-      throw MergeError.failed("The image clip is \(Int(v.durationMs)) ms, expected \(Int(want)) ms.")
+    if !(v.durationMs > 0) || Swift.abs(v.durationMs - want) > 500 / Double(fps) {
+      throw MergeError.failed(
+        "The image clip's picture is \(Int(v.durationMs.rounded())) ms, expected \(Int(want.rounded())) ms.")
     }
     return out
   }
