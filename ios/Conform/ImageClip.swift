@@ -130,8 +130,10 @@ enum ImageClip {
     else { throw MergeError.failed("Couldn't create the image clip's picture.") }
 
     // Drawing happens in the upright canvas; this lays it into the coded frame (a P3 or grey image
-    // is converted to sRGB as it's drawn).
-    context.concatenate(codedFromCanvas(degrees, canvas: canvas))
+    // is converted to sRGB as it's drawn). In Core Graphics' y-up space the tag's matrix anchored
+    // on the canvas does that: it turns the canvas counter-clockwise by the tag's degrees (the tag
+    // turns it back clockwise on display) and moves it back to the origin.
+    context.concatenate(Conform.tag(degrees, coded: canvas))
     context.interpolationQuality = .high
     context.setFillColor(background)
     context.fill(CGRect(origin: .zero, size: canvas))
@@ -147,19 +149,6 @@ enum ImageClip {
     CVBufferSetAttachment(buffer, kCVImageBufferTransferFunctionKey, kCVImageBufferTransferFunction_ITU_R_709_2, .shouldPropagate)
     CVBufferSetAttachment(buffer, kCVImageBufferYCbCrMatrixKey, kCVImageBufferYCbCrMatrix_ITU_R_709_2, .shouldPropagate)
     return buffer
-  }
-
-  /// Upright canvas → coded frame, in Core Graphics' y-up space: turned counter-clockwise by the
-  /// tag's degrees (the tag turns it back clockwise on display), then moved back to the origin.
-  private static func codedFromCanvas(_ degrees: Int, canvas: CGSize) -> CGAffineTransform {
-    let turn: CGAffineTransform
-    switch degrees {
-    case 90: turn = CGAffineTransform(a: 0, b: 1, c: -1, d: 0, tx: 0, ty: 0)
-    case 180: turn = CGAffineTransform(a: -1, b: 0, c: 0, d: -1, tx: 0, ty: 0)
-    case 270: turn = CGAffineTransform(a: 0, b: -1, c: 1, d: 0, tx: 0, ty: 0)
-    default: return .identity
-    }
-    return MergeGeometry.anchored(turn, size: canvas)
   }
 
   /// Writes `frames` copies of the picture at 1/fps steps and silence as long, interleaved by
