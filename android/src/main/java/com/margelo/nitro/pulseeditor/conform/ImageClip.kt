@@ -13,8 +13,6 @@ import android.graphics.Rect
 import android.media.ExifInterface
 import android.net.Uri
 import android.os.Build
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import androidx.annotation.OptIn
 import androidx.annotation.RequiresApi
@@ -100,18 +98,14 @@ object ImageClip {
     try {
       val settings = Transcode.Settings(
         bitrate = options.bitrate.toInt(), durationMs = durationMs.toDouble(), portrait = true,
-        rotationTag = degrees, input = Transcode.Input.IMAGE, bitmapLoader = PictureLoader(picture),
+        rotationTag = degrees, input = Transcode.Input.IMAGE,
+        // Media3 owns the picture once loaded: it recycles it after the last frame.
+        bitmapLoader = PictureLoader(picture),
         // The last frame lasts 1/fps and the picture ends with the clip, as on iOS.
         videoDurationUs = (frames * 1_000_000L + fps / 2) / fps,
       )
-      val outcome = try {
-        Transcode.run(context, composition(uri, options, degrees, durationMs, fps), output, settings) {
-          progress(it * 0.98)
-        }
-      } finally {
-        // Freed on the main looper, after Transformer is done with it there: a cancel is posted
-        // there before this, and Transformer.cancel() returns once the export is released.
-        Handler(Looper.getMainLooper()).post { picture.recycle() }
+      val outcome = Transcode.run(context, composition(uri, options, degrees, durationMs, fps), output, settings) {
+        progress(it * 0.98)
       }
       return withContext(Dispatchers.IO) {
         moveMoovToFront(output)
