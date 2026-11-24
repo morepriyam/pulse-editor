@@ -3,14 +3,11 @@ package com.margelo.nitro.pulseeditor.conform
 import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.ColorSpace
 import android.graphics.ImageDecoder
-import android.graphics.Matrix
 import android.graphics.Paint
 import android.graphics.Rect
-import android.media.ExifInterface
 import android.net.Uri
 import android.os.Build
 import android.util.Log
@@ -57,9 +54,8 @@ import kotlinx.coroutines.withContext
 /**
  * A still image as one clip in the recorder's format (see `ImageClipOptions`), so it can join the
  * camera's recordings like a conformed import:
- * - decoded at most canvas-sized (ImageDecoder on Android 9+, which applies the EXIF orientation;
- *   BitmapFactory with ExifInterface below), into 8-bit sRGB (a wide-gamut or HDR photo is
- *   converted, an Ultra HDR gain map left out);
+ * - decoded at most canvas-sized with ImageDecoder, which applies the EXIF orientation, into 8-bit
+ *   sRGB (a wide-gamut or HDR photo is converted, an Ultra HDR gain map left out);
  * - drawn once onto a canvas-sized bitmap filled with the background colour, fitted and centered,
  *   transparency composited onto the background;
  * - that bitmap exported as a Media3 image item at a constant frame rate (every frame present: 90
@@ -68,11 +64,13 @@ import kotlinx.coroutines.withContext
  *   bitrate; the sequence asks for an audio track too, so Media3 adds silence, put through
  *   conform's audio processors into the requested layout and encoded as AAC;
  * - the output checked like a conform's.
- * An image this phone can't decode (HEIC without a HEIF decoder, say) is rejected.
+ * An image this phone can't decode (HEIC without a HEIF decoder, say) is rejected, and so is any
+ * image below Android 9, which has no ImageDecoder.
  */
 @OptIn(UnstableApi::class)
 object ImageClip {
   suspend fun run(context: Context, uri: String, options: ImageClipOptions, progress: MergeProgress): ConformResult {
+    if (Build.VERSION.SDK_INT < 28) throw MergeException("Making a clip from an image needs Android 9 or later.")
     Merge.removeStaleOutputs(context)
     progress(0.0)
     validate(options)
@@ -175,11 +173,22 @@ object ImageClip {
   private const val UNREADABLE = "This image can't be read on this device."
 
   /** The image upright, at most about `maxDimension` on its long side, as a software bitmap. */
+  @RequiresApi(28)
   private fun decode(context: Context, uri: String, maxDimension: Int): Bitmap {
     val parsed = mediaUri(uri)
     try {
-      return if (Build.VERSION.SDK_INT >= 28) decodeWithImageDecoder(context.contentResolver, parsed, maxDimension)
-      else decodeWithBitmapFactory(context.contentResolver, parsed, maxDimension)
+      val source = if (parsed.scheme == ContentResolver.SCHEME_FILE) ImageDecoder.createSource(File(parsed.path!!))
+      else ImageDecoder.createSource(context.contentResolver, parsed)
+      return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+        decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+        decoder.setTargetColorSpace(ColorSpace.get(ColorSpace.Named.SRGB))
+        val longSide = max(info.size.width, info.size.height)
+        if (longSide > maxDimension) {
+          val scale = maxDimension.toDouble() / longSide
+          decoder.setTargetSize(
+            max(1, (info.size.width * scale).roundToInt()), max(1, (info.size.height * scale).roundToInt()))
+        }
+      }
     } catch (e: FileNotFoundException) {
       throw MergeException("The image's file is missing.")
     } catch (e: CancellationException) {
@@ -191,59 +200,6 @@ object ImageClip {
       throw MergeException(UNREADABLE)
     } catch (e: OutOfMemoryError) {
       throw MergeException("This image is too large to read on this device.")
-    }
-  }
-
-  @RequiresApi(28)
-  private fun decodeWithImageDecoder(resolver: ContentResolver, uri: Uri, maxDimension: Int): Bitmap {
-    val source = if (uri.scheme == ContentResolver.SCHEME_FILE) ImageDecoder.createSource(File(uri.path!!))
-    else ImageDecoder.createSource(resolver, uri)
-    return ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-      decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-      decoder.setTargetColorSpace(ColorSpace.get(ColorSpace.Named.SRGB))
-      val longSide = max(info.size.width, info.size.height)
-      if (longSide > maxDimension) {
-        val scale = maxDimension.toDouble() / longSide
-        decoder.setTargetSize(
-          max(1, (info.size.width * scale).roundToInt()), max(1, (info.size.height * scale).roundToInt()))
-      }
-    }
-  }
-
-  /** Android 7–8: subsampled by a power of two to at least `maxDimension`, then turned upright by its EXIF orientation. */
-  private fun decodeWithBitmapFactory(resolver: ContentResolver, uri: Uri, maxDimension: Int): Bitmap {
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    (resolver.openInputStream(uri) ?: throw FileNotFoundException()).use { BitmapFactory.decodeStream(it, null, bounds) }
-    val longSide = max(bounds.outWidth, bounds.outHeight)
-    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) throw MergeException(UNREADABLE)
-    var sample = 1
-    while (longSide / (sample * 2) >= maxDimension) sample *= 2
-    val decodeOptions = BitmapFactory.Options().apply {
-      inSampleSize = sample
-      inPreferredConfig = Bitmap.Config.ARGB_8888
-      if (Build.VERSION.SDK_INT >= 26) inPreferredColorSpace = ColorSpace.get(ColorSpace.Named.SRGB)
-    }
-    val bitmap = (resolver.openInputStream(uri) ?: throw FileNotFoundException()).use {
-      BitmapFactory.decodeStream(it, null, decodeOptions)
-    } ?: throw MergeException(UNREADABLE)
-    val orientation = try {
-      resolver.openInputStream(uri)?.use { ExifInterface(it).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL) }
-    } catch (e: Exception) {
-      null
-    } ?: ExifInterface.ORIENTATION_NORMAL
-    val matrix = Matrix()
-    when (orientation) {
-      ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.setScale(-1f, 1f)
-      ExifInterface.ORIENTATION_ROTATE_180 -> matrix.setRotate(180f)
-      ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.setScale(1f, -1f)
-      ExifInterface.ORIENTATION_TRANSPOSE -> matrix.apply { setRotate(90f); postScale(-1f, 1f) }
-      ExifInterface.ORIENTATION_ROTATE_90 -> matrix.setRotate(90f)
-      ExifInterface.ORIENTATION_TRANSVERSE -> matrix.apply { setRotate(-90f); postScale(-1f, 1f) }
-      ExifInterface.ORIENTATION_ROTATE_270 -> matrix.setRotate(270f)
-      else -> return bitmap
-    }
-    return Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true).also {
-      if (it !== bitmap) bitmap.recycle()
     }
   }
 
