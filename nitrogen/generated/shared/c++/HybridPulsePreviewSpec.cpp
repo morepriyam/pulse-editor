@@ -22,6 +22,10 @@ namespace margelo::nitro::pulseeditor {
       prototype.registerHybridSetter("onTime", &HybridPulsePreviewSpec::setOnTime);
       prototype.registerHybridGetter("onStatus", &HybridPulsePreviewSpec::getOnStatus);
       prototype.registerHybridSetter("onStatus", &HybridPulsePreviewSpec::setOnStatus);
+      prototype.registerHybridMethod("prepareVoiceover", &HybridPulsePreviewSpec::prepareVoiceover);
+      prototype.registerHybridMethod("startVoiceover", &HybridPulsePreviewSpec::startVoiceover);
+      prototype.registerHybridMethod("stopVoiceover", &HybridPulsePreviewSpec::stopVoiceover);
+      prototype.registerHybridMethod("cancelVoiceover", &HybridPulsePreviewSpec::cancelVoiceover);
       prototype.registerHybridMethod("play", &HybridPulsePreviewSpec::play);
       prototype.registerHybridMethod("pause", &HybridPulsePreviewSpec::pause);
       prototype.registerHybridMethod("seek", &HybridPulsePreviewSpec::seek);

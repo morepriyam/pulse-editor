@@ -91,7 +91,7 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
 
   override var clips: Array<MergeClip> = emptyArray()
     set(value) { field = value; changed = true }
-  override var options: MergeOptions = MergeOptions(1080.0, 1920.0, 30.0, 5_000_000.0, MergeAudio(48_000.0, 2.0))
+  override var options: MergeOptions = MergeOptions(1080.0, 1920.0, 30.0, 5_000_000.0, MergeAudio(48_000.0, 2.0), null, null, null)
     set(value) { field = value; changed = true }
   override var onTime: (timeMs: Double, playing: Boolean) -> Unit = { _, _ -> }
   override var onStatus: (status: PreviewStatus) -> Unit = {}
@@ -217,11 +217,14 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
 
   /** Probe new clips (once each), build the composition and swap it in at the current position. */
   private fun rebuild() {
-    val list = clips.toList()
+    val list = clips.map { if (options.sourceMuted == true) it.copy(muted = true) else it }
     val size = renderSize()
     build?.cancel()
     build = scope.launch {
       try {
+        if (options.voiceoverMuted != true && !options.voiceover.isNullOrEmpty()) {
+          throw IllegalStateException("Voiceover playback is currently supported on iOS only.")
+        }
         val media = withContext(Dispatchers.IO) {
           list.map { clip -> probes.getOrPut(clip.uri) { Probe.read(context, clip.uri) } }.also(::logDecoders)
         }
@@ -492,6 +495,20 @@ class HybridPulsePreview(private val context: ThemedReactContext) : HybridPulseP
     // A drag holds the picture.
     main.post { if (!scrubbing) player?.play() }
   }
+
+  override fun prepareVoiceover(): Promise<Unit> = Promise<Unit>().also {
+    it.reject(UnsupportedOperationException("Voiceover recording is currently available on iOS."))
+  }
+
+  override fun startVoiceover(): Promise<Double> = Promise<Double>().also {
+    it.reject(UnsupportedOperationException("Voiceover recording is currently available on iOS."))
+  }
+
+  override fun stopVoiceover(): Promise<VoiceoverTake> = Promise<VoiceoverTake>().also {
+    it.reject(UnsupportedOperationException("Voiceover recording is currently available on iOS."))
+  }
+
+  override fun cancelVoiceover() {}
 
   override fun pause() {
     main.post { player?.pause() }

@@ -19,12 +19,15 @@ enum Timeline {
 
   /// A clip is whole source frames: both trim ends snap to the nearest frame, as the join's do,
   /// so a rendered clip, its copied neighbours and the preview all cut on the same frames.
-  static func compose(_ items: [(clip: MergeClip, media: Probe.Media)], target: RenderTarget) async throws -> Composed {
+  static func compose(
+    _ items: [(clip: MergeClip, media: Probe.Media)], target: RenderTarget,
+    voiceover: [VoiceoverAudio] = [], sourceMuted: Bool = false, voiceoverMuted: Bool = false
+  ) async throws -> Composed {
     let composition = AVMutableComposition()
     guard let video = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
       throw MergeError.failed("Couldn't create the video track.")
     }
-    let hasAudio = items.contains { !$0.clip.muted && $0.media.audioTrack != nil }
+    let hasAudio = !sourceMuted && items.contains { !$0.clip.muted && $0.media.audioTrack != nil }
     var audio = hasAudio
       ? [composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)].compactMap { $0 }
       : []
@@ -68,6 +71,11 @@ enum Timeline {
       cursor = cursor + slot
     }
     let duration = cursor
+    // Insert narration only after all clip retiming: its clock is the full draft's timeline,
+    // independent of the clips and their playback speeds.
+    if !voiceoverMuted {
+      audio += try await insertVoiceover(voiceover, into: composition, duration: duration)
+    }
 
     let videoComposition = AVMutableVideoComposition()
     videoComposition.instructions = instructions
@@ -82,6 +90,37 @@ enum Timeline {
     return Composed(
       composition: composition, videoTrack: video, audioTracks: audio,
       videoComposition: videoComposition, duration: duration, starts: starts)
+  }
+
+  /// Each take uses its own track, so independent takes can overlap without moving one another.
+  /// Clamp to the picture's end and to the audio's actual source range; never extend the video.
+  /// Preview and export call this same function, including when the source is muted.
+  static func insertVoiceover(
+    _ takes: [VoiceoverAudio], into composition: AVMutableComposition, duration: CMTime
+  ) async throws -> [AVMutableCompositionTrack] {
+    var tracks: [AVMutableCompositionTrack] = []
+    for take in takes {
+      try Task.checkCancellation()
+      guard take.timelineStartMs.isFinite, take.sourceStartMs.isFinite, take.sourceEndMs.isFinite,
+            take.timelineStartMs >= 0, take.sourceStartMs >= 0,
+            take.sourceEndMs > take.sourceStartMs else {
+        throw MergeError.invalid("A voiceover take has an invalid placement or trim.")
+      }
+      let at = CMTime(seconds: take.timelineStartMs / 1000, preferredTimescale: 1_000_000)
+      guard at < duration else { continue }
+      let asset = AVURLAsset(url: fileURL(take.uri))
+      let sources = try await Probe.audioTracks(of: asset)
+      guard !sources.isEmpty else { throw MergeError.failed("A voiceover take has no audio.") }
+      let start = CMTime(seconds: take.sourceStartMs / 1000, preferredTimescale: 1_000_000)
+      let length = CMTimeMinimum(
+        CMTime(seconds: (take.sourceEndMs - take.sourceStartMs) / 1000, preferredTimescale: 1_000_000),
+        duration - at)
+      var takeTracks: [AVMutableCompositionTrack] = []
+      try await insertAudio(sources, range: CMTimeRange(start: start, duration: length), at: at,
+                            into: &takeTracks, of: composition)
+      tracks += takeTracks
+    }
+    return tracks
   }
 
   /// Insert a clip's sound, the part of each source track inside `range`, at `cursor`: the k-th

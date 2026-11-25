@@ -189,6 +189,74 @@ open class HybridPulsePreviewSpec_cxx {
 
   // Methods
   @inline(__always)
+  public final func prepareVoiceover() -> bridge.Result_std__shared_ptr_Promise_void___ {
+    do {
+      let __result = try self.__implementation.prepareVoiceover()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_void__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_void__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_void__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve() })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_void___(__exceptionPtr)
+    }
+  }
+
+  @inline(__always)
+  public final func startVoiceover() -> bridge.Result_std__shared_ptr_Promise_double___ {
+    do {
+      let __result = try self.__implementation.startVoiceover()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_double__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_double__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_double__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_double___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_double___(__exceptionPtr)
+    }
+  }
+
+  @inline(__always)
+  public final func stopVoiceover() -> bridge.Result_std__shared_ptr_Promise_VoiceoverTake___ {
+    do {
+      let __result = try self.__implementation.stopVoiceover()
+      let __resultCpp = { () -> bridge.std__shared_ptr_Promise_VoiceoverTake__ in
+        let __promise = bridge.create_std__shared_ptr_Promise_VoiceoverTake__()
+        let __promiseHolder = bridge.wrap_std__shared_ptr_Promise_VoiceoverTake__(__promise)
+        __result
+          .then({ __result in __promiseHolder.resolve(__result) })
+          .catch({ __error in __promiseHolder.reject(__error.toCpp()) })
+        return __promise
+      }()
+      return bridge.create_Result_std__shared_ptr_Promise_VoiceoverTake___(__resultCpp)
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_std__shared_ptr_Promise_VoiceoverTake___(__exceptionPtr)
+    }
+  }
+
+  @inline(__always)
+  public final func cancelVoiceover() -> bridge.Result_void_ {
+    do {
+      try self.__implementation.cancelVoiceover()
+      return bridge.create_Result_void_()
+    } catch (let __error) {
+      let __exceptionPtr = __error.toCpp()
+      return bridge.create_Result_void_(__exceptionPtr)
+    }
+  }
+
+  @inline(__always)
   public final func play() -> bridge.Result_void_ {
     do {
       try self.__implementation.play()

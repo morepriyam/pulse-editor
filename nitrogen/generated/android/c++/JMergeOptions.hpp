@@ -11,7 +11,12 @@
 #include "MergeOptions.hpp"
 
 #include "JMergeAudio.hpp"
+#include "JVoiceoverAudio.hpp"
 #include "MergeAudio.hpp"
+#include "VoiceoverAudio.hpp"
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace margelo::nitro::pulseeditor {
 
@@ -42,12 +47,30 @@ namespace margelo::nitro::pulseeditor {
       double bitrate = this->getFieldValue(fieldBitrate);
       static const auto fieldAudio = clazz->getField<JMergeAudio>("audio");
       jni::local_ref<JMergeAudio> audio = this->getFieldValue(fieldAudio);
+      static const auto fieldVoiceover = clazz->getField<jni::JArrayClass<JVoiceoverAudio>>("voiceover");
+      jni::local_ref<jni::JArrayClass<JVoiceoverAudio>> voiceover = this->getFieldValue(fieldVoiceover);
+      static const auto fieldSourceMuted = clazz->getField<jni::JBoolean>("sourceMuted");
+      jni::local_ref<jni::JBoolean> sourceMuted = this->getFieldValue(fieldSourceMuted);
+      static const auto fieldVoiceoverMuted = clazz->getField<jni::JBoolean>("voiceoverMuted");
+      jni::local_ref<jni::JBoolean> voiceoverMuted = this->getFieldValue(fieldVoiceoverMuted);
       return MergeOptions(
         width,
         height,
         fps,
         bitrate,
-        audio->toCpp()
+        audio->toCpp(),
+        voiceover != nullptr ? std::make_optional([&](auto&& __input) {
+          size_t __size = __input->size();
+          std::vector<VoiceoverAudio> __vector;
+          __vector.reserve(__size);
+          for (size_t __i = 0; __i < __size; __i++) {
+            auto __element = __input->getElement(__i);
+            __vector.push_back(__element->toCpp());
+          }
+          return __vector;
+        }(voiceover)) : std::nullopt,
+        sourceMuted != nullptr ? std::make_optional(static_cast<bool>(sourceMuted->value())) : std::nullopt,
+        voiceoverMuted != nullptr ? std::make_optional(static_cast<bool>(voiceoverMuted->value())) : std::nullopt
       );
     }
 
@@ -57,7 +80,7 @@ namespace margelo::nitro::pulseeditor {
      */
     [[maybe_unused]]
     static jni::local_ref<JMergeOptions::javaobject> fromCpp(const MergeOptions& value) {
-      using JSignature = JMergeOptions(double, double, double, double, jni::alias_ref<JMergeAudio>);
+      using JSignature = JMergeOptions(double, double, double, double, jni::alias_ref<JMergeAudio>, jni::alias_ref<jni::JArrayClass<JVoiceoverAudio>>, jni::alias_ref<jni::JBoolean>, jni::alias_ref<jni::JBoolean>);
       static const auto clazz = javaClassStatic();
       static const auto create = clazz->getStaticMethod<JSignature>("fromCpp");
       return create(
@@ -66,7 +89,19 @@ namespace margelo::nitro::pulseeditor {
         value.height,
         value.fps,
         value.bitrate,
-        JMergeAudio::fromCpp(value.audio)
+        JMergeAudio::fromCpp(value.audio),
+        value.voiceover.has_value() ? [&](auto&& __input) {
+          size_t __size = __input.size();
+          jni::local_ref<jni::JArrayClass<JVoiceoverAudio>> __array = jni::JArrayClass<JVoiceoverAudio>::newArray(__size);
+          for (size_t __i = 0; __i < __size; __i++) {
+            const auto& __element = __input[__i];
+            auto __elementJni = JVoiceoverAudio::fromCpp(__element);
+            __array->setElement(__i, *__elementJni);
+          }
+          return __array;
+        }(value.voiceover.value()) : nullptr,
+        value.sourceMuted.has_value() ? jni::JBoolean::valueOf(value.sourceMuted.value()) : nullptr,
+        value.voiceoverMuted.has_value() ? jni::JBoolean::valueOf(value.voiceoverMuted.value()) : nullptr
       );
     }
   };

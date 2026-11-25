@@ -61,6 +61,10 @@ namespace margelo::nitro::pulseeditor {
 
   public:
     // Methods
+    std::shared_ptr<Promise<void>> prepareVoiceover() override;
+    std::shared_ptr<Promise<double>> startVoiceover() override;
+    std::shared_ptr<Promise<VoiceoverTake>> stopVoiceover() override;
+    void cancelVoiceover() override;
     void play() override;
     void pause() override;
     std::shared_ptr<Promise<double>> seek(double timeMs) override;

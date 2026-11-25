@@ -18,8 +18,32 @@ public extension MergeOptions {
   /**
    * Create a new instance of `MergeOptions`.
    */
-  init(width: Double, height: Double, fps: Double, bitrate: Double, audio: MergeAudio) {
-    self.init(width, height, fps, bitrate, audio)
+  init(width: Double, height: Double, fps: Double, bitrate: Double, audio: MergeAudio, voiceover: [VoiceoverAudio]?, sourceMuted: Bool?, voiceoverMuted: Bool?) {
+    self.init(width, height, fps, bitrate, audio, { () -> bridge.std__optional_std__vector_VoiceoverAudio__ in
+      if let __unwrappedValue = voiceover {
+        return bridge.create_std__optional_std__vector_VoiceoverAudio__({ () -> bridge.std__vector_VoiceoverAudio_ in
+          var __vector = bridge.create_std__vector_VoiceoverAudio_(__unwrappedValue.count)
+          for __item in __unwrappedValue {
+            __vector.push_back(__item)
+          }
+          return __vector
+        }())
+      } else {
+        return .init()
+      }
+    }(), { () -> bridge.std__optional_bool_ in
+      if let __unwrappedValue = sourceMuted {
+        return bridge.create_std__optional_bool_(__unwrappedValue)
+      } else {
+        return .init()
+      }
+    }(), { () -> bridge.std__optional_bool_ in
+      if let __unwrappedValue = voiceoverMuted {
+        return bridge.create_std__optional_bool_(__unwrappedValue)
+      } else {
+        return .init()
+      }
+    }())
   }
 
   @inline(__always)
@@ -45,5 +69,41 @@ public extension MergeOptions {
   @inline(__always)
   var audio: MergeAudio {
     return self.__audio
+  }
+
+  @inline(__always)
+  var voiceover: [VoiceoverAudio]? {
+    return { () -> [VoiceoverAudio]? in
+      if bridge.has_value_std__optional_std__vector_VoiceoverAudio__(self.__voiceover) {
+        let __unwrapped = bridge.get_std__optional_std__vector_VoiceoverAudio__(self.__voiceover)
+        return __unwrapped.map({ __item in __item })
+      } else {
+        return nil
+      }
+    }()
+  }
+
+  @inline(__always)
+  var sourceMuted: Bool? {
+    return { () -> Bool? in
+      if bridge.has_value_std__optional_bool_(self.__sourceMuted) {
+        let __unwrapped = bridge.get_std__optional_bool_(self.__sourceMuted)
+        return __unwrapped
+      } else {
+        return nil
+      }
+    }()
+  }
+
+  @inline(__always)
+  var voiceoverMuted: Bool? {
+    return { () -> Bool? in
+      if bridge.has_value_std__optional_bool_(self.__voiceoverMuted) {
+        let __unwrapped = bridge.get_std__optional_bool_(self.__voiceoverMuted)
+        return __unwrapped
+      } else {
+        return nil
+      }
+    }()
   }
 }

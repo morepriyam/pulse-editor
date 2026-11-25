@@ -22,6 +22,8 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
   private let player = AVPlayer()
   private var media: [String: Probe.Media] = [:]
   private var build: Task<Void, Never>?
+  private var timelineGeneration = 0
+  private var rebuilding = false
   private var changed = false
   private var durationMs = 0.0
   private var clipStartsMs: [Double] = []
@@ -33,7 +35,7 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
   private static var audioPlaying = false
 
   var clips: [MergeClip] = [] { didSet { changed = true } }
-  var options = MergeOptions(width: 1080, height: 1920, fps: 30, bitrate: 5_000_000, audio: MergeAudio(sampleRate: 48_000, channels: 2)) {
+  var options = MergeOptions(width: 1080, height: 1920, fps: 30, bitrate: 5_000_000, audio: MergeAudio(sampleRate: 48_000, channels: 2), voiceover: nil, sourceMuted: nil, voiceoverMuted: nil) {
     didSet { changed = true }
   }
   var onTime: (_ timeMs: Double, _ playing: Bool) -> Void = { _, _ in }
@@ -72,6 +74,18 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
   private var swapTarget: CMTime?
   /// Play once the swap lands: it was playing when the edit came in, and nothing paused it since.
   private var resumeAfterSwap = false
+  private let voiceoverCapture = VoiceoverCapture()
+  private var voiceoverGeneration = 0
+  private var voiceoverRecording = false
+  private var voiceoverStopping = false
+  private var voiceoverStartHost = 0.0
+  private var voiceoverStartMs = 0.0
+  private var voiceoverFirstFrameMs = -1.0
+  private var voiceoverPreviousMute = false
+  private var voiceoverResult: Result<VoiceoverTake, Error>?
+  private var voiceoverResultFile: VoiceoverFileOwnership?
+  private var voiceoverWaiters: [Promise<VoiceoverTake>] = []
+  private var lifecycleObservers: [NSObjectProtocol] = []
 
   override init() {
     super.init()
@@ -83,6 +97,10 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
       DispatchQueue.main.async {
         guard let self else { return }
         let playing = p.timeControlStatus == .playing
+        if !playing, self.voiceoverRecording {
+          if Self.ms(p.currentTime()) >= self.durationMs - 1 { self.finishVoiceover() }
+          else { self.interruptVoiceover(reason: "Voiceover was cancelled because video playback stopped. Try recording again.") }
+        }
         self.onTime(Self.ms(self.swapTarget ?? p.currentTime()), playing)
         // Follow what plays, not the calls: a swap resumes playback without play().
         if p.timeControlStatus == .paused { Self.audioStopped() }
@@ -92,9 +110,31 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
     }
     timeObserver = player.addPeriodicTimeObserver(forInterval: CMTime(value: 1, timescale: 12), queue: .main) { [weak self] t in
       guard let self, self.player.timeControlStatus == .playing else { return }
+      if self.voiceoverRecording {
+        let expected = self.voiceoverStartMs + (CMClockGetTime(CMClockGetHostTimeClock()).seconds - self.voiceoverStartHost) * 1000
+        if abs(Self.ms(self.player.currentTime()) - expected) > max(50, 1500 / max(1, self.options.fps)) {
+          self.interruptVoiceover(reason: "Voiceover was cancelled because video playback stalled. Try recording again.")
+          return
+        }
+      }
       // Mid-swap the new item reads ~0 (and the observer fires on the jump): report its target.
       self.onTime(Self.ms(self.swapTarget ?? t), true)
     }
+    lifecycleObservers = [
+      NotificationCenter.default.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in self?.interruptVoiceover() },
+      NotificationCenter.default.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: .main) { [weak self] note in
+        if (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt) == AVAudioSession.InterruptionType.began.rawValue { self?.interruptVoiceover() }
+      },
+      NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] note in
+        let reason = (note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt) ?? 0
+        if reason == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue
+          || reason == AVAudioSession.RouteChangeReason.newDeviceAvailable.rawValue
+          || reason == AVAudioSession.RouteChangeReason.noSuitableRouteForCategory.rawValue { self?.interruptVoiceover() }
+      },
+      NotificationCenter.default.addObserver(forName: AVAudioSession.mediaServicesWereResetNotification, object: nil, queue: .main) { [weak self] _ in
+        self?.interruptVoiceover()
+      }
+    ]
   }
 
   func afterUpdate() {
@@ -107,12 +147,22 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
 
   /// Load new clips (once each), build the composition and swap it in at the current position.
   private func rebuild() {
+    if voiceoverRecording || voiceoverStopping { interruptVoiceover() }
     let list = clips
     let options = self.options
     let size = renderSize(options)
     build?.cancel()
+    timelineGeneration += 1
+    let generation = timelineGeneration
+    rebuilding = true
     build = Task { @MainActor [weak self] in
       guard let self else { return }
+      defer {
+        if generation == self.timelineGeneration {
+          self.rebuilding = false
+          self.build = nil
+        }
+      }
       let started = CACurrentMediaTime()
       do {
         var items: [(clip: MergeClip, media: Probe.Media)] = []
@@ -127,7 +177,8 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
         try Task.checkCancellation()
         let target = RenderTarget(
           size: size, transform: .identity, canvas: size, fps: options.fps, bitrate: 0, audio: options.audio)
-        let composed = try await Timeline.compose(items, target: target)
+        let composed = try await Timeline.compose(items, target: target,
+          voiceover: options.voiceover ?? [], sourceMuted: options.sourceMuted ?? false, voiceoverMuted: options.voiceoverMuted ?? false)
         try Task.checkCancellation()
         let item = AVPlayerItem(asset: composed.composition.copy() as! AVComposition)
         item.videoComposition = composed.videoComposition.copy() as? AVVideoComposition
@@ -149,7 +200,9 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
 
   private func swap(to item: AVPlayerItem, started: Double) {
     let first = player.currentItem == nil
-    let now = swapTarget ?? player.currentTime()
+    // A seek on the old item may still be landing while this composition builds. Preserve
+    // that requested position instead of replacing the item at its stale currentTime.
+    let now = !waiters.isEmpty && chaseTime.isValid ? chaseTime : (swapTarget ?? player.currentTime())
     let at = first ? CMTime.zero : CMTimeMinimum(now, CMTime(value: CMTimeValue(max(0, durationMs - 1)), timescale: 1000))
     // An edit during a swap: the player isn't playing the new item yet, the swap before resumes.
     let wasPlaying = player.timeControlStatus == .playing || resumeAfterSwap
@@ -166,6 +219,11 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
     item.add(output)
     frameOutput = output
     swapTarget = first ? nil : at
+    // Replacing the item cancels its seeks. Its callbacks no longer own this seek state;
+    // leave waiters queued so the new item's swap completion can drain the latest target.
+    displayWatch?.invalidate()
+    displayWatch = nil
+    seeking = false
     player.replaceCurrentItem(with: item)
     pendingSwap = first ? nil : (started, false)
     // The layer's first frame of the new item: the first frame of all (ready), or the end of a swap.
@@ -217,6 +275,7 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
     }
     pendingSwap = nil
     lastSwapMs = (CACurrentMediaTime() - swap.started) * 1000
+    onStatus(PreviewStatus(durationMs: durationMs, clipStartsMs: clipStartsMs, ready: ready, error: nil))
   }
 
   /// The preview draws at the view's pixel size (the canvas's shape, fitted inside it), never
@@ -230,6 +289,173 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
   }
 
   // MARK: Playback
+
+  func prepareVoiceover() throws -> Promise<Void> {
+    let promise = Promise<Void>()
+    DispatchQueue.main.async {
+      let generation = self.voiceoverGeneration
+      AVAudioSession.sharedInstance().requestRecordPermission { granted in
+        DispatchQueue.main.async {
+          guard generation == self.voiceoverGeneration else {
+            promise.reject(withError: RuntimeError("Voiceover was closed.")); return
+          }
+          guard granted else {
+            promise.reject(withError: RuntimeError("Allow microphone access in Settings to record voiceover.")); return
+          }
+          do {
+            try self.voiceoverCapture.prepare()
+            self.voiceoverCapture.waitForInput { result in
+              guard generation == self.voiceoverGeneration else {
+                promise.reject(withError: RuntimeError("Voiceover was closed.")); return
+              }
+              switch result {
+              case .success:
+                self.onStatus(PreviewStatus(durationMs: self.durationMs, clipStartsMs: self.clipStartsMs, ready: self.ready, error: nil))
+                promise.resolve(withResult: ())
+              case .failure(let error): promise.reject(withError: error)
+              }
+            }
+          }
+          catch { self.voiceoverCapture.cancel(); promise.reject(withError: error) }
+        }
+      }
+    }
+    return promise
+  }
+
+  func startVoiceover() throws -> Promise<Double> {
+    let promise = Promise<Double>()
+    DispatchQueue.main.async {
+      guard self.ready, !self.rebuilding, !self.changed, !self.seeking, self.pendingSwap == nil, !self.voiceoverRecording, !self.voiceoverStopping,
+            self.player.currentItem?.status == .readyToPlay else {
+        promise.reject(withError: RuntimeError("Wait for the preview to finish loading before recording.")); return
+      }
+      self.player.pause()
+      let start = Self.ms(self.player.currentTime())
+      guard start < self.durationMs - 1 else {
+        promise.reject(withError: RuntimeError("Move the playhead before the end to record voiceover.")); return
+      }
+      let host = CMClockGetTime(CMClockGetHostTimeClock())
+      do {
+        try self.voiceoverCapture.start(hostSeconds: host.seconds)
+        self.discardCompletedVoiceover()
+        self.voiceoverStartHost = host.seconds
+        self.voiceoverStartMs = start
+        self.voiceoverFirstFrameMs = -1
+        self.voiceoverPreviousMute = self.player.isMuted
+        self.player.isMuted = true
+        self.voiceoverRecording = true
+        self.resumeAfterSwap = false
+        // The paused seek has already landed. An explicit item time would request another
+        // seek here; .invalid starts its current frame with the shared host-clock anchor.
+        self.player.setRate(1, time: .invalid, atHostTime: host)
+        promise.resolve(withResult: start)
+      } catch { promise.reject(withError: error) }
+    }
+    return promise
+  }
+
+  func stopVoiceover() throws -> Promise<VoiceoverTake> {
+    let promise = Promise<VoiceoverTake>()
+    DispatchQueue.main.async {
+      if let result = self.voiceoverResult {
+        self.resolveVoiceover(promise, result)
+      } else if self.voiceoverRecording || self.voiceoverStopping {
+        self.voiceoverWaiters.append(promise)
+        if self.voiceoverRecording { self.finishVoiceover() }
+      } else { promise.reject(withError: RuntimeError("There is no voiceover take to finish.")) }
+    }
+    return promise
+  }
+
+  private func finishVoiceover() {
+    guard voiceoverRecording else { return }
+    player.pause()
+    let end = min(durationMs, max(voiceoverStartMs, Self.ms(player.currentTime())))
+    let host = CMClockGetTime(CMClockGetHostTimeClock()).seconds
+    if end < durationMs - 1,
+      abs((host - voiceoverStartHost) * 1000 - (end - voiceoverStartMs)) > max(20, 1000 / max(1, options.fps)) {
+      interruptVoiceover(reason: "Voiceover was cancelled because video playback stalled. Try recording again.")
+      return
+    }
+    voiceoverRecording = false
+    voiceoverStopping = true
+    player.isMuted = voiceoverPreviousMute
+    onTime(end, false)
+    let generation = voiceoverGeneration
+    let start = voiceoverStartMs
+    let startHost = voiceoverStartHost
+    let frameMs = voiceoverFirstFrameMs
+    voiceoverCapture.stop(hostSeconds: min(host, startHost + (end - start) / 1000)) { [weak self] result in
+      guard let self, generation == self.voiceoverGeneration else {
+        // Cancellation may run after the writer finished but before this main-thread reply.
+        // No JS caller received that file, so it has no owner to dispose it later.
+        if case .success(let captured) = result {
+          VoiceoverFileOwnership(url: fileURL(captured.uri)).discardIfUnclaimed()
+        }
+        return
+      }
+      let take: Result<VoiceoverTake, Error> = result.map { captured in
+        let offset = max(0, (captured.firstHostSeconds - startHost) * 1000)
+        // The input has a discrete sample grid; never ask storage/preview to trim beyond its
+        // last sample when the player's paused time falls a fraction of a sample later.
+        let capturedEnd = min(end, start + offset + captured.durationMs)
+        return VoiceoverTake(uri: captured.uri, startMs: start + offset, endMs: capturedEnd,
+          durationMs: captured.durationMs, sourceStartMs: 0,
+          pressToPlaybackMs: frameMs, pressToCaptureMs: offset,
+          stopAlignmentMs: captured.durationMs - max(0, end - start - offset), audioVideoOffsetMs: offset)
+      }
+      self.voiceoverStopping = false
+      self.voiceoverResult = take
+      if case .success(let captured) = take {
+        self.voiceoverResultFile = VoiceoverFileOwnership(url: fileURL(captured.uri))
+      }
+      let waiting = self.voiceoverWaiters
+      self.voiceoverWaiters.removeAll()
+      waiting.forEach { self.resolveVoiceover($0, take) }
+    }
+  }
+
+  private func resolveVoiceover(_ promise: Promise<VoiceoverTake>, _ result: Result<VoiceoverTake, Error>) {
+    switch result {
+    case .success(let take):
+      self.voiceoverResultFile?.transferToHost()
+      promise.resolve(withResult: take)
+    case .failure(let error): promise.reject(withError: error)
+    }
+  }
+
+  func cancelVoiceover() throws {
+    DispatchQueue.main.async { self.releaseVoiceover() }
+  }
+
+  private func discardCompletedVoiceover() {
+    voiceoverResultFile?.discardIfUnclaimed()
+    voiceoverResultFile = nil
+    voiceoverResult = nil
+  }
+
+  private func releaseVoiceover(discardCompleted: Bool = false) {
+    voiceoverGeneration += 1
+    if voiceoverRecording || voiceoverStopping {
+      player.pause()
+      player.isMuted = voiceoverPreviousMute
+    }
+    voiceoverRecording = false
+    voiceoverStopping = false
+    if discardCompleted { discardCompletedVoiceover() }
+    voiceoverCapture.cancel()
+    let waiting = voiceoverWaiters
+    voiceoverWaiters.removeAll()
+    waiting.forEach { $0.reject(withError: RuntimeError("Voiceover recording was cancelled.")) }
+  }
+
+  private func interruptVoiceover(reason: String = "Voiceover stopped because the microphone was interrupted. Reopen Voiceover to continue.") {
+    guard voiceoverCapture.prepared || voiceoverRecording || voiceoverStopping else { return }
+    releaseVoiceover(discardCompleted: false)
+    onStatus(PreviewStatus(durationMs: durationMs, clipStartsMs: clipStartsMs, ready: ready,
+      error: reason))
+  }
 
   func play() throws {
     DispatchQueue.main.async {
@@ -255,6 +481,7 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
 
   func pause() throws {
     DispatchQueue.main.async {
+      if self.voiceoverRecording { self.interruptVoiceover(reason: "Voiceover was cancelled because video playback stopped. Try recording again.") }
       self.resumeAfterSwap = false
       self.player.pause()
     }
@@ -263,6 +490,7 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
   func seek(timeMs: Double) throws -> Promise<Double> {
     let promise = Promise<Double>()
     DispatchQueue.main.async {
+      if self.voiceoverRecording { self.interruptVoiceover(reason: "Voiceover was cancelled because the playhead moved. Try recording again.") }
       self.waiters.append(promise)
       let ms = min(max(0, timeMs), max(0, self.durationMs - 1))
       self.chaseTime = CMTime(value: CMTimeValue((ms * 1000).rounded()), timescale: 1_000_000)
@@ -276,10 +504,11 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
 
   /// One seek at a time, always to the latest time asked for; exact unless the person is dragging.
   private func seekToChaseTime() {
+    // A ready item can still have its swap's old-position seek in flight. Keep later seeks
+    // queued until that seek completes; overlapping AVPlayer seeks can cancel the Undo target
+    // and leave the old playhead position on screen. The swap completion drains these waiters.
+    if pendingSwap?.seeked == false { return }
     guard let item = player.currentItem, item.status == .readyToPlay else {
-      // A swap is landing (its new item not ready): its seek runs this one once it's done, rather
-      // than answering with the new item's ~0 and not seeking.
-      if pendingSwap?.seeked == false { return }
       // Not loaded yet (the first timeline): answer with where it is.
       finishSeeks(Self.ms(player.currentTime()))
       return
@@ -293,9 +522,10 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
     let fromMs = Self.ms(player.currentTime())
     player.seek(to: target, toleranceBefore: tolerance, toleranceAfter: tolerance) { [weak self] _ in
       DispatchQueue.main.async {
-        guard let self else { return }
+        guard let self, self.player.currentItem === item else { return }
         let landedMs = Self.ms(self.player.currentTime())
         self.whenShown(after: before, from: fromMs, to: landedMs) {
+          guard self.player.currentItem === item else { return }
           self.seeking = false
           if CMTimeCompare(target, self.chaseTime) == 0 {
             self.lastSeekMs = (CACurrentMediaTime() - self.seekStart) * 1000
@@ -350,6 +580,7 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
 
   func setScrubbing(scrubbing: Bool) throws {
     DispatchQueue.main.async {
+      if scrubbing, self.voiceoverRecording { self.interruptVoiceover(reason: "Voiceover was cancelled because the playhead moved. Try recording again.") }
       let wasScrubbing = self.scrubbing
       self.scrubbing = scrubbing
       // Count the frames a drag shows, as playback does.
@@ -399,6 +630,9 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
     guard let output = frameOutput else { return }
     let t = output.itemTime(forHostTime: link.targetTimestamp)
     if output.hasNewPixelBuffer(forItemTime: t), let frame = output.copyPixelBuffer(forItemTime: t, itemTimeForDisplay: nil) {
+      if voiceoverRecording, voiceoverFirstFrameMs < 0, Self.ms(t) > voiceoverStartMs + 1 {
+        voiceoverFirstFrameMs = (CACurrentMediaTime() - voiceoverStartHost) * 1000
+      }
       lastFrame = frame
       framesShown += 1
     }
@@ -412,6 +646,9 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
 
   func onDropView() {
     DispatchQueue.main.async {
+      self.releaseVoiceover(discardCompleted: true)
+      self.lifecycleObservers.forEach(NotificationCenter.default.removeObserver)
+      self.lifecycleObservers.removeAll()
       self.build?.cancel()
       self.displayWatch?.invalidate()
       self.displayWatch = nil

@@ -16,6 +16,10 @@ public protocol HybridPulsePreviewSpec_protocol: HybridObject, HybridView {
   var onStatus: (_ status: PreviewStatus) -> Void { get set }
 
   // Methods
+  func prepareVoiceover() throws -> Promise<Void>
+  func startVoiceover() throws -> Promise<Double>
+  func stopVoiceover() throws -> Promise<VoiceoverTake>
+  func cancelVoiceover() throws -> Void
   func play() throws -> Void
   func pause() throws -> Void
   func seek(timeMs: Double) throws -> Promise<Double>

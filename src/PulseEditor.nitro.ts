@@ -73,6 +73,14 @@ export interface MergeAudio {
   channels: number;
 }
 
+/** A draft-level narration take, independent of video clip boundaries. */
+export interface VoiceoverAudio {
+  uri: string;
+  timelineStartMs: number;
+  sourceStartMs: number;
+  sourceEndMs: number;
+}
+
 export interface MergeOptions {
   /** Output canvas (display size) and frame rate, e.g. 1080×1920 @ 30. */
   width: number;
@@ -83,6 +91,10 @@ export interface MergeOptions {
   bitrate: number;
   /** Audio layout for anything that gets encoded (the recorder's). */
   audio: MergeAudio;
+  /** Narration is mixed with the unmuted source audio, without ducking. */
+  voiceover?: VoiceoverAudio[];
+  sourceMuted?: boolean;
+  voiceoverMuted?: boolean;
 }
 
 export interface MergeResult {

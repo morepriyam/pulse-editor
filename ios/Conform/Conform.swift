@@ -25,7 +25,8 @@ enum Conform {
     try Task.checkCancellation()
 
     let mergeOptions = MergeOptions(
-      width: options.width, height: options.height, fps: options.fps, bitrate: options.bitrate, audio: options.audio)
+      width: options.width, height: options.height, fps: options.fps, bitrate: options.bitrate, audio: options.audio,
+      voiceover: nil, sourceMuted: nil, voiceoverMuted: nil)
     let output = try Merge.outputURL("conform")
     do {
       if options.copyVideo {

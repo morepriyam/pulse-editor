@@ -19,6 +19,8 @@ namespace margelo::nitro::pulseeditor { struct MergeClip; }
 namespace margelo::nitro::pulseeditor { struct MergeOptions; }
 // Forward declaration of `PreviewStatus` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct PreviewStatus; }
+// Forward declaration of `VoiceoverTake` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct VoiceoverTake; }
 // Forward declaration of `PreviewStats` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct PreviewStats; }
 
@@ -28,6 +30,7 @@ namespace margelo::nitro::pulseeditor { struct PreviewStats; }
 #include <functional>
 #include "PreviewStatus.hpp"
 #include <NitroModules/Promise.hpp>
+#include "VoiceoverTake.hpp"
 #include <string>
 #include "PreviewStats.hpp"
 
@@ -69,6 +72,10 @@ namespace margelo::nitro::pulseeditor {
 
     public:
       // Methods
+      virtual std::shared_ptr<Promise<void>> prepareVoiceover() = 0;
+      virtual std::shared_ptr<Promise<double>> startVoiceover() = 0;
+      virtual std::shared_ptr<Promise<VoiceoverTake>> stopVoiceover() = 0;
+      virtual void cancelVoiceover() = 0;
       virtual void play() = 0;
       virtual void pause() = 0;
       virtual std::shared_ptr<Promise<double>> seek(double timeMs) = 0;

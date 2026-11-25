@@ -161,7 +161,7 @@ enum Merge {
     let cutoff = Date().addingTimeInterval(-24 * 60 * 60)
     let files = (try? FileManager.default.contentsOfDirectory(
       at: outputDirectory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
-    for file in files where ["merge-", "conform-", "image-", "frame-"].contains(where: file.lastPathComponent.hasPrefix) {
+    for file in files where ["merge-", "conform-", "image-", "frame-", "voiceover-"].contains(where: file.lastPathComponent.hasPrefix) {
       let modified = (try? file.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate
       if let modified, modified < cutoff { try? FileManager.default.removeItem(at: file) }
     }

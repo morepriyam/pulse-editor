@@ -15,8 +15,12 @@ namespace margelo::nitro::pulseeditor { struct MergeCrop; }
 namespace margelo::nitro::pulseeditor { struct MergeOptions; }
 // Forward declaration of `MergeAudio` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeAudio; }
+// Forward declaration of `VoiceoverAudio` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct VoiceoverAudio; }
 // Forward declaration of `PreviewStatus` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct PreviewStatus; }
+// Forward declaration of `VoiceoverTake` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct VoiceoverTake; }
 // Forward declaration of `PreviewStats` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct PreviewStats; }
 
@@ -31,6 +35,8 @@ namespace margelo::nitro::pulseeditor { struct PreviewStats; }
 #include "JMergeOptions.hpp"
 #include "MergeAudio.hpp"
 #include "JMergeAudio.hpp"
+#include "VoiceoverAudio.hpp"
+#include "JVoiceoverAudio.hpp"
 #include <functional>
 #include "JFunc_void_double_bool.hpp"
 #include <NitroModules/JNICallable.hpp>
@@ -39,6 +45,9 @@ namespace margelo::nitro::pulseeditor { struct PreviewStats; }
 #include "JPreviewStatus.hpp"
 #include <NitroModules/Promise.hpp>
 #include <NitroModules/JPromise.hpp>
+#include <NitroModules/JUnit.hpp>
+#include "VoiceoverTake.hpp"
+#include "JVoiceoverTake.hpp"
 #include "PreviewStats.hpp"
 #include "JPreviewStats.hpp"
 
@@ -144,6 +153,57 @@ namespace margelo::nitro::pulseeditor {
   }
 
   // Methods
+  std::shared_ptr<Promise<void>> JHybridPulsePreviewSpec::prepareVoiceover() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("prepareVoiceover");
+    auto __result = method(_javaPart);
+    return [&]() {
+      auto __promise = Promise<void>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& /* unit */) {
+        __promise->resolve();
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<double>> JHybridPulsePreviewSpec::startVoiceover() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("startVoiceover");
+    auto __result = method(_javaPart);
+    return [&]() {
+      auto __promise = Promise<double>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<jni::JDouble>(__boxedResult);
+        __promise->resolve(__result->value());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  std::shared_ptr<Promise<VoiceoverTake>> JHybridPulsePreviewSpec::stopVoiceover() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<jni::local_ref<JPromise::javaobject>()>("stopVoiceover");
+    auto __result = method(_javaPart);
+    return [&]() {
+      auto __promise = Promise<VoiceoverTake>::create();
+      __result->cthis()->addOnResolvedListener([=](const jni::alias_ref<jni::JObject>& __boxedResult) {
+        auto __result = jni::static_ref_cast<JVoiceoverTake>(__boxedResult);
+        __promise->resolve(__result->toCpp());
+      });
+      __result->cthis()->addOnRejectedListener([=](const jni::alias_ref<jni::JThrowable>& __throwable) {
+        jni::JniException __jniError(__throwable);
+        __promise->reject(std::make_exception_ptr(__jniError));
+      });
+      return __promise;
+    }();
+  }
+  void JHybridPulsePreviewSpec::cancelVoiceover() {
+    static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("cancelVoiceover");
+    method(_javaPart);
+  }
   void JHybridPulsePreviewSpec::play() {
     static const auto method = _javaPart->javaClassStatic()->getMethod<void()>("play");
     method(_javaPart);
