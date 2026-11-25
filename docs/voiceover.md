@@ -15,8 +15,10 @@ owns the saved media and take list; recording never edits, splits or reorders vi
    Move/copy the returned CAF into durable storage before changing the saved take list.
 4. Call `cancelVoiceover()` when leaving. It removes an unfinished take and microphone tap,
    stops the audio engine and restores the previous audio-session category. An unsaved
-   completed cache file remains available for a failed-save retry. The host removes it on final
-   disposal; the next start also cleans the preceding completed cache file after it was saved.
+   completed cache file remains available for a failed-save retry. Once a successful stop
+   promise delivers a file to JavaScript, the host owns its deletion after save or final disposal.
+   Canceling, dropping the preview or starting another take never deletes a delivered file that
+   the host may still be copying. Native cleanup removes only results that were never delivered.
 
 Backgrounding, audio interruption/route loss, an unexpected playback pause or stall, seeking,
 scrubbing and changing the composition cancel an in-progress take rather than saving audio
@@ -57,3 +59,8 @@ one minute, five successive short takes and a seek/retake at 44.1 and 48 kHz. It
 CAF sample to check for omission, repetition, reordering and accumulated timestamp drift,
 and checks that empty captures and missing/reordered input buffers fail. Mixing/export
 validation is documented by the host app.
+
+Run `sh scripts/check-voiceover-file-ownership.sh` for the shipping cleanup regression. It keeps
+the first capture's copy pending until after cancellation and a new take starts, then verifies
+that its bytes still copy intact. Undelivered replacement, preview-drop and canceled-completion
+files are reclaimed.

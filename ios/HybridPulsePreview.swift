@@ -83,6 +83,7 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
   private var voiceoverFirstFrameMs = -1.0
   private var voiceoverPreviousMute = false
   private var voiceoverResult: Result<VoiceoverTake, Error>?
+  private var voiceoverResultFile: VoiceoverFileOwnership?
   private var voiceoverWaiters: [Promise<VoiceoverTake>] = []
   private var lifecycleObservers: [NSObjectProtocol] = []
 
@@ -389,7 +390,9 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
       guard let self, generation == self.voiceoverGeneration else {
         // Cancellation may run after the writer finished but before this main-thread reply.
         // No JS caller received that file, so it has no owner to dispose it later.
-        if case .success(let captured) = result { try? FileManager.default.removeItem(at: fileURL(captured.uri)) }
+        if case .success(let captured) = result {
+          VoiceoverFileOwnership(url: fileURL(captured.uri)).discardIfUnclaimed()
+        }
         return
       }
       let take: Result<VoiceoverTake, Error> = result.map { captured in
@@ -404,6 +407,9 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
       }
       self.voiceoverStopping = false
       self.voiceoverResult = take
+      if case .success(let captured) = take {
+        self.voiceoverResultFile = VoiceoverFileOwnership(url: fileURL(captured.uri))
+      }
       let waiting = self.voiceoverWaiters
       self.voiceoverWaiters.removeAll()
       waiting.forEach { self.resolveVoiceover($0, take) }
@@ -412,7 +418,9 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
 
   private func resolveVoiceover(_ promise: Promise<VoiceoverTake>, _ result: Result<VoiceoverTake, Error>) {
     switch result {
-    case .success(let take): promise.resolve(withResult: take)
+    case .success(let take):
+      self.voiceoverResultFile?.transferToHost()
+      promise.resolve(withResult: take)
     case .failure(let error): promise.reject(withError: error)
     }
   }
@@ -422,7 +430,8 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
   }
 
   private func discardCompletedVoiceover() {
-    if case .success(let take) = voiceoverResult { try? FileManager.default.removeItem(at: fileURL(take.uri)) }
+    voiceoverResultFile?.discardIfUnclaimed()
+    voiceoverResultFile = nil
     voiceoverResult = nil
   }
 
@@ -637,7 +646,7 @@ final class HybridPulsePreview: HybridPulsePreviewSpec {
 
   func onDropView() {
     DispatchQueue.main.async {
-      self.releaseVoiceover()
+      self.releaseVoiceover(discardCompleted: true)
       self.lifecycleObservers.forEach(NotificationCenter.default.removeObserver)
       self.lifecycleObservers.removeAll()
       self.build?.cancel()
