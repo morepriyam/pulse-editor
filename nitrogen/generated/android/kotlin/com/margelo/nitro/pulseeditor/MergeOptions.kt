@@ -32,7 +32,16 @@ data class MergeOptions(
   val bitrate: Double,
   @DoNotStrip
   @Keep
-  val audio: MergeAudio
+  val audio: MergeAudio,
+  @DoNotStrip
+  @Keep
+  val voiceover: Array<VoiceoverAudio>?,
+  @DoNotStrip
+  @Keep
+  val sourceMuted: Boolean?,
+  @DoNotStrip
+  @Keep
+  val voiceoverMuted: Boolean?
 ) {
   /* primary constructor */
 
@@ -44,6 +53,9 @@ data class MergeOptions(
       && Objects.deepEquals(this.fps, other.fps)
       && Objects.deepEquals(this.bitrate, other.bitrate)
       && Objects.deepEquals(this.audio, other.audio)
+      && Objects.deepEquals(this.voiceover, other.voiceover)
+      && Objects.deepEquals(this.sourceMuted, other.sourceMuted)
+      && Objects.deepEquals(this.voiceoverMuted, other.voiceoverMuted)
   }
 
   override fun hashCode(): Int {
@@ -52,7 +64,10 @@ data class MergeOptions(
       height,
       fps,
       bitrate,
-      audio
+      audio,
+      voiceover,
+      sourceMuted,
+      voiceoverMuted
     ).contentDeepHashCode()
   }
 
@@ -64,8 +79,8 @@ data class MergeOptions(
     @Keep
     @Suppress("unused")
     @JvmStatic
-    private fun fromCpp(width: Double, height: Double, fps: Double, bitrate: Double, audio: MergeAudio): MergeOptions {
-      return MergeOptions(width, height, fps, bitrate, audio)
+    private fun fromCpp(width: Double, height: Double, fps: Double, bitrate: Double, audio: MergeAudio, voiceover: Array<VoiceoverAudio>?, sourceMuted: Boolean?, voiceoverMuted: Boolean?): MergeOptions {
+      return MergeOptions(width, height, fps, bitrate, audio, voiceover, sourceMuted, voiceoverMuted)
     }
   }
 }

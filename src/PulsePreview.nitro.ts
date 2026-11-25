@@ -33,6 +33,24 @@ export interface PreviewStats {
   framesDropped: number;
 }
 
+/** A completed microphone take. Times use the native player's timeline and input host clock. */
+export interface VoiceoverTake {
+  uri: string;
+  startMs: number;
+  endMs: number;
+  /** Length of the source recording; sourceStartMs trims capture before the timeline anchor. */
+  durationMs: number;
+  sourceStartMs: number;
+  /** Native command to first displayed moving frame (-1 if none). */
+  pressToPlaybackMs: number;
+  /** Native command to first included input sample's host timestamp. */
+  pressToCaptureMs: number;
+  /** Captured sample duration minus the paused player's timeline duration. */
+  stopAlignmentMs: number;
+  /** Input sample clock vs the scheduled video clock; not an acoustic measurement. */
+  audioVideoOffsetMs: number;
+}
+
 export interface PulsePreviewProps extends HybridViewProps {
   /** The draft's clips, in order, with their edits (as `merge` takes them). */
   clips: MergeClip[];
@@ -47,6 +65,14 @@ export interface PulsePreviewProps extends HybridViewProps {
 }
 
 export interface PulsePreviewMethods extends HybridViewMethods {
+  /** iOS: request permission and warm the microphone before enabling push-to-talk. */
+  prepareVoiceover(): Promise<void>;
+  /** Start prepared capture and video playback using one native host-clock anchor. */
+  startVoiceover(): Promise<number>;
+  /** Pause video and finish one take. Repeated calls return the same completed take. */
+  stopVoiceover(): Promise<VoiceoverTake>;
+  /** Discard an unfinished take and release microphone/session resources. */
+  cancelVoiceover(): void;
   play(): void;
   pause(): void;
   /** Show the frame at `timeMs` on the timeline. Resolves with that frame's time once it's on

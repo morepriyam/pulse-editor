@@ -25,6 +25,7 @@ export type {
   MergeClip,
   MergeCrop,
   MergeOptions,
+  VoiceoverAudio,
   MergeResult,
   ProbeAudio,
   ProbeResult,
@@ -42,7 +43,11 @@ export type {
   FramesOptions,
   Frame,
 } from './PulseEditor.nitro';
-export type { PreviewStats, PreviewStatus } from './PulsePreview.nitro';
+export type {
+  PreviewStats,
+  PreviewStatus,
+  VoiceoverTake,
+} from './PulsePreview.nitro';
 export {
   PulsePreview,
   type PulsePreviewRef,

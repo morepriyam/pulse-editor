@@ -70,6 +70,10 @@ namespace margelo::nitro::pulseeditor { struct ThumbnailOptions; }
 namespace margelo::nitro::pulseeditor { struct Thumbnail; }
 // Forward declaration of `Transfer` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { enum class Transfer; }
+// Forward declaration of `VoiceoverAudio` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct VoiceoverAudio; }
+// Forward declaration of `VoiceoverTake` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct VoiceoverTake; }
 
 // Include C++ defined types
 #include "AudioPCM.hpp"
@@ -103,6 +107,8 @@ namespace margelo::nitro::pulseeditor { enum class Transfer; }
 #include "Thumbnail.hpp"
 #include "ThumbnailOptions.hpp"
 #include "Transfer.hpp"
+#include "VoiceoverAudio.hpp"
+#include "VoiceoverTake.hpp"
 #include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/Promise.hpp>
 #include <NitroModules/Result.hpp>

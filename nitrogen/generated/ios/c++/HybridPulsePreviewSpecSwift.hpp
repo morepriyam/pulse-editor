@@ -20,8 +20,12 @@ namespace margelo::nitro::pulseeditor { struct MergeCrop; }
 namespace margelo::nitro::pulseeditor { struct MergeOptions; }
 // Forward declaration of `MergeAudio` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeAudio; }
+// Forward declaration of `VoiceoverAudio` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct VoiceoverAudio; }
 // Forward declaration of `PreviewStatus` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct PreviewStatus; }
+// Forward declaration of `VoiceoverTake` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct VoiceoverTake; }
 // Forward declaration of `PreviewStats` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct PreviewStats; }
 
@@ -32,9 +36,11 @@ namespace margelo::nitro::pulseeditor { struct PreviewStats; }
 #include <optional>
 #include "MergeOptions.hpp"
 #include "MergeAudio.hpp"
+#include "VoiceoverAudio.hpp"
 #include <functional>
 #include "PreviewStatus.hpp"
 #include <NitroModules/Promise.hpp>
+#include "VoiceoverTake.hpp"
 #include "PreviewStats.hpp"
 
 #include "PulseEditor-Swift-Cxx-Umbrella.hpp"
@@ -113,6 +119,36 @@ namespace margelo::nitro::pulseeditor {
 
   public:
     // Methods
+    inline std::shared_ptr<Promise<void>> prepareVoiceover() override {
+      auto __result = _swiftPart.prepareVoiceover();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<double>> startVoiceover() override {
+      auto __result = _swiftPart.startVoiceover();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline std::shared_ptr<Promise<VoiceoverTake>> stopVoiceover() override {
+      auto __result = _swiftPart.stopVoiceover();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+      auto __value = std::move(__result.value());
+      return __value;
+    }
+    inline void cancelVoiceover() override {
+      auto __result = _swiftPart.cancelVoiceover();
+      if (__result.hasError()) [[unlikely]] {
+        std::rethrow_exception(__result.error());
+      }
+    }
     inline void play() override {
       auto __result = _swiftPart.play();
       if (__result.hasError()) [[unlikely]] {

@@ -30,8 +30,13 @@
 
 // Forward declaration of `MergeAudio` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeAudio; }
+// Forward declaration of `VoiceoverAudio` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct VoiceoverAudio; }
 
 #include "MergeAudio.hpp"
+#include "VoiceoverAudio.hpp"
+#include <vector>
+#include <optional>
 
 namespace margelo::nitro::pulseeditor {
 
@@ -45,10 +50,13 @@ namespace margelo::nitro::pulseeditor {
     double fps     SWIFT_PRIVATE;
     double bitrate     SWIFT_PRIVATE;
     MergeAudio audio     SWIFT_PRIVATE;
+    std::optional<std::vector<VoiceoverAudio>> voiceover     SWIFT_PRIVATE;
+    std::optional<bool> sourceMuted     SWIFT_PRIVATE;
+    std::optional<bool> voiceoverMuted     SWIFT_PRIVATE;
 
   public:
     MergeOptions() = default;
-    explicit MergeOptions(double width, double height, double fps, double bitrate, MergeAudio audio): width(width), height(height), fps(fps), bitrate(bitrate), audio(audio) {}
+    explicit MergeOptions(double width, double height, double fps, double bitrate, MergeAudio audio, std::optional<std::vector<VoiceoverAudio>> voiceover, std::optional<bool> sourceMuted, std::optional<bool> voiceoverMuted): width(width), height(height), fps(fps), bitrate(bitrate), audio(audio), voiceover(voiceover), sourceMuted(sourceMuted), voiceoverMuted(voiceoverMuted) {}
 
   public:
     friend bool operator==(const MergeOptions& lhs, const MergeOptions& rhs) = default;
@@ -68,7 +76,10 @@ namespace margelo::nitro {
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "height"))),
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "fps"))),
         JSIConverter<double>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "bitrate"))),
-        JSIConverter<margelo::nitro::pulseeditor::MergeAudio>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "audio")))
+        JSIConverter<margelo::nitro::pulseeditor::MergeAudio>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "audio"))),
+        JSIConverter<std::optional<std::vector<margelo::nitro::pulseeditor::VoiceoverAudio>>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "voiceover"))),
+        JSIConverter<std::optional<bool>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "sourceMuted"))),
+        JSIConverter<std::optional<bool>>::fromJSI(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "voiceoverMuted")))
       );
     }
     static inline jsi::Value toJSI(jsi::Runtime& runtime, const margelo::nitro::pulseeditor::MergeOptions& arg) {
@@ -78,6 +89,9 @@ namespace margelo::nitro {
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "fps"), JSIConverter<double>::toJSI(runtime, arg.fps));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "bitrate"), JSIConverter<double>::toJSI(runtime, arg.bitrate));
       obj.setProperty(runtime, PropNameIDCache::get(runtime, "audio"), JSIConverter<margelo::nitro::pulseeditor::MergeAudio>::toJSI(runtime, arg.audio));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "voiceover"), JSIConverter<std::optional<std::vector<margelo::nitro::pulseeditor::VoiceoverAudio>>>::toJSI(runtime, arg.voiceover));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "sourceMuted"), JSIConverter<std::optional<bool>>::toJSI(runtime, arg.sourceMuted));
+      obj.setProperty(runtime, PropNameIDCache::get(runtime, "voiceoverMuted"), JSIConverter<std::optional<bool>>::toJSI(runtime, arg.voiceoverMuted));
       return obj;
     }
     static inline bool canConvert(jsi::Runtime& runtime, const jsi::Value& value) {
@@ -93,6 +107,9 @@ namespace margelo::nitro {
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "fps")))) return false;
       if (!JSIConverter<double>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "bitrate")))) return false;
       if (!JSIConverter<margelo::nitro::pulseeditor::MergeAudio>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "audio")))) return false;
+      if (!JSIConverter<std::optional<std::vector<margelo::nitro::pulseeditor::VoiceoverAudio>>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "voiceover")))) return false;
+      if (!JSIConverter<std::optional<bool>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "sourceMuted")))) return false;
+      if (!JSIConverter<std::optional<bool>>::canConvert(runtime, obj.getProperty(runtime, PropNameIDCache::get(runtime, "voiceoverMuted")))) return false;
       return true;
     }
   };

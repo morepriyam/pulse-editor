@@ -170,6 +170,22 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
     };
   }
   
+  // pragma MARK: std::function<void()>
+  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PulseEditor::Func_void::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)]() mutable -> void {
+      swiftClosure.call();
+    };
+  }
+
+  // pragma MARK: std::function<void(const VoiceoverTake& /* result */)>
+  Func_void_VoiceoverTake create_Func_void_VoiceoverTake(void* NON_NULL swiftClosureWrapper) noexcept {
+    auto swiftClosure = PulseEditor::Func_void_VoiceoverTake::fromUnsafe(swiftClosureWrapper);
+    return [swiftClosure = std::move(swiftClosure)](const VoiceoverTake& result) mutable -> void {
+      swiftClosure.call(result);
+    };
+  }
+
   // pragma MARK: std::function<void(const std::string& /* result */)>
   Func_void_std__string create_Func_void_std__string(void* NON_NULL swiftClosureWrapper) noexcept {
     auto swiftClosure = PulseEditor::Func_void_std__string::fromUnsafe(swiftClosureWrapper);

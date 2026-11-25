@@ -71,6 +71,22 @@ abstract class HybridPulsePreviewSpec: HybridView() {
   // Methods
   @DoNotStrip
   @Keep
+  abstract fun prepareVoiceover(): Promise<Unit>
+
+  @DoNotStrip
+  @Keep
+  abstract fun startVoiceover(): Promise<Double>
+
+  @DoNotStrip
+  @Keep
+  abstract fun stopVoiceover(): Promise<VoiceoverTake>
+
+  @DoNotStrip
+  @Keep
+  abstract fun cancelVoiceover(): Unit
+
+  @DoNotStrip
+  @Keep
   abstract fun play(): Unit
   
   @DoNotStrip

@@ -42,6 +42,8 @@ namespace margelo::nitro::pulseeditor { struct MergeClip; }
 namespace margelo::nitro::pulseeditor { struct MergeOptions; }
 // Forward declaration of `MergeAudio` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { struct MergeAudio; }
+// Forward declaration of `VoiceoverAudio` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct VoiceoverAudio; }
 // Forward declaration of `HybridConformJobSpec` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { class HybridConformJobSpec; }
 // Forward declaration of `ConformOptions` to properly resolve imports.
@@ -72,6 +74,7 @@ namespace margelo::nitro::pulseeditor { class HybridSeekBenchSpec; }
 #include "MergeClip.hpp"
 #include "MergeOptions.hpp"
 #include "MergeAudio.hpp"
+#include "VoiceoverAudio.hpp"
 #include "HybridConformJobSpec.hpp"
 #include "ConformOptions.hpp"
 #include "ImageClipOptions.hpp"

@@ -31,6 +31,9 @@ import kotlinx.coroutines.withContext
 object Merge {
   suspend fun run(context: Context, clips: List<MergeClip>, options: MergeOptions, progress: MergeProgress): MergeResult {
     if (clips.isEmpty()) throw MergeException("No clips to merge.")
+    if (options.voiceoverMuted != true && !options.voiceover.isNullOrEmpty()) {
+      throw MergeException("Voiceover export is currently supported on iOS only.")
+    }
     removeStaleOutputs(context)
     progress(0.0)
     val probed = coroutineScope {

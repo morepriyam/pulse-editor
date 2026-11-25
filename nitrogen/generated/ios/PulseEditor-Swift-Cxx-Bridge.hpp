@@ -58,6 +58,10 @@ namespace margelo::nitro::pulseeditor { struct SeekBenchSeek; }
 namespace margelo::nitro::pulseeditor { struct Thumbnail; }
 // Forward declaration of `Transfer` to properly resolve imports.
 namespace margelo::nitro::pulseeditor { enum class Transfer; }
+// Forward declaration of `VoiceoverAudio` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct VoiceoverAudio; }
+// Forward declaration of `VoiceoverTake` to properly resolve imports.
+namespace margelo::nitro::pulseeditor { struct VoiceoverTake; }
 
 // Forward declarations of Swift defined types
 // Forward declaration of `HybridConformJobSpec_cxx` to properly resolve imports.
@@ -96,6 +100,8 @@ namespace PulseEditor { class HybridSeekBenchSpec_cxx; }
 #include "SeekBenchSeek.hpp"
 #include "Thumbnail.hpp"
 #include "Transfer.hpp"
+#include "VoiceoverAudio.hpp"
+#include "VoiceoverTake.hpp"
 #include <NitroModules/ArrayBuffer.hpp>
 #include <NitroModules/ArrayBufferHolder.hpp>
 #include <NitroModules/Promise.hpp>
@@ -590,6 +596,47 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
     return vector;
   }
   
+  // pragma MARK: std::vector<VoiceoverAudio>
+  /**
+   * Specialized version of `std::vector<VoiceoverAudio>`.
+   */
+  using std__vector_VoiceoverAudio_ = std::vector<VoiceoverAudio>;
+  inline std::vector<VoiceoverAudio> create_std__vector_VoiceoverAudio_(size_t size) noexcept {
+    std::vector<VoiceoverAudio> vector;
+    vector.reserve(size);
+    return vector;
+  }
+
+  // pragma MARK: std::optional<std::vector<VoiceoverAudio>>
+  /**
+   * Specialized version of `std::optional<std::vector<VoiceoverAudio>>`.
+   */
+  using std__optional_std__vector_VoiceoverAudio__ = std::optional<std::vector<VoiceoverAudio>>;
+  inline std::optional<std::vector<VoiceoverAudio>> create_std__optional_std__vector_VoiceoverAudio__(const std::vector<VoiceoverAudio>& value) noexcept {
+    return std::optional<std::vector<VoiceoverAudio>>(value);
+  }
+  inline bool has_value_std__optional_std__vector_VoiceoverAudio__(const std::optional<std::vector<VoiceoverAudio>>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline std::vector<VoiceoverAudio> get_std__optional_std__vector_VoiceoverAudio__(const std::optional<std::vector<VoiceoverAudio>>& optional) noexcept {
+    return optional.value();
+  }
+
+  // pragma MARK: std::optional<bool>
+  /**
+   * Specialized version of `std::optional<bool>`.
+   */
+  using std__optional_bool_ = std::optional<bool>;
+  inline std::optional<bool> create_std__optional_bool_(const bool& value) noexcept {
+    return std::optional<bool>(value);
+  }
+  inline bool has_value_std__optional_bool_(const std::optional<bool>& optional) noexcept {
+    return optional.has_value();
+  }
+  inline bool get_std__optional_bool_(const std::optional<bool>& optional) noexcept {
+    return optional.value();
+  }
+
   // pragma MARK: std::shared_ptr<HybridPulseEditorSpec>
   /**
    * Specialized version of `std::shared_ptr<HybridPulseEditorSpec>`.
@@ -724,6 +771,40 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
     return Func_void_PreviewStatus_Wrapper(std::move(value));
   }
   
+  // pragma MARK: std::shared_ptr<Promise<void>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<void>>`.
+   */
+  using std__shared_ptr_Promise_void__ = std::shared_ptr<Promise<void>>;
+  inline std::shared_ptr<Promise<void>> create_std__shared_ptr_Promise_void__() noexcept {
+    return Promise<void>::create();
+  }
+  inline PromiseHolder<void> wrap_std__shared_ptr_Promise_void__(std::shared_ptr<Promise<void>> promise) noexcept {
+    return PromiseHolder<void>(std::move(promise));
+  }
+
+  // pragma MARK: std::function<void()>
+  /**
+   * Specialized version of `std::function<void()>`.
+   */
+  using Func_void = std::function<void()>;
+  /**
+   * Wrapper class for a `std::function<void()>`, this can be used from Swift.
+   */
+  class Func_void_Wrapper final {
+  public:
+    explicit Func_void_Wrapper(std::function<void()>&& func): _function(std::make_unique<std::function<void()>>(std::move(func))) {}
+    inline void call() const noexcept {
+      _function->operator()();
+    }
+  private:
+    std::unique_ptr<std::function<void()>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void create_Func_void(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_Wrapper wrap_Func_void(Func_void value) noexcept {
+    return Func_void_Wrapper(std::move(value));
+  }
+
   // pragma MARK: std::shared_ptr<Promise<double>>
   /**
    * Specialized version of `std::shared_ptr<Promise<double>>`.
@@ -736,6 +817,40 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
     return PromiseHolder<double>(std::move(promise));
   }
   
+  // pragma MARK: std::shared_ptr<Promise<VoiceoverTake>>
+  /**
+   * Specialized version of `std::shared_ptr<Promise<VoiceoverTake>>`.
+   */
+  using std__shared_ptr_Promise_VoiceoverTake__ = std::shared_ptr<Promise<VoiceoverTake>>;
+  inline std::shared_ptr<Promise<VoiceoverTake>> create_std__shared_ptr_Promise_VoiceoverTake__() noexcept {
+    return Promise<VoiceoverTake>::create();
+  }
+  inline PromiseHolder<VoiceoverTake> wrap_std__shared_ptr_Promise_VoiceoverTake__(std::shared_ptr<Promise<VoiceoverTake>> promise) noexcept {
+    return PromiseHolder<VoiceoverTake>(std::move(promise));
+  }
+
+  // pragma MARK: std::function<void(const VoiceoverTake& /* result */)>
+  /**
+   * Specialized version of `std::function<void(const VoiceoverTake&)>`.
+   */
+  using Func_void_VoiceoverTake = std::function<void(const VoiceoverTake& /* result */)>;
+  /**
+   * Wrapper class for a `std::function<void(const VoiceoverTake& / * result * /)>`, this can be used from Swift.
+   */
+  class Func_void_VoiceoverTake_Wrapper final {
+  public:
+    explicit Func_void_VoiceoverTake_Wrapper(std::function<void(const VoiceoverTake& /* result */)>&& func): _function(std::make_unique<std::function<void(const VoiceoverTake& /* result */)>>(std::move(func))) {}
+    inline void call(VoiceoverTake result) const noexcept {
+      _function->operator()(result);
+    }
+  private:
+    std::unique_ptr<std::function<void(const VoiceoverTake& /* result */)>> _function;
+  } SWIFT_NONCOPYABLE;
+  Func_void_VoiceoverTake create_Func_void_VoiceoverTake(void* NON_NULL swiftClosureWrapper) noexcept;
+  inline Func_void_VoiceoverTake_Wrapper wrap_Func_void_VoiceoverTake(Func_void_VoiceoverTake value) noexcept {
+    return Func_void_VoiceoverTake_Wrapper(std::move(value));
+  }
+
   // pragma MARK: std::shared_ptr<Promise<std::string>>
   /**
    * Specialized version of `std::shared_ptr<Promise<std::string>>`.
@@ -782,6 +897,15 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
   using std__weak_ptr_HybridPulsePreviewSpec_ = std::weak_ptr<HybridPulsePreviewSpec>;
   inline std__weak_ptr_HybridPulsePreviewSpec_ weakify_std__shared_ptr_HybridPulsePreviewSpec_(const std::shared_ptr<HybridPulsePreviewSpec>& strong) noexcept { return strong; }
   
+  // pragma MARK: Result<std::shared_ptr<Promise<void>>>
+  using Result_std__shared_ptr_Promise_void___ = Result<std::shared_ptr<Promise<void>>>;
+  inline Result_std__shared_ptr_Promise_void___ create_Result_std__shared_ptr_Promise_void___(const std::shared_ptr<Promise<void>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<void>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_void___ create_Result_std__shared_ptr_Promise_void___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<void>>>::withError(error);
+  }
+
   // pragma MARK: Result<std::shared_ptr<Promise<double>>>
   using Result_std__shared_ptr_Promise_double___ = Result<std::shared_ptr<Promise<double>>>;
   inline Result_std__shared_ptr_Promise_double___ create_Result_std__shared_ptr_Promise_double___(const std::shared_ptr<Promise<double>>& value) noexcept {
@@ -791,6 +915,15 @@ namespace margelo::nitro::pulseeditor::bridge::swift {
     return Result<std::shared_ptr<Promise<double>>>::withError(error);
   }
   
+  // pragma MARK: Result<std::shared_ptr<Promise<VoiceoverTake>>>
+  using Result_std__shared_ptr_Promise_VoiceoverTake___ = Result<std::shared_ptr<Promise<VoiceoverTake>>>;
+  inline Result_std__shared_ptr_Promise_VoiceoverTake___ create_Result_std__shared_ptr_Promise_VoiceoverTake___(const std::shared_ptr<Promise<VoiceoverTake>>& value) noexcept {
+    return Result<std::shared_ptr<Promise<VoiceoverTake>>>::withValue(value);
+  }
+  inline Result_std__shared_ptr_Promise_VoiceoverTake___ create_Result_std__shared_ptr_Promise_VoiceoverTake___(const std::exception_ptr& error) noexcept {
+    return Result<std::shared_ptr<Promise<VoiceoverTake>>>::withError(error);
+  }
+
   // pragma MARK: Result<std::shared_ptr<Promise<std::string>>>
   using Result_std__shared_ptr_Promise_std__string___ = Result<std::shared_ptr<Promise<std::string>>>;
   inline Result_std__shared_ptr_Promise_std__string___ create_Result_std__shared_ptr_Promise_std__string___(const std::shared_ptr<Promise<std::string>>& value) noexcept {

@@ -25,7 +25,7 @@ enum Join {
     guard let videoOut = composition.addMutableTrack(withMediaType: .video, preferredTrackID: kCMPersistentTrackID_Invalid) else {
       throw MergeError.failed("Couldn't create the video track.")
     }
-    let hasAudio = segments.contains { !$0.muted && $0.media.audioTrack != nil }
+    let hasAudio = options.sourceMuted != true && segments.contains { !$0.muted && $0.media.audioTrack != nil }
     var audioOut = hasAudio
       ? [composition.addMutableTrack(withMediaType: .audio, preferredTrackID: kCMPersistentTrackID_Invalid)].compactMap { $0 }
       : []
@@ -57,6 +57,11 @@ enum Join {
       }
       cursor = cursor + range.duration
     }
+    // Only the final join sees narration. Per-clip renders keep their source sound, then this
+    // shared timeline insertion mixes it without stretching narration at clip speed changes.
+    let narration = options.voiceoverMuted == true ? [] : options.voiceover ?? []
+    let narrationTracks = try await Timeline.insertVoiceover(narration, into: composition, duration: cursor)
+    audioOut += narrationTracks
     try Task.checkCancellation()
 
     let output = try output ?? Merge.outputURL()
@@ -67,7 +72,7 @@ enum Join {
       // The composition reads the encoded audio through this asset; a track doesn't keep its
       // asset alive, so hold it until the export is done.
       var encodedAsset: AVAsset?
-      if !audioOut.isEmpty, encodeAudio || audioPieces > 1 || audioGap {
+      if !audioOut.isEmpty, encodeAudio || audioPieces > 1 || audioGap || !narrationTracks.isEmpty {
         let url = output.deletingPathExtension().appendingPathExtension("audio.mp4")
         encodedAudio = url
         try await AudioEncode.run(composition, audio: options.audio, to: url) { progress($0 * 0.3) }

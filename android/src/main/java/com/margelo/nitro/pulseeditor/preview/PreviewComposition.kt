@@ -30,7 +30,7 @@ import kotlin.math.roundToLong
 @OptIn(UnstableApi::class)
 internal object PreviewComposition {
   fun build(clips: List<MergeClip>, media: List<ProbeResult>, width: Int, height: Int, fps: Double): Composition {
-    val options = MergeOptions(width.toDouble(), height.toDouble(), fps, 5_000_000.0, MergeAudio(48_000.0, 2.0))
+    val options = MergeOptions(width.toDouble(), height.toDouble(), fps, 5_000_000.0, MergeAudio(48_000.0, 2.0), null, null, null)
     val pairs = clips.zip(media)
     val video = EditedMediaItemSequence.Builder(setOf(C.TRACK_TYPE_VIDEO))
       .addItems(pairs.map { (clip, m) -> MergeExport.videoItem(clip, m, options).withSourceDuration(m) })

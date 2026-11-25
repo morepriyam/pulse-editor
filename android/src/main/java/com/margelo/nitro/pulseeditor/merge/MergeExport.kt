@@ -88,7 +88,7 @@ internal object MergeExport {
   private fun composition(clips: List<MergeClip>, media: List<ProbeResult>, options: MergeOptions, join: Boolean): Composition {
     val pairs = clips.zip(media)
     // Declare audio only when some clip has sound: muted or silent clips then get silence.
-    val hasAudio = pairs.any { (clip, m) -> !clip.muted && m.audio != null }
+    val hasAudio = options.sourceMuted != true && pairs.any { (clip, m) -> !clip.muted && m.audio != null }
     val builder = if (join) {
       // Video copied in its own sequence, audio encoded in a parallel one (copied AAC keeps each
       // source's end padding, which can't be cut mid-frame, so every clip would push the next
